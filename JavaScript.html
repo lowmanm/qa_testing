@@ -542,7 +542,7 @@ function handleEvaluationSubmit(e) {
             <button class="view-evaluation-button btn btn-sm btn-primary"
               data-evaluation-id="${evaluation.id}">View</button>
 
-            ${evaluation.status === 'completed' && !evaluation.hasResolvedDispute ?
+            ${evaluation.status === 'completed' ? 
   `<button class="dispute-button btn btn-sm btn-danger ml-2"
     data-evaluation-id="${evaluation.id}">Dispute</button>` : ''}
           </td>
