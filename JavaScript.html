@@ -347,6 +347,9 @@ function showEvaluationForm(auditId) {
         form.setAttribute('data-reference-number', audit.referenceNumber || '');
         form.setAttribute('data-task-type', audit.taskType || '');
         form.setAttribute('data-outcome', audit.outcome || '');
+      setTimeout(() => {
+  loadQuestionsForEvaluation(audit.taskType);
+}, 0);
 
         // Load questions for this task type
         loadQuestionsForEvaluation(audit.taskType);
@@ -359,33 +362,39 @@ function loadQuestionsForEvaluation(taskType, attempt = 1) {
   const maxRetries = 5;
   const questionsContainer = document.getElementById('questions');
 
+  console.log(`Attempting to load questions for "${taskType}", Attempt: ${attempt}`);
+
   if (!questionsContainer) {
-  console.warn(`Attempt ${attempt}: Questions container not found`);
-  if (attempt < maxRetries) {
-    setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
-  } else {
-    const evalFormView = document.getElementById('evaluationFormView');
-if (evalFormView) {
-  evalFormView.innerHTML = `
-    <div class="alert alert-danger">
-      Failed to load questions for this task. Please try again.
-      <button id="retryLoadQuestions" class="btn btn-sm btn-warning ml-2">Try Again</button>
-    </div>
-  `;
-  document.getElementById('retryLoadQuestions').addEventListener('click', () => {
-    // Reload the view and try again
-    showEvaluationForm(document.getElementById('evaluationForm').getAttribute('data-audit-id'));
-  });
-} else {
-      alert('Unable to load questions. Please return to the Audit Queue and try again.');
+    console.warn(`Attempt ${attempt}: Questions container not found`);
+    
+    if (attempt < maxRetries) {
+      setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
+    } else {
+      const evalFormView = document.getElementById('evaluationFormView');
+      if (evalFormView) {
+        evalFormView.innerHTML = `
+          <div class="alert alert-danger">
+            Failed to load questions for this task. Please try again.
+            <button id="retryLoadQuestions" class="btn btn-sm btn-warning ml-2">Try Again</button>
+          </div>
+        `;
+        document.getElementById('retryLoadQuestions')?.addEventListener('click', () => {
+          const auditId = document.getElementById('evaluationForm')?.getAttribute('data-audit-id');
+          if (auditId) {
+            showEvaluationForm(auditId);
+          } else {
+            alert("Audit ID missing. Please return to the audit queue.");
+          }
+        });
+      } else {
+        alert('Unable to load questions. Please return to the Audit Queue and try again.');
+      }
     }
+    return;
   }
-  return;
-}
 
   questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
 
-  // Get questions for this task type
   google.script.run.withSuccessHandler(function (questions) {
     let maxPossibleScore = 0;
 
@@ -434,9 +443,7 @@ if (evalFormView) {
       questionsContainer.appendChild(questionElement);
     });
 
-    // Store the maximum possible score
     document.getElementById('evaluationForm').setAttribute('data-max-score', maxPossibleScore);
-
   }).getQuestionsForTaskType(taskType);
 }
 
