@@ -612,8 +612,9 @@ function viewEvaluation(evaluationId) {
     container.innerHTML = '';
     evaluation.questions.forEach(q => {
       const responseLabel = q.response === 'yes' ? 'Yes' : 'No';
+      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
       container.innerHTML += `
-        <div class="question-card">
+        <div class="question-card ${highlightClass}">
           <div class="question-header">
             <h3 class="question-text">${q.questionText}</h3>
             <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
