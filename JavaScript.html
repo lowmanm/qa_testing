@@ -538,6 +538,7 @@ function handleEvaluationSubmit(e) {
       updateAuditStatusAndLock(auditId, 'evaluated')
         .then(() => {
           alert('Evaluation saved and audit unlocked successfully!');
+          resetEvaluationForm();   // <-- 🔁 Clear the form here
           // Cleanup UI
           document.getElementById('evaluationLoadingIndicator')?.remove();
           form.classList.remove('hidden');
@@ -690,6 +691,31 @@ function viewEvaluation(evaluationId) {
 document.getElementById('closeViewEvaluation').addEventListener('click', function() {
   showEvaluations();
 });
+
+function resetEvaluationForm() {
+  const form = document.getElementById('evaluationForm');
+  form.reset(); // Resets input values and radio buttons
+
+  // Clear all dynamic question cards
+  const questionsContainer = document.getElementById('questions');
+  if (questionsContainer) {
+    questionsContainer.innerHTML = '';
+  }
+
+  // Clear overall feedback textarea
+  const feedbackField = document.getElementById('feedback');
+  if (feedbackField) {
+    feedbackField.value = '';
+  }
+
+  // Remove form-level data attributes
+  form.removeAttribute('data-audit-id');
+  form.removeAttribute('data-reference-number');
+  form.removeAttribute('data-task-type');
+  form.removeAttribute('data-outcome');
+  form.removeAttribute('data-max-score');
+}
+
 
   // Show dispute form
   // Show dispute form
