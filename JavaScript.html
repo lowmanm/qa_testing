@@ -393,7 +393,7 @@ function loadQuestionsForEvaluation(taskType) {
                 <div class="question-body">
                     <div class="radio-group">
                         <label>
-                            <input type="radio" name="question_${question.id}" value="yes" required>
+                            <input type="radio" name="question_${question.id}" value="yes">
                             <span>Yes</span>
                         </label>
                         <label>
@@ -435,6 +435,22 @@ function handleEvaluationSubmit(e) {
     var taskType = form.getAttribute('data-task-type');
     var outcome = form.getAttribute('data-outcome');
     var feedback = document.getElementById('feedback').value;
+
+  // Manual validation: Check if every question has a selected answer
+let allAnswered = true;
+document.querySelectorAll('.question-card').forEach(function(questionCard) {
+  const questionId = questionCard.getAttribute('data-question-id');
+  const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
+  if (!selectedOption) {
+    allAnswered = false;
+  }
+});
+
+if (!allAnswered) {
+  alert("Please answer all questions before submitting the evaluation.");
+  return;
+}
+
 
     // Calculate score and collect results
     var score = 0;
