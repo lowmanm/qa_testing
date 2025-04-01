@@ -1114,3 +1114,11 @@ function resolveDispute(payload) {
   CacheService.getScriptCache().removeAll(['all_evaluations', 'all_disputes']);
 }
 
+function getAllEvaluationsAndDisputes() {
+  return {
+    evaluations: getAllEvaluations(), // assumes this function already exists
+    disputes: getAllDisputes()        // assumes this function already exists
+  };
+}
+
+
