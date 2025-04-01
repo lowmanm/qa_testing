@@ -347,9 +347,6 @@ function showEvaluationForm(auditId) {
         form.setAttribute('data-reference-number', audit.referenceNumber || '');
         form.setAttribute('data-task-type', audit.taskType || '');
         form.setAttribute('data-outcome', audit.outcome || '');
-      setTimeout(() => {
-  loadQuestionsForEvaluation(audit.taskType);
-}, 0);
 
         // Load questions for this task type
         setTimeout(() => {
