@@ -356,72 +356,78 @@ function showEvaluationForm(auditId) {
 
 
   // Load questions for evaluation
-function loadQuestionsForEvaluation(taskType) {
-    var questionsContainer = document.getElementById('questions');
+// Load questions for evaluation
+function loadQuestionsForEvaluation(taskType, attempt = 1) {
+  const maxRetries = 5;
+  const questionsContainer = document.getElementById('questions');
 
-    if (!questionsContainer) {
-        console.error('Questions container not found');
-        return;
+  if (!questionsContainer) {
+    console.warn(`Attempt ${attempt}: Questions container not found`);
+    if (attempt < maxRetries) {
+      setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
+    } else {
+      alert('Unable to load questions for evaluation. Please refresh the page.');
+    }
+    return;
+  }
+
+  questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
+
+  // Get questions for this task type
+  google.script.run.withSuccessHandler(function (questions) {
+    let maxPossibleScore = 0;
+
+    if (questions.length === 0) {
+      questionsContainer.innerHTML = '<div class="alert alert-warning">No questions found for this task type.</div>';
+      return;
     }
 
-    questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
+    questionsContainer.innerHTML = '';
 
-    // Get questions for this task type
-    google.script.run.withSuccessHandler(function(questions) {
-        var maxPossibleScore = 0;
+    questions.forEach(function (question) {
+      if (question.pointsPossible > 0) {
+        maxPossibleScore += parseInt(question.pointsPossible);
+      }
 
-        if (questions.length === 0) {
-            questionsContainer.innerHTML = '<div class="alert alert-warning">No questions found for this task type.</div>';
-            return;
-        }
+      const questionElement = document.createElement('div');
+      questionElement.className = 'question-card';
 
-        questionsContainer.innerHTML = '';
+      questionElement.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${question.questionText}</h3>
+          <span class="question-points">Points: ${question.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="question_${question.id}" value="yes" required>
+              <span>Yes</span>
+            </label>
+            <label>
+              <input type="radio" name="question_${question.id}" value="no">
+              <span>No</span>
+            </label>
+          </div>
+          <div class="feedback-field">
+            <label for="feedback_${question.id}">Specific Feedback:</label>
+            <textarea id="feedback_${question.id}" name="feedback_${question.id}" rows="2" class="form-control"></textarea>
+          </div>
+        </div>
+      `;
 
-        questions.forEach(function(question) {
-            if (question.pointsPossible > 0) {
-                maxPossibleScore += parseInt(question.pointsPossible);
-            }
+      questionElement.setAttribute('data-question-id', question.id);
+      questionElement.setAttribute('data-question-text', question.questionText);
+      questionElement.setAttribute('data-points-possible', question.pointsPossible);
 
-            var questionElement = document.createElement('div');
-            questionElement.className = 'question-card';
+      questionsContainer.appendChild(questionElement);
+    });
 
-            var questionHtml = `
-                <div class="question-header">
-                    <h3 class="question-text">${question.questionText}</h3>
-                    <span class="question-points">Points: ${question.pointsPossible}</span>
-                </div>
-                <div class="question-body">
-                    <div class="radio-group">
-                        <label>
-                            <input type="radio" name="question_${question.id}" value="yes">
-                            <span>Yes</span>
-                        </label>
-                        <label>
-                            <input type="radio" name="question_${question.id}" value="no">
-                            <span>No</span>
-                        </label>
-                    </div>
-                    <div class="feedback-field">
-                        <label for="feedback_${question.id}">Specific Feedback:</label>
-                        <textarea id="feedback_${question.id}" name="feedback_${question.id}" rows="2" class="form-control"></textarea>
-                    </div>
-                </div>
-            `;
+    // Store the maximum possible score
+    document.getElementById('evaluationForm').setAttribute('data-max-score', maxPossibleScore);
 
-            questionElement.innerHTML = questionHtml;
-            questionsContainer.appendChild(questionElement);
-
-            // Store the question data as a data attribute
-            questionElement.setAttribute('data-question-id', question.id);
-            questionElement.setAttribute('data-question-text', question.questionText);
-            questionElement.setAttribute('data-points-possible', question.pointsPossible);
-        });
-
-        // Store the maximum possible score as a data attribute on the form
-        document.getElementById('evaluationForm').setAttribute('data-max-score', maxPossibleScore);
-
-    }).getQuestionsForTaskType(taskType);
+  }).getQuestionsForTaskType(taskType);
 }
+
 
 // Handle evaluation form submission
 function handleEvaluationSubmit(e) {
