@@ -196,6 +196,32 @@
         </div>
       </div>
 
+      <div id="resolveDisputeView" class="view hidden">
+  <div class="card">
+    <h2>Resolve Dispute</h2>
+    <div id="resolveEvaluationDetails" class="evaluation-details mb-4">
+      Loading evaluation...
+    </div>
+
+    <form id="resolveDisputeForm">
+      <div id="resolveDisputeQuestions" class="questions-container mb-4">
+        Loading disputed questions...
+      </div>
+
+      <div class="form-group mb-3">
+        <label for="resolutionNotes">Overall Notes (optional)</label>
+        <textarea id="resolutionNotes" name="resolutionNotes" rows="3" class="form-control"></textarea>
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn btn-secondary" onclick="showDisputes()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Resolution</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
       <div id="adminView" class="view hidden">
         <div class="card">
           <h2>Admin Panel</h2>
