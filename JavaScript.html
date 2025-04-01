@@ -1,6 +1,6 @@
+<script>
 // Frontend Logic - Optimized
 
-// On page load
 document.addEventListener('DOMContentLoaded', function () {
   initializeApp();
   bindNavigation();
@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', function () {
   startLiveSync();
 });
 
-// Initialize app view and user
 function initializeApp() {
   google.script.run.withSuccessHandler(function (user) {
     document.getElementById('userName').textContent = user.name;
@@ -16,8 +15,6 @@ function initializeApp() {
 
     if (user.role === 'admin' || user.role === 'qa_manager') {
       document.getElementById('navAdmin').style.display = 'block';
-    } else {
-      document.getElementById('navAdmin').style.display = 'none';
     }
 
     if (user.role === 'qa_analyst' || user.role === 'qa_manager') {
@@ -59,11 +56,76 @@ function cancelEvaluation() {
   google.script.run.withSuccessHandler(showAuditQueue).updateAuditStatusAndLock(auditId, 'pending');
 }
 
+function handleEvaluationSubmit(event) {
+  event.preventDefault();
+
+  const form = document.getElementById('evaluationForm');
+  const auditId = form.getAttribute('data-audit-id');
+  const taskType = form.getAttribute('data-task-type');
+  const referenceNumber = form.getAttribute('data-reference-number');
+  const outcome = form.getAttribute('data-outcome');
+  const maxScore = parseInt(form.getAttribute('data-max-score'));
+
+  const feedback = form.feedback.value.trim();
+  const qaEmail = document.getElementById('userName').textContent;
+
+  const questions = Array.from(document.querySelectorAll('.question-card')).map(card => {
+    const questionId = card.getAttribute('data-question-id');
+    const questionText = card.getAttribute('data-question-text');
+    const pointsPossible = parseInt(card.getAttribute('data-points-possible'));
+    const response = form[`question_${questionId}`]?.value;
+    const feedbackText = form[`feedback_${questionId}`]?.value || '';
+
+    return {
+      questionId,
+      questionText,
+      response,
+      pointsEarned: response === 'yes' ? pointsPossible : 0,
+      pointsPossible,
+      feedback: feedbackText
+    };
+  });
+
+  if (questions.some(q => !q.response)) {
+    alert('Please answer all questions before submitting.');
+    return;
+  }
+
+  const totalPoints = questions.reduce((sum, q) => sum + q.pointsEarned, 0);
+
+  const evaluation = {
+    auditId,
+    taskType,
+    referenceNumber,
+    outcome,
+    qaEmail,
+    startTimestamp: new Date().toISOString(),
+    totalPoints,
+    totalPointsPossible: maxScore,
+    status: 'completed',
+    feedback,
+    questions
+  };
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving...';
+
+  google.script.run.withSuccessHandler(() => {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Evaluation';
+    showAuditQueue();
+  }).withFailureHandler((err) => {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Evaluation';
+    alert('Error saving evaluation: ' + err.message);
+  }).saveEvaluation(evaluation);
+}
+
 function showDashboard() {
   hideAllViews();
   document.getElementById('dashboardView').classList.remove('hidden');
   highlightNavItem('navDashboard');
-  // Optionally reload stats
 }
 
 function showAuditQueue() {
@@ -92,9 +154,7 @@ function loadPendingTasks() {
         <td>${audit.referenceNumber || 'N/A'}</td>
         <td>${formatDate(audit.taskTimestamp)}</td>
         <td>${audit.auditStatus}</td>
-        <td>
-          <button class="btn btn-sm btn-primary" onclick="showEvaluationForm('${audit.auditId}')">Evaluate</button>
-        </td>
+        <td><button class="btn btn-sm btn-primary" onclick="showEvaluationForm('${audit.auditId}')">Evaluate</button></td>
       `;
       tableBody.appendChild(row);
     });
@@ -116,7 +176,6 @@ function showEvaluationForm(auditId) {
     form.setAttribute('data-reference-number', audit.referenceNumber || '');
     form.setAttribute('data-outcome', audit.outcome || '');
     form.setAttribute('data-max-score', calculateMaxScore(questions));
-
   }).prepareEvaluationWithQuestions(auditId);
 }
 
@@ -167,6 +226,160 @@ function calculateMaxScore(questions) {
   return questions.reduce((sum, q) => sum + parseInt(q.pointsPossible), 0);
 }
 
+function showEvaluations() {
+  hideAllViews();
+  document.getElementById('evaluationsView').classList.remove('hidden');
+  highlightNavItem('navEvaluations');
+  loadCompletedEvaluations();
+}
+
+function loadCompletedEvaluations() {
+  const tableBody = document.getElementById('evaluationsBody');
+  tableBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+
+  google.script.run.withSuccessHandler(function (evals) {
+    if (!evals.length) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No completed evaluations found</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = '';
+    evals.forEach(evalItem => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${formatTaskType(evalItem.taskType)}</td>
+        <td>${evalItem.agentEmail || 'N/A'}</td>
+        <td>${formatDate(evalItem.stopTimestamp)}</td>
+        <td>${evalItem.evalScore || '-'}</td>
+        <td>${evalItem.status}</td>
+        <td><button class="btn btn-sm btn-secondary" onclick="showDisputeForm('${evalItem.evalId}')">Dispute</button></td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }).getCompletedEvaluations();
+}
+
+function showDisputeForm(evalId) {
+  hideAllViews();
+  document.getElementById('disputeFormView').classList.remove('hidden');
+  const container = document.getElementById('disputeQuestions');
+  container.innerHTML = 'Loading...';
+
+  google.script.run.withSuccessHandler(function (result) {
+    const { evaluation, questions } = result;
+
+    document.getElementById('evaluationDetails').innerHTML = `
+      <strong>Agent:</strong> ${evaluation.agentEmail}<br>
+      <strong>Score:</strong> ${evaluation.totalPoints} / ${evaluation.totalPointsPossible}<br>
+      <strong>Feedback:</strong> ${evaluation.feedback || 'None'}
+    `;
+
+    container.innerHTML = '';
+    questions.forEach(q => {
+      const div = document.createElement('div');
+      div.className = 'dispute-question';
+      div.innerHTML = `
+        <label>
+          <input type="checkbox" name="disputeQ" value="${q.questionId}">
+          ${q.questionText}
+        </label>
+      `;
+      container.appendChild(div);
+    });
+
+    document.getElementById('disputeForm').onsubmit = function (e) {
+      e.preventDefault();
+      const reason = document.getElementById('disputeReason').value.trim();
+      const checked = Array.from(container.querySelectorAll('input[name="disputeQ"]:checked')).map(i => i.value);
+      if (!reason || !checked.length) {
+        alert('Please provide a reason and select questions.');
+        return;
+      }
+
+      const payload = {
+        evalId,
+        reason,
+        questionIds: checked,
+        userEmail: evaluation.agentEmail,
+        timestamp: new Date().toISOString()
+      };
+
+      google.script.run.withSuccessHandler(() => {
+        alert('Dispute submitted.');
+        showEvaluations();
+      }).submitDispute(payload);
+    };
+
+    // Render resolution form as well
+    renderDisputeResolutionForm(result.evaluation.id);
+  }).prepareDisputeForm(evalId);
+}
+
+function showDisputes() {
+  hideAllViews();
+  document.getElementById('disputesView').classList.remove('hidden');
+  highlightNavItem('navDisputes');
+  loadDisputesQueue();
+}
+
+function loadDisputesQueue() {
+  const tableBody = document.getElementById('disputesBody');
+  tableBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+
+  google.script.run.withSuccessHandler(function (disputes) {
+    if (!disputes.length) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending disputes found</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = '';
+    disputes.forEach(d => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${d.evalId}</td>
+        <td>${d.userEmail}</td>
+        <td>${formatDate(d.disputeTimestamp)}</td>
+        <td>${d.questionIds}</td>
+        <td>${d.status}</td>
+        <td><button class="btn btn-sm btn-outline" onclick="showDisputeForm('${d.evalId}')">Review</button></td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }).getAllDisputes();
+}
+
+function renderDisputeResolutionForm(disputeId) {
+  const container = document.getElementById('disputeResolutionForm');
+  container.innerHTML = `
+    <h3>Resolve Dispute</h3>
+    <form id="resolveForm">
+      <label><input type="radio" name="resolution" value="Stay" required> Keep Original Score (Stay)</label><br>
+      <label><input type="radio" name="resolution" value="Overturned"> Change Score (Overturned)</label>
+      <div style="margin-top: 10px;">
+        <label for="resolutionFeedback">Resolution Feedback (optional):</label><br>
+        <textarea id="resolutionFeedback" name="resolutionFeedback" rows="3" class="form-control"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Submit Resolution</button>
+    </form>
+  `;
+
+  document.getElementById('resolveForm').onsubmit = function (e) {
+    e.preventDefault();
+    const resolution = document.querySelector('input[name="resolution"]:checked')?.value;
+    const feedback = document.getElementById('resolutionFeedback').value.trim();
+
+    if (!resolution) {
+      alert('Please select a resolution.');
+      return;
+    }
+
+    google.script.run.withSuccessHandler(() => {
+      alert('Dispute resolved successfully.');
+      showDisputes();
+    }).resolveDispute(disputeId, resolution, feedback);
+  };
+}
+
 function hideAllViews() {
   document.querySelectorAll('.view').forEach(view => view.classList.add('hidden'));
 }
@@ -182,6 +395,11 @@ function formatTaskType(type) {
 }
 
 function formatDate(dateStr) {
+  if (!dateStr) return 'Unknown';
   const date = new Date(dateStr);
-  return isNaN(date) ? 'Invalid Date' : date.toLocaleDateString();
+  if (isNaN(date.getTime())) return dateStr;
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const cstDate = new Date(utc - 6 * 3600000);
+  return cstDate.toLocaleDateString() + ' ' + cstDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+</script>
