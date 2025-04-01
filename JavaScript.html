@@ -352,7 +352,15 @@ function showEvaluationForm(auditId) {
 }, 0);
 
         // Load questions for this task type
-        loadQuestionsForEvaluation(audit.taskType);
+        setTimeout(() => {
+  if (document.getElementById('questions')) {
+    loadQuestionsForEvaluation(audit.taskType);
+  } else {
+    console.warn("Questions container not found on initial load, retrying...");
+    setTimeout(() => loadQuestionsForEvaluation(audit.taskType), 200);
+  }
+}, 0);
+
 
     }).prepareEvaluation(auditId);
 }
