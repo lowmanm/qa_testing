@@ -354,22 +354,34 @@ function showEvaluationForm(auditId) {
     }).prepareEvaluation(auditId);
 }
 
-
-  // Load questions for evaluation
 // Load questions for evaluation
 function loadQuestionsForEvaluation(taskType, attempt = 1) {
   const maxRetries = 5;
   const questionsContainer = document.getElementById('questions');
 
   if (!questionsContainer) {
-    console.warn(`Attempt ${attempt}: Questions container not found`);
-    if (attempt < maxRetries) {
-      setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
+  console.warn(`Attempt ${attempt}: Questions container not found`);
+  if (attempt < maxRetries) {
+    setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
+  } else {
+    const evalFormView = document.getElementById('evaluationFormView');
+    if (evalFormView) {
+      evalFormView.innerHTML = `
+        <div class="alert alert-danger">
+          Failed to load questions for this task. Please try again.
+          <button id="retryLoadQuestions" class="btn btn-sm btn-warning ml-2">Try Again</button>
+        </div>
+      `;
+      document.getElementById('retryLoadQuestions').addEventListener('click', () => {
+        // Reload the view and try again
+        showEvaluationForm(document.getElementById('evaluationForm').getAttribute('data-audit-id'));
+      });
     } else {
-      alert('Unable to load questions for evaluation. Please refresh the page.');
+      alert('Unable to load questions. Please return to the Audit Queue and try again.');
     }
-    return;
   }
+  return;
+}
 
   questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
 
