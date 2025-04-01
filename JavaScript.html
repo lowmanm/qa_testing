@@ -1190,27 +1190,27 @@ function hideUserForm() {
     });
   }
 
-  function resolveDispute(disputeId) {
+ function resolveDispute(disputeId) {
   hideAllViews();
   document.getElementById('resolveDisputeView').classList.remove('hidden');
 
-google.script.run.withSuccessHandler(function(data) {
-  console.log("ALL DISPUTES:", data.disputes);
-  console.log("ALL EVALUATIONS:", data.evaluations);
-  console.log("Target Dispute ID:", disputeId);
+  google.script.run.withSuccessHandler(function(data) {
+    console.log("ALL DISPUTES:", data.disputes);
+    console.log("ALL EVALUATIONS:", data.evaluations);
+    console.log("Target Dispute ID:", disputeId);
 
-  const dispute = data.disputes.find(d => d.id === disputeId);
-  console.log("Matched Dispute:", dispute);
+    const dispute = data.disputes.find(d => d.id === disputeId);
+    console.log("Matched Dispute:", dispute);
 
-  const evaluation = dispute ? data.evaluations.find(e => {
-    console.log(`Checking evaluation: id=${e.id}, evalId=${e.evalId}, dispute.evalId=${dispute.evalId}`);
-    return e.id === dispute.evalId || e.evalId === dispute.evalId;
-  }) : null;
-  console.log("Matched Evaluation:", evaluation);
+    const evaluation = dispute ? data.evaluations.find(e => {
+      console.log(`Checking evaluation: id=${e.id}, evalId=${e.evalId}, dispute.evalId=${dispute.evalId}`);
+      return e.id === dispute.evalId || e.evalId === dispute.evalId;
+    }) : null;
+    console.log("Matched Evaluation:", evaluation);
 
-  if (!dispute || !evaluation) return alert("Dispute or evaluation not found");
+    if (!dispute || !evaluation) return alert("Dispute or evaluation not found");
 
-    // Set dispute status to "reviewing"
+    // Update status to "reviewing"
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
     // Show evaluation metadata
