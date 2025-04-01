@@ -6,7 +6,6 @@ function doGet(e) {
     .setTitle('QA Evaluation System')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 
-  // Deep-linking support for specific evaluation
   if (e.parameter && e.parameter.evaluationId) {
     page.addMetaTag('evaluationId', e.parameter.evaluationId);
   }
@@ -23,7 +22,6 @@ const CACHE_DURATION = 60; // seconds
 function getCachedOrFetch(cacheKey, fetchFunction) {
   const cache = CacheService.getScriptCache();
   const cachedData = cache.get(cacheKey);
-
   if (cachedData) {
     try {
       return JSON.parse(cachedData);
@@ -31,16 +29,20 @@ function getCachedOrFetch(cacheKey, fetchFunction) {
       Logger.log('Error parsing cached data: ' + e.message);
     }
   }
-
   const freshData = fetchFunction();
-
   try {
     cache.put(cacheKey, JSON.stringify(freshData), CACHE_DURATION);
   } catch (e) {
     Logger.log('Error caching data: ' + e.message);
   }
-
   return freshData;
+}
+
+function getSheetDataAsObjects(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift();
+  return data.map(row => Object.fromEntries(headers.map((h, i) => [h, row[i]])));
 }
 
 // USERS
@@ -139,12 +141,10 @@ function saveEvaluation(evaluation) {
   evaluation.stopTimestamp = new Date().toISOString();
   evaluation.evalScore = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
 
-  // Save summary
   const summaryHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const summaryRow = summaryHeaders.map(h => evaluation[h] || '');
   sheet.appendRow(summaryRow);
 
-  // Save questions
   evaluation.questions.forEach(q => {
     const questHeaders = questSheet.getRange(1, 1, 1, questSheet.getLastColumn()).getValues()[0];
     const questRow = questHeaders.map(h => q[h] || evaluation.evalId || '');
@@ -155,7 +155,6 @@ function saveEvaluation(evaluation) {
   return { success: true };
 }
 
-// NOTIFICATIONS
 function notifyAgentAndManager(evaluation) {
   const user = getUserByEmail(evaluation.agentEmail);
   const managerEmail = user?.managerEmail;
@@ -169,10 +168,61 @@ function notifyAgentAndManager(evaluation) {
   }
 }
 
-// UTILITIES
-function getSheetDataAsObjects(sheetName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+// EVALUATIONS VIEW
+function getCompletedEvaluations() {
+  const all = getSheetDataAsObjects('evalSummary');
+  return all.filter(e => e.status === 'completed');
+}
+
+// DISPUTES
+function prepareDisputeForm(evalId) {
+  const evalData = getSheetDataAsObjects('evalSummary').find(e => e.evalId === evalId);
+  const questionData = getSheetDataAsObjects('evalQuest').filter(q => q.evalId === evalId);
+  return { evaluation: evalData, questions: questionData };
+}
+
+function submitDispute(payload) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  const newRow = headers.map(h => {
+    if (h === 'id') return 'dispute_' + new Date().getTime();
+    if (h === 'evalId') return payload.evalId;
+    if (h === 'userEmail') return payload.userEmail;
+    if (h === 'disputeTimestamp') return payload.timestamp;
+    if (h === 'reason') return payload.reason;
+    if (h === 'questionIds') return payload.questionIds.join(',');
+    if (h === 'status') return 'pending';
+    return '';
+  });
+
+  sheet.appendRow(newRow);
+  return { success: true };
+}
+
+function getAllDisputes() {
+  return getSheetDataAsObjects('disputesQueue').filter(d => d.status === 'pending');
+}
+
+function resolveDispute(disputeId, resolution, feedback) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
   const data = sheet.getDataRange().getValues();
-  const headers = data.shift();
-  return data.map(row => Object.fromEntries(headers.map((h, i) => [h, row[i]])));
+  const headers = data[0];
+
+  const idIndex = headers.indexOf('id');
+  const statusIndex = headers.indexOf('status');
+  const resolutionIndex = headers.indexOf('resolution');
+  const feedbackIndex = headers.indexOf('resolutionFeedback');
+  const resolvedAtIndex = headers.indexOf('resolutionTimestamp');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIndex] === disputeId) {
+      sheet.getRange(i + 1, statusIndex + 1).setValue('resolved');
+      sheet.getRange(i + 1, resolutionIndex + 1).setValue(resolution);
+      sheet.getRange(i + 1, feedbackIndex + 1).setValue(feedback);
+      sheet.getRange(i + 1, resolvedAtIndex + 1).setValue(new Date().toISOString()); // renamed to resolutionTimestamp
+      return { success: true };
+    }
+  }
+  throw new Error('Dispute not found');
 }
