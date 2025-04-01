@@ -455,100 +455,104 @@ function loadQuestionsForEvaluation(taskType, attempt = 1) {
 
 // Handle evaluation form submission
 function handleEvaluationSubmit(e) {
-    e.preventDefault();
+  e.preventDefault();
 
-    // Get form data
-    var form = document.getElementById('evaluationForm');
-    var auditId = form.getAttribute('data-audit-id');
-    var maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
-    var referenceNumber = form.getAttribute('data-reference-number');
-    var taskType = form.getAttribute('data-task-type');
-    var outcome = form.getAttribute('data-outcome');
-    var feedback = document.getElementById('feedback').value;
+  var form = document.getElementById('evaluationForm');
+  var auditId = form.getAttribute('data-audit-id');
+  var maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
+  var referenceNumber = form.getAttribute('data-reference-number');
+  var taskType = form.getAttribute('data-task-type');
+  var outcome = form.getAttribute('data-outcome');
+  var feedback = document.getElementById('feedback').value;
 
-  // Manual validation: Check if every question has a selected answer
-let allAnswered = true;
-document.querySelectorAll('.question-card').forEach(function(questionCard) {
-  const questionId = questionCard.getAttribute('data-question-id');
-  const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
-  if (!selectedOption) {
-    allAnswered = false;
+  // Manual validation
+  let allAnswered = true;
+  document.querySelectorAll('.question-card').forEach(function(questionCard) {
+    const questionId = questionCard.getAttribute('data-question-id');
+    const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
+    if (!selectedOption) {
+      allAnswered = false;
+    }
+  });
+
+  if (!allAnswered) {
+    alert("Please answer all questions before submitting the evaluation.");
+    return;
   }
-});
 
-if (!allAnswered) {
-  alert("Please answer all questions before submitting the evaluation.");
-  return;
-}
+  // Calculate score and collect results
+  var score = 0;
+  var questions = [];
 
+  document.querySelectorAll('.question-card').forEach(function(questionCard) {
+    var questionId = questionCard.getAttribute('data-question-id');
+    var questionText = questionCard.getAttribute('data-question-text');
+    var pointsPossible = parseInt(questionCard.getAttribute('data-points-possible') || 0);
 
-    // Calculate score and collect results
-    var score = 0;
-    var questions = [];
+    var selectedOption = document.querySelector('input[name="question_' + questionId + '"]:checked');
+    var response = selectedOption ? selectedOption.value : 'no';
+    var questionFeedback = document.getElementById('feedback_' + questionId).value;
 
-    // Process each question
-    document.querySelectorAll('.question-card').forEach(function(questionCard) {
-        var questionId = questionCard.getAttribute('data-question-id');
-        var questionText = questionCard.getAttribute('data-question-text');
-        var pointsPossible = parseInt(questionCard.getAttribute('data-points-possible') || 0);
+    var pointsEarned = response === 'yes' ? pointsPossible : 0;
+    score += pointsEarned;
 
-        var selectedOption = document.querySelector('input[name="question_' + questionId + '"]:checked');
-        var response = selectedOption ? selectedOption.value : 'no';
-        var questionFeedback = document.getElementById('feedback_' + questionId).value;
-
-        // Calculate points earned based on response (yes/no) and possible points
-        var pointsEarned = response === 'yes' ? pointsPossible : 0;
-        score += pointsEarned;
-
-        questions.push({
-            questionId: questionId,
-            questionText: questionText,
-            response: response,
-            pointsEarned: pointsEarned,
-            pointsPossible: pointsPossible,
-            feedback: questionFeedback
-        });
+    questions.push({
+      questionId: questionId,
+      questionText: questionText,
+      response: response,
+      pointsEarned: pointsEarned,
+      pointsPossible: pointsPossible,
+      feedback: questionFeedback
     });
+  });
 
-    // Create evaluation object
-    var evaluationData = {
-        auditId: auditId,
-        referenceNumber: referenceNumber,
-        taskType: taskType,
-        outcome: outcome,
-        qaEmail: '', // Will be set server-side to current user
-        startTimestamp: new Date().toISOString(), // UTC
-        totalPoints: score,
-        totalPointsPossible: maxPossibleScore,
-        status: 'completed',
-        feedback: feedback,
-        questions: questions
-    };
+  var evaluationData = {
+    auditId: auditId,
+    referenceNumber: referenceNumber,
+    taskType: taskType,
+    outcome: outcome,
+    qaEmail: '',
+    startTimestamp: new Date().toISOString(),
+    totalPoints: score,
+    totalPointsPossible: maxPossibleScore,
+    status: 'completed',
+    feedback: feedback,
+    questions: questions
+  };
 
-    // Show loading state
-    form.innerHTML = '<div class="loading">Saving evaluation...</div>';
+  // ✅ Show loading indicator without destroying the form
+  form.classList.add('hidden');
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.id = 'evaluationLoadingIndicator';
+  loadingIndicator.className = 'loading';
+  loadingIndicator.innerText = 'Saving evaluation...';
+  document.getElementById('evaluationFormView').appendChild(loadingIndicator);
 
-    // Save the evaluation
-    google.script.run
-        .withSuccessHandler(function(result) {
-            // Update the audit status to "evaluated" and unlock the record
-            updateAuditStatusAndLock(auditId, 'evaluated')
-                .then(() => {
-                    alert('Evaluation saved and audit unlocked successfully!');
-                    showAuditQueue();
-                })
-                .catch(error => {
-                    console.error('Error updating audit status:', error);
-                    alert('Failed to unlock the record after saving evaluation. Please try again.');
-                });
+  // Save the evaluation
+  google.script.run
+    .withSuccessHandler(function(result) {
+      updateAuditStatusAndLock(auditId, 'evaluated')
+        .then(() => {
+          alert('Evaluation saved and audit unlocked successfully!');
+          // Cleanup UI
+          document.getElementById('evaluationLoadingIndicator')?.remove();
+          form.classList.remove('hidden');
+          showAuditQueue();
         })
-        .withFailureHandler(function(error) {
-            form.innerHTML = '<div class="alert alert-danger">Error saving evaluation: ' + error.message + '</div>';
-            setTimeout(function() {
-                showAuditQueue();
-            }, 3000);
-        })
-        .saveEvaluation(evaluationData);
+        .catch(error => {
+          console.error('Error updating audit status:', error);
+          alert('Failed to unlock the record after saving evaluation. Please try again.');
+          document.getElementById('evaluationLoadingIndicator')?.remove();
+          form.classList.remove('hidden');
+        });
+    })
+    .withFailureHandler(function(error) {
+      document.getElementById('evaluationLoadingIndicator')?.remove();
+      form.classList.remove('hidden');
+      alert('Error saving evaluation: ' + error.message);
+      showAuditQueue();
+    })
+    .saveEvaluation(evaluationData);
 }
 
   // Load evaluations
