@@ -1057,72 +1057,60 @@ function prepareEvaluation(auditId) {
 function resolveDispute(payload) {
   const { disputeId, evalId, decisions, resolutionNotes, status } = payload;
   const now = new Date().toISOString();
-  const user = Session.getActiveUser().getEmail() || 'system';
+  const user = Session.getActiveUser().getEmail();
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const disputesSheet = ss.getSheetByName('disputesQueue');
   const evalSheet = ss.getSheetByName('evalSummary');
   const questSheet = ss.getSheetByName('evalQuest');
 
-  // Update question-level scores
-  const questData = questSheet.getDataRange().getValues();
-  const questHeaders = questData[0];
-  const evalIdCol = questHeaders.indexOf('evalId');
-  const qIdCol = questHeaders.indexOf('questionId');
-  const earnedCol = questHeaders.indexOf('pointsEarned');
-  const feedbackCol = questHeaders.indexOf('feedback');
+  // 1. Update evalQuest scores & feedback
+  const qHeaders = questSheet.getRange(1, 1, 1, questSheet.getLastColumn()).getValues()[0];
+  const data = questSheet.getDataRange().getValues();
 
-  decisions.forEach(dec => {
-    for (let i = 1; i < questData.length; i++) {
-      if (questData[i][evalIdCol] === evalId && questData[i][qIdCol] === dec.questionId) {
-        if (dec.resolution === 'overturned') {
-          questSheet.getRange(i + 1, earnedCol + 1).setValue(questData[i][questHeaders.indexOf('pointsPossible')]);
-        }
-        if (dec.note) {
-          questSheet.getRange(i + 1, feedbackCol + 1).setValue(dec.note);
-        }
-        break;
-      }
+  const evalIdCol = qHeaders.indexOf('evalId');
+  const qIdCol = qHeaders.indexOf('questionId');
+  const earnedCol = qHeaders.indexOf('pointsEarned');
+  const feedbackCol = qHeaders.indexOf('feedback');
+  const pointsPossibleCol = qHeaders.indexOf('pointsPossible');
+
+  data.forEach((row, i) => {
+    if (row[evalIdCol] !== evalId) return;
+    const qMatch = decisions.find(d => d.questionId === row[qIdCol]);
+    if (!qMatch) return;
+
+    const rowIndex = i + 1;
+    if (qMatch.resolution === 'overturned') {
+      questSheet.getRange(rowIndex, earnedCol + 1).setValue(row[pointsPossibleCol]);
+    }
+    if (qMatch.note) {
+      questSheet.getRange(rowIndex, feedbackCol + 1).setValue(qMatch.note);
     }
   });
 
-  // Recalculate evaluation score
-  const updatedData = questSheet.getDataRange().getValues().filter(r => r[evalIdCol] === evalId);
-  const totalEarned = updatedData.reduce((sum, r) => sum + (parseInt(r[earnedCol]) || 0), 0);
-  const totalPossible = updatedData.reduce((sum, r) => sum + (parseInt(r[questHeaders.indexOf('pointsPossible')]) || 0), 0);
-
-  const evalData = evalSheet.getDataRange().getValues();
-  const evalHeaders = evalData[0];
-  const idCol = evalHeaders.indexOf('id');
-  const earnedIdx = evalHeaders.indexOf('totalPoints');
-  const possibleIdx = evalHeaders.indexOf('totalPointsPossible');
-  const scoreCol = evalHeaders.indexOf('evalScore');
-
-  for (let i = 1; i < evalData.length; i++) {
-    if (evalData[i][idCol] === evalId) {
-      evalSheet.getRange(i + 1, earnedIdx + 1).setValue(totalEarned);
-      evalSheet.getRange(i + 1, possibleIdx + 1).setValue(totalPossible);
-      evalSheet.getRange(i + 1, scoreCol + 1).setValue(`${Math.round((totalEarned / totalPossible) * 100)}%`);
-      break;
-    }
+  // 2. Update evalSummary score
+  const filtered = data.filter(r => r[evalIdCol] === evalId);
+  const totalEarned = filtered.reduce((sum, r) => sum + (parseInt(r[earnedCol]) || 0), 0);
+  const totalPossible = filtered.reduce((sum, r) => sum + (parseInt(r[pointsPossibleCol]) || 0), 0);
+  const evalHeaders = evalSheet.getRange(1, 1, 1, evalSheet.getLastColumn()).getValues()[0];
+  const rowIndexEval = evalSheet.getDataRange().getValues().findIndex(r => r[evalHeaders.indexOf('id')] === evalId);
+  if (rowIndexEval >= 1) {
+    evalSheet.getRange(rowIndexEval + 1, evalHeaders.indexOf('totalPoints') + 1).setValue(totalEarned);
+    evalSheet.getRange(rowIndexEval + 1, evalHeaders.indexOf('totalPointsPossible') + 1).setValue(totalPossible);
+    evalSheet.getRange(rowIndexEval + 1, evalHeaders.indexOf('evalScore') + 1)
+      .setValue(Math.round((totalEarned / totalPossible) * 100) + '%');
   }
 
-  // Update dispute record
-  const dispData = disputesSheet.getDataRange().getValues();
-  const dispHeaders = dispData[0];
-  const dispIdCol = dispHeaders.indexOf('id');
-
-  for (let i = 1; i < dispData.length; i++) {
-    if (dispData[i][dispIdCol] === disputeId) {
-      disputesSheet.getRange(i + 1, dispHeaders.indexOf('status') + 1).setValue(status);
-      disputesSheet.getRange(i + 1, dispHeaders.indexOf('resolutionNotes') + 1).setValue(resolutionNotes || '');
-      disputesSheet.getRange(i + 1, dispHeaders.indexOf('resolvedBy') + 1).setValue(user);
-      disputesSheet.getRange(i + 1, dispHeaders.indexOf('resolutionTimestamp') + 1).setValue(now);
-      break;
-    }
+  // 3. Update dispute resolution metadata
+  const dispHeaders = disputesSheet.getRange(1, 1, 1, disputesSheet.getLastColumn()).getValues()[0];
+  const rowIndexDispute = disputesSheet.getDataRange().getValues().findIndex(r => r[dispHeaders.indexOf('id')] === disputeId);
+  if (rowIndexDispute >= 1) {
+    disputesSheet.getRange(rowIndexDispute + 1, dispHeaders.indexOf('status') + 1).setValue(status);
+    disputesSheet.getRange(rowIndexDispute + 1, dispHeaders.indexOf('resolutionNotes') + 1).setValue(resolutionNotes);
+    disputesSheet.getRange(rowIndexDispute + 1, dispHeaders.indexOf('resolvedBy') + 1).setValue(user);
+    disputesSheet.getRange(rowIndexDispute + 1, dispHeaders.indexOf('resolutionTimestamp') + 1).setValue(now);
   }
 
-  CacheService.getScriptCache().removeAll(['all_audits', 'all_evaluations', 'all_disputes']);
-  return true;
+  CacheService.getScriptCache().removeAll(['all_evaluations', 'all_disputes']);
 }
 
