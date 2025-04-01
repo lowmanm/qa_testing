@@ -223,15 +223,17 @@ function showAdmin() {
   }
 
   // Hide all views
-  function hideAllViews() {
-    document.getElementById('dashboardView').classList.add('hidden');
-    document.getElementById('auditQueueView').classList.add('hidden');
-    document.getElementById('evaluationFormView').classList.add('hidden');
-    document.getElementById('evaluationsView').classList.add('hidden');
-    document.getElementById('disputesView').classList.add('hidden');
-    document.getElementById('disputeFormView').classList.add('hidden');
-    document.getElementById('adminView').classList.add('hidden');
-  }
+function hideAllViews() {
+  document.getElementById('dashboardView').classList.add('hidden');
+  document.getElementById('auditQueueView').classList.add('hidden');
+  document.getElementById('evaluationFormView').classList.add('hidden');
+  document.getElementById('evaluationsView').classList.add('hidden');
+  document.getElementById('disputesView').classList.add('hidden');
+  document.getElementById('disputeFormView').classList.add('hidden');
+  document.getElementById('adminView').classList.add('hidden');
+  document.getElementById('viewEvaluationView').classList.add('hidden');
+}
+
 
   // Highlight the active navigation item
   function highlightNavItem(navId) {
