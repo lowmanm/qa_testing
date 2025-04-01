@@ -166,14 +166,17 @@ function setupSpreadsheet() {
       // Rename existing Disputes sheet
       disputesQueueSheet.setName('disputesQueue');
       // Update headers to match new schema
-      disputesQueueSheet.getRange(1, 1, 1, 7).setValues([[
+      disputesQueueSheet.getRange(1, 1, 1, 10).setValues([[
         'id',
         'evalId',
         'userEmail',
         'disputeTimestamp',
         'reason',
         'questionIds',
-        'status'
+        'status',
+        'resolutionNotes',         // NEW
+        'resolvedBy',              // NEW
+        'resolutionTimestamp'      // NEW
       ]]);
     } else {
       // Create new disputesQueue sheet
@@ -185,7 +188,10 @@ function setupSpreadsheet() {
         'disputeTimestamp',
         'reason',
         'questionIds',
-        'status'
+        'status',
+        'resolutionNotes',         // NEW
+        'resolvedBy',              // NEW
+        'resolutionTimestamp'      // NEW
       ]);
     }
   }
