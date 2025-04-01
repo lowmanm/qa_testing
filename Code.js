@@ -1,228 +1,1049 @@
-// Cleaned and Optimized Code.js
 
-function doGet(e) {
-  const template = HtmlService.createTemplateFromFile('Index');
-  const page = template.evaluate()
+// Code.gs - Main script file
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
     .setTitle('QA Evaluation System')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-
-  if (e.parameter && e.parameter.evaluationId) {
-    page.addMetaTag('evaluationId', e.parameter.evaluationId);
-  }
-
-  return page;
 }
 
+// Include HTML files
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-const CACHE_DURATION = 60; // seconds
+// Optimized data structure setup without mock data
+function setupSpreadsheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  // Create users sheet
+  if (!ss.getSheetByName('users')) {
+    var usersSheet = ss.getSheetByName('Users');
+    if (usersSheet) {
+      // Rename existing Users sheet
+      usersSheet.setName('users');
+      // Update headers to match new schema
+      usersSheet.getRange(1, 1, 1, 8).setValues([['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl']]);
+    } else {
+      // Create new users sheet
+      usersSheet = ss.insertSheet('users');
+      usersSheet.appendRow(['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl']);
+    }
+  }
+
+  // Create auditQueue sheet
+  if (!ss.getSheetByName('auditQueue')) {
+    var auditQueueSheet = ss.getSheetByName('Tasks');
+    if (auditQueueSheet) {
+      // Rename existing Tasks sheet
+      auditQueueSheet.setName('auditQueue');
+      // Update headers to match new schema
+      auditQueueSheet.getRange(1, 1, 1, 10).setValues([[
+        'auditId',
+        'taskId',
+        'referenceNumber',
+        'auditStatus',
+        'agentEmail',
+        'requestType',
+        'taskType',
+        'outcome',
+        'taskTimestamp',
+        'auditTimestamp',
+        'locked' // New column 2025-03-24
+      ]]);
+    } else {
+      // Create new auditQueue sheet
+      auditQueueSheet = ss.insertSheet('auditQueue');
+      auditQueueSheet.appendRow([
+        'auditId',
+        'taskId',
+        'referenceNumber',
+        'auditStatus',
+        'agentEmail',
+        'requestType',
+        'taskType',
+        'outcome',
+        'taskTimestamp',
+        'auditTimestamp',
+        'locked' // New column 2025-03-24
+      ]);
+    }
+  }
+
+  // Create evalSummary sheet
+  if (!ss.getSheetByName('evalSummary')) {
+    var evalSummarySheet = ss.getSheetByName('Evaluations');
+    if (evalSummarySheet) {
+      // Rename existing Evaluations sheet
+      evalSummarySheet.setName('evalSummary');
+      // Update headers to match new schema
+      evalSummarySheet.getRange(1, 1, 1, 13).setValues([[
+        'id',
+        'evalId',
+        'referenceNumber',
+        'taskType',
+        'outcome',
+        'qaEmail',
+        'startTimestamp',
+        'stopTimestamp',
+        'totalPoints',
+        'totalPointsPossible',
+        'status',
+        'feedback',
+        'evalScore'
+      ]]);
+    } else {
+      // Create new evalSummary sheet
+      evalSummarySheet = ss.insertSheet('evalSummary');
+      evalSummarySheet.appendRow([
+        'id',
+        'evalId',
+        'referenceNumber',
+        'taskType',
+        'outcome',
+        'qaEmail',
+        'startTimestamp',
+        'stopTimestamp',
+        'totalPoints',
+        'totalPointsPossible',
+        'status',
+        'feedback',
+        'evalScore'
+      ]);
+    }
+  }
+
+  // Create evalQuest sheet
+  if (!ss.getSheetByName('evalQuest')) {
+    var evalQuestSheet = ss.insertSheet('evalQuest');
+    evalQuestSheet.appendRow([
+      'id',
+      'evalId',
+      'questionId',
+      'questionText',
+      'response',
+      'pointsEarned',
+      'pointsPossible',
+      'feedback'
+    ]);
+  }
+
+  // Create questions sheet
+  if (!ss.getSheetByName('questions')) {
+    var questionsSheet = ss.getSheetByName('Questions');
+    if (questionsSheet) {
+      // Rename and update existing Questions sheet
+      questionsSheet.setName('questions');
+      // Update headers to match new schema
+      questionsSheet.getRange(1, 1, 1, 7).setValues([[
+        'id',
+        'setId',
+        'taskType',
+        'questionText',
+        'pointsPossible',
+        'createdBy',
+        'createdTimestamp'
+      ]]);
+    } else {
+      // Create new questions sheet
+      questionsSheet = ss.insertSheet('questions');
+      questionsSheet.appendRow([
+        'id',
+        'setId',
+        'taskType',
+        'questionText',
+        'pointsPossible',
+        'createdBy',
+        'createdTimestamp'
+      ]);
+    }
+  }
+
+  // Create disputesQueue sheet
+  if (!ss.getSheetByName('disputesQueue')) {
+    var disputesQueueSheet = ss.getSheetByName('Disputes');
+    if (disputesQueueSheet) {
+      // Rename existing Disputes sheet
+      disputesQueueSheet.setName('disputesQueue');
+      // Update headers to match new schema
+      disputesQueueSheet.getRange(1, 1, 1, 7).setValues([[
+        'id',
+        'evalId',
+        'userEmail',
+        'disputeTimestamp',
+        'reason',
+        'questionIds',
+        'status'
+      ]]);
+    } else {
+      // Create new disputesQueue sheet
+      disputesQueueSheet = ss.insertSheet('disputesQueue');
+      disputesQueueSheet.appendRow([
+        'id',
+        'evalId',
+        'userEmail',
+        'disputeTimestamp',
+        'reason',
+        'questionIds',
+        'status'
+      ]);
+    }
+  }
+}
+
+// Create a new menu when the spreadsheet opens
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('QA System')
+    .addItem('Open QA App', 'openQaApp')
+    .addItem('Setup Spreadsheet', 'setupSpreadsheet')
+    .addItem('Import Data from Email', 'importDataFromEmail')
+    .addToUi();
+}
+
+function openQaApp() {
+  var html = HtmlService.createHtmlOutputFromFile('Index')
+    .setWidth(1200)
+    .setHeight(800);
+  SpreadsheetApp.getUi().showModalDialog(html, 'QA Evaluation System');
+}
+
+// Optimized function to import data from Gmail
+function importDataFromEmail() {
+  try {
+    // Search for emails with the specified subject
+    var query = 'subject:"NVS Audit File" has:attachment filename:nvs_qa_audit.csv';
+    var threads = GmailApp.search(query, 0, 1);  // Get the most recent matching thread
+
+    if (threads.length === 0) {
+      throw new Error("No emails found with subject 'NVS Audit File' and attachment 'nvs_qa_audit.csv'");
+    }
+
+    // Get the first message from the thread
+    var messages = threads[0].getMessages();
+    var message = messages[0];
+
+    // Get attachments
+    var attachments = message.getAttachments();
+    var csvAttachment = null;
+
+    // Find the CSV attachment with the correct name
+    for (var i = 0; i < attachments.length; i++) {
+      if (attachments[i].getName() === 'nvs_qa_audit.csv') {
+        csvAttachment = attachments[i];
+        break;
+      }
+    }
+
+    if (!csvAttachment) {
+      throw new Error("No attachment named 'nvs_qa_audit.csv' found in the email");
+    }
+
+    // Parse the CSV data
+    var content = csvAttachment.getDataAsString();
+    var csvData = Utilities.parseCsv(content);
+
+    // Get header row
+    var headers = csvData[0];
+    Logger.log("Found CSV headers: " + headers.join(", "));
+
+    // Get or create the auditQueue sheet
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var auditQueueSheet = ss.getSheetByName('auditQueue');
+
+    // If auditQueue sheet doesn't exist, create it or rename from Tasks
+    if (!auditQueueSheet) {
+      if (ss.getSheetByName('Tasks')) {
+        ss.getSheetByName('Tasks').setName('auditQueue');
+        auditQueueSheet = ss.getSheetByName('auditQueue');
+      } else {
+        auditQueueSheet = ss.insertSheet('auditQueue');
+        auditQueueSheet.appendRow([
+          'auditId',
+          'taskId',
+          'referenceNumber',
+          'auditStatus',
+          'agentEmail',
+          'requestType',
+          'taskType',
+          'outcome',
+          'taskTimestamp',
+          'auditTimestamp'
+        ]);
+      }
+    }
+
+    var auditQueueHeaders = auditQueueSheet.getRange(1, 1, 1, auditQueueSheet.getLastColumn()).getValues()[0];
+    Logger.log("Sheet headers: " + auditQueueHeaders.join(", "));
+
+    // Improved CSV to sheet mapping - case insensitive and flexible matching
+    var headerMapping = {};
+    headers.forEach(function(header, index) {
+      var normalizedHeader = header.toLowerCase().trim().replace(/\s+/g, '');
+
+      // Map CSV headers to our sheet headers based on normalized strings
+      if (normalizedHeader.includes('taskid') || normalizedHeader.includes('task_id')) {
+        headerMapping['taskId'] = index;
+      } else if (normalizedHeader.includes('reference') || normalizedHeader.includes('ref')) {
+        headerMapping['referenceNumber'] = index;
+      } else if (normalizedHeader.includes('status')) {
+        headerMapping['auditStatus'] = index;
+      } else if ((normalizedHeader.includes('agent') && normalizedHeader.includes('email')) || normalizedHeader.includes('agentemail')) {
+        headerMapping['agentEmail'] = index;
+      } else if (normalizedHeader.includes('request') && normalizedHeader.includes('type')) {
+        headerMapping['requestType'] = index;
+      } else if (normalizedHeader.includes('task') && normalizedHeader.includes('type')) {
+        headerMapping['taskType'] = index;
+      } else if (normalizedHeader.includes('outcome') || normalizedHeader.includes('result')) {
+        headerMapping['outcome'] = index;
+      } else if ((normalizedHeader.includes('task') && normalizedHeader.includes('time')) ||
+                 (normalizedHeader.includes('task') && normalizedHeader.includes('date'))) {
+        headerMapping['taskTimestamp'] = index;
+      }
+    });
+
+    Logger.log("Header mapping: " + JSON.stringify(headerMapping));
+
+    // Bulk import preparation
+    var auditsToImport = [];
+    var now = new Date().toISOString(); // Store timestamp in UTC
+    var auditsImported = 0;
+
+    // Process each row in the CSV (skip the header row)
+    for (var i = 1; i < csvData.length; i++) {
+      var row = csvData[i];
+
+      // Skip empty rows
+      if (row.length === 0 || (row.length === 1 && row[0] === '')) continue;
+
+      // Generate a unique auditId
+      var auditId = 'audit' + (new Date().getTime() + i);
+
+      // Create audit row
+      var auditRow = [];
+
+      // Fill row with mapped data
+      for (var j = 0; j < auditQueueHeaders.length; j++) {
+        var header = auditQueueHeaders[j];
+        if (header === 'auditId') {
+          auditRow.push(auditId);
+        } else if (header === 'auditTimestamp') {
+          auditRow.push(now);
+        } else if (header === 'taskTimestamp' && headerMapping[header] !== undefined) {
+          var rawTimestamp = row[headerMapping[header]];
+          try {
+            // Try to parse the date and format to ISO
+            var parsedDate = new Date(rawTimestamp);
+            if (!isNaN(parsedDate.getTime())) {
+              auditRow.push(parsedDate.toISOString());
+            } else {
+              auditRow.push(rawTimestamp); // Keep original if parsing fails
+              Logger.log("Warning: Couldn't parse date: " + rawTimestamp);
+            }
+          } catch (e) {
+            auditRow.push(rawTimestamp); // Keep original if exception occurs
+            Logger.log("Error parsing date: " + e.message);
+          }
+        } else if (headerMapping[header] !== undefined) {
+          auditRow.push(row[headerMapping[header]]);
+        } else {
+          auditRow.push('');
+        }
+      }
+
+      // Add to bulk import array
+      auditsToImport.push(auditRow);
+      auditsImported++;
+
+      // Process in batches of 100 to avoid memory issues
+      if (auditsToImport.length >= 100) {
+        if (auditsToImport.length > 0) {
+          auditQueueSheet.getRange(auditQueueSheet.getLastRow() + 1, 1, auditsToImport.length, auditQueueHeaders.length)
+            .setValues(auditsToImport);
+          auditsToImport = [];
+        }
+      }
+    }
+
+    // Import any remaining rows
+    if (auditsToImport.length > 0) {
+      auditQueueSheet.getRange(auditQueueSheet.getLastRow() + 1, 1, auditsToImport.length, auditQueueHeaders.length)
+        .setValues(auditsToImport);
+    }
+
+    // Mark the email as read
+    message.markRead();
+
+    return {
+      success: true,
+      message: `Successfully imported ${auditsImported} audits from email.`,
+      date: new Date().toISOString() // Return timestamp in UTC
+    };
+  } catch (error) {
+    Logger.log('Error importing data from email: ' + error.message);
+    return {
+      success: false,
+      message: 'Error importing data: ' + error.message,
+      date: new Date().toISOString() // Return timestamp in UTC
+    };
+  }
+}
+
+// Optimized data access functions using caching for better performance
+// Cache duration in seconds
+var CACHE_DURATION = 300; // 5 minutes
+
+// Helper function to get cache or fetch fresh data
 function getCachedOrFetch(cacheKey, fetchFunction) {
-  const cache = CacheService.getScriptCache();
-  const cachedData = cache.get(cacheKey);
+  var cache = CacheService.getScriptCache();
+  var cachedData = cache.get(cacheKey);
+
   if (cachedData) {
     try {
       return JSON.parse(cachedData);
     } catch (e) {
       Logger.log('Error parsing cached data: ' + e.message);
+      // Proceed to fetch fresh data if parsing fails
     }
   }
-  const freshData = fetchFunction();
+
+  // Fetch fresh data
+  var freshData = fetchFunction();
+
+  // Store in cache
   try {
     cache.put(cacheKey, JSON.stringify(freshData), CACHE_DURATION);
   } catch (e) {
     Logger.log('Error caching data: ' + e.message);
+    // Continue even if caching fails
   }
+
   return freshData;
 }
 
-function getSheetDataAsObjects(sheetName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  const data = sheet.getDataRange().getValues();
-  const headers = data.shift();
-  return data.map(row => Object.fromEntries(headers.map((h, i) => [h, row[i]])));
-}
-
-// USERS
+// Optimized function to get all users
 function getAllUsers() {
-  return getCachedOrFetch('all_users', () => getSheetDataAsObjects('users'));
+  return getCachedOrFetch('all_users', function() {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+    return getSheetDataAsObjects(sheet);
+  });
 }
 
-function getUserByEmail(email) {
-  return getAllUsers().find(u => u.email === email);
+function createUser(userData) {
+  var usersSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+
+  // Create a unique user ID if not provided
+  if (!userData.id) {
+    userData.id = 'user' + new Date().getTime();
+  }
+
+  // Set created timestamp in UTC
+  userData.createdTimestamp = new Date().toISOString();
+
+  // Set createdBy if not provided
+  if (!userData.createdBy) {
+    userData.createdBy = Session.getActiveUser().getEmail() || 'system';
+  }
+
+  // Get the headers
+  var headers = usersSheet.getRange(1, 1, 1, usersSheet.getLastColumn()).getValues()[0];
+
+  // Create a row with data in the correct order
+  var row = [];
+  headers.forEach(function(header) {
+    row.push(userData[header] || '');
+  });
+
+  // Log for debugging
+  Logger.log('Creating user with data: ' + JSON.stringify(userData));
+  Logger.log('Headers: ' + JSON.stringify(headers));
+  Logger.log('Row data to insert: ' + JSON.stringify(row));
+
+  // Append the row
+  usersSheet.appendRow(row);
+
+  // Invalidate users cache
+  CacheService.getScriptCache().remove('all_users');
+
+  return userData;
 }
 
-// AUDITS
-function getPendingAudits() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+function updateUser(userData) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+  var data = sheet.getDataRange().getValues();
+  var headers = data.shift();
+  var idColIndex = headers.indexOf('id');
 
-  const auditStatusIndex = headers.indexOf('auditStatus');
-  const lockedIndex = headers.indexOf('locked');
-  const lockedAtIndex = headers.indexOf('lockedAt');
+  if (idColIndex === -1) {
+    throw new Error('Could not find "id" column in users sheet');
+  }
 
-  const now = new Date();
-  const audits = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const isLocked = row[lockedIndex] === true || row[lockedIndex] === 'TRUE';
-    const lockedAt = new Date(row[lockedAtIndex]);
-
-    if (isLocked && !isNaN(lockedAt.getTime()) && (now - lockedAt) > 10 * 60 * 1000) {
-      sheet.getRange(i + 1, lockedIndex + 1).setValue(false);
-      sheet.getRange(i + 1, lockedAtIndex + 1).setValue('');
-      sheet.getRange(i + 1, auditStatusIndex + 1).setValue('pending');
-      row[lockedIndex] = false;
-    }
-
-    if (row[auditStatusIndex] !== 'evaluated' && !row[lockedIndex]) {
-      const audit = {};
-      headers.forEach((key, j) => audit[key] = row[j]);
-      audits.push(audit);
+  // Find the user row
+  var rowIndex = -1;
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][idColIndex] === userData.id) {
+      rowIndex = i + 2; // +2 because of 0-indexing and header row
+      break;
     }
   }
 
-  return audits;
+  if (rowIndex === -1) {
+    throw new Error('User with ID ' + userData.id + ' not found');
+  }
+
+  // Update each cell
+  headers.forEach(function(header, colIndex) {
+    if (header in userData && header !== 'createdTimestamp' && header !== 'createdBy') {
+      sheet.getRange(rowIndex, colIndex + 1).setValue(userData[header]);
+    }
+  });
+
+  // Invalidate users cache
+  CacheService.getScriptCache().remove('all_users');
+
+  return userData;
 }
 
-function getAuditById(auditId) {
-  const audits = getAllAudits();
-  return audits.find(a => a.auditId === auditId);
+function deleteUser(userId) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+  var data = sheet.getDataRange().getValues();
+  var headers = data.shift();
+  var idColIndex = headers.indexOf('id');
+
+  if (idColIndex === -1) {
+    throw new Error('Could not find "id" column in users sheet');
+  }
+
+  // Find the user row
+  var rowIndex = -1;
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][idColIndex] === userId) {
+      rowIndex = i + 2; // +2 because of 0-indexing and header row
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    throw new Error('User with ID ' + userId + ' not found');
+  }
+
+  // Delete the row
+  sheet.deleteRow(rowIndex);
+
+  // Invalidate users cache
+  CacheService.getScriptCache().remove('all_users');
+
+  return { success: true, message: 'User deleted successfully' };
 }
 
+// Use caching for question data
+function getAllQuestions() {
+  return getCachedOrFetch('all_questions', function() {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+    return getSheetDataAsObjects(sheet);
+  });
+}
+
+// Use caching for audit data
 function getAllAudits() {
-  return getSheetDataAsObjects('auditQueue');
+  return getCachedOrFetch('all_audits', function() {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+    return getSheetDataAsObjects(sheet);
+  });
 }
 
+// Server-side function to update audit status and lock the record
 function updateAuditStatusAndLock(auditId, status) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idIndex = headers.indexOf('auditId');
-  const statusIndex = headers.indexOf('auditStatus');
-  const lockedIndex = headers.indexOf('locked');
-  const lockedAtIndex = headers.indexOf('lockedAt');
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+  var data = sheet.getDataRange().getValues();
+  var headers = data.shift();
+  var idColIndex = headers.indexOf('auditId');
+  var statusColIndex = headers.indexOf('auditStatus');
+  var lockedColIndex = headers.indexOf('locked');
 
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idIndex] === auditId) {
-      sheet.getRange(i + 1, statusIndex + 1).setValue(status);
-      sheet.getRange(i + 1, lockedIndex + 1).setValue(status === 'evaluated' ? false : true);
-      sheet.getRange(i + 1, lockedAtIndex + 1).setValue(status === 'evaluated' ? '' : new Date().toISOString());
+  if (idColIndex === -1 || statusColIndex === -1 || lockedColIndex === -1) {
+    Logger.log('Warning: Could not find required columns in auditQueue sheet');
+    return;
+  }
+
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][idColIndex] === auditId) {
+      sheet.getRange(i + 2, statusColIndex + 1).setValue(status);
+      sheet.getRange(i + 2, lockedColIndex + 1).setValue(status === 'evaluated' ? false : true);
+
+      // Invalidate audits cache
+      CacheService.getScriptCache().remove('all_audits');
       return { success: true };
     }
   }
+
+  Logger.log('Warning: Could not find audit with ID ' + auditId);
   throw new Error('Audit not found');
 }
 
-// QUESTIONS
-function getAllQuestions() {
-  return getCachedOrFetch('all_questions', () => getSheetDataAsObjects('questions'));
+function createQuestion(questionData) {
+  var questionsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+
+  // Create a unique question ID if not provided
+  if (!questionData.id) {
+    var baseId = 'q' + new Date().getTime();
+    questionData.id = baseId + '-' + questionData.taskType;
+  }
+
+  // Set created timestamp in UTC
+  questionData.createdTimestamp = new Date().toISOString();
+
+  // Set createdBy if not provided
+  if (!questionData.createdBy) {
+    questionData.createdBy = Session.getActiveUser().getEmail() || 'system';
+  }
+
+  // Generate a setId if not provided
+  if (!questionData.setId) {
+    // Find existing sets for this task type and create a new one
+    var existingSets = questionsSheet.getDataRange().getValues();
+    var headers = existingSets.shift();
+    var setIdColIndex = headers.indexOf('setId');
+    var taskTypeColIndex = headers.indexOf('taskType');
+
+    var existingSetIds = [];
+    for (var i = 0; i < existingSets.length; i++) {
+      if (existingSets[i][taskTypeColIndex] === questionData.taskType) {
+        var setId = existingSets[i][setIdColIndex];
+        if (setId && !existingSetIds.includes(setId)) {
+          existingSetIds.push(setId);
+        }
+      }
+    }
+
+    // Use the first set for this task type or create a new one
+    if (existingSetIds.length > 0) {
+      questionData.setId = existingSetIds[0];
+    } else {
+      questionData.setId = 'set' + (new Date().getTime() % 1000);
+    }
+  }
+
+  // Get the headers
+  var headers = questionsSheet.getRange(1, 1, 1, questionsSheet.getLastColumn()).getValues()[0];
+
+  // Create a row with data in the correct order
+  var row = [];
+  headers.forEach(function(header) {
+    row.push(questionData[header] || '');
+  });
+
+  // Append the row
+  questionsSheet.appendRow(row);
+
+  // Invalidate questions cache
+  CacheService.getScriptCache().remove('all_questions');
+
+  return questionData;
+}
+
+function updateQuestion(questionData) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+  var data = sheet.getDataRange().getValues();
+  var headers = data.shift();
+  var idColIndex = headers.indexOf('id');
+
+  if (idColIndex === -1) {
+    throw new Error('Could not find "id" column in questions sheet');
+  }
+
+  // Find the question row
+  var rowIndex = -1;
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][idColIndex] === questionData.id) {
+      rowIndex = i + 2; // +2 because of 0-indexing and header row
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    throw new Error('Question with ID ' + questionData.id + ' not found');
+  }
+
+  // Update each cell
+  headers.forEach(function(header, colIndex) {
+    if (header in questionData && header !== 'createdTimestamp' && header !== 'createdBy') {
+      sheet.getRange(rowIndex, colIndex + 1).setValue(questionData[header]);
+    }
+  });
+
+  // Invalidate questions cache
+  CacheService.getScriptCache().remove('all_questions');
+
+  return questionData;
+}
+
+function deleteQuestion(questionId) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+  var data = sheet.getDataRange().getValues();
+  var headers = data.shift();
+  var idColIndex = headers.indexOf('id');
+
+  if (idColIndex === -1) {
+    throw new Error('Could not find "id" column in questions sheet');
+  }
+
+  // Find the question row
+  var rowIndex = -1;
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][idColIndex] === questionId) {
+      rowIndex = i + 2; // +2 because of 0-indexing and header row
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    throw new Error('Question with ID ' + questionId + ' not found');
+  }
+
+  // Delete the row
+  sheet.deleteRow(rowIndex);
+
+  // Invalidate questions cache
+  CacheService.getScriptCache().remove('all_questions');
+
+  return { success: true, message: 'Question deleted successfully' };
 }
 
 function getQuestionsForTaskType(taskType) {
-  return getAllQuestions().filter(q => q.taskType === taskType);
-}
+  var cacheKey = 'questions_' + taskType;
 
-// EVALUATION FLOW
-function prepareEvaluationWithQuestions(auditId) {
-  const audit = getAuditById(auditId);
-  const questions = getQuestionsForTaskType(audit.taskType);
-  return { audit, questions };
-}
+  return getCachedOrFetch(cacheKey, function() {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+    var data = getSheetDataAsObjects(sheet);
 
-function saveEvaluation(evaluation) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalSummary');
-  const questSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalQuest');
-
-  evaluation.stopTimestamp = new Date().toISOString();
-  evaluation.evalScore = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
-
-  const summaryHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const summaryRow = summaryHeaders.map(h => evaluation[h] || '');
-  sheet.appendRow(summaryRow);
-
-  evaluation.questions.forEach(q => {
-    const questHeaders = questSheet.getRange(1, 1, 1, questSheet.getLastColumn()).getValues()[0];
-    const questRow = questHeaders.map(h => q[h] || evaluation.evalId || '');
-    questSheet.appendRow(questRow);
+    return data.filter(function(question) {
+      return question.taskType === taskType;
+    });
   });
-
-  notifyAgentAndManager(evaluation);
-  return { success: true };
 }
 
-function notifyAgentAndManager(evaluation) {
-  const user = getUserByEmail(evaluation.agentEmail);
-  const managerEmail = user?.managerEmail;
+function getAllEvaluations() {
+  return getCachedOrFetch('all_evaluations', function() {
+    var evalSummarySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalSummary');
+    var evalQuestSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalQuest');
 
-  const agentHtml = `<p>Your score: ${evaluation.totalPoints}/${evaluation.totalPointsPossible}</p>`;
-  GmailApp.sendEmail(user.email, 'Your Evaluation Results', '', { htmlBody: agentHtml });
+    var summaries = getSheetDataAsObjects(evalSummarySheet);
+    var questions = getSheetDataAsObjects(evalQuestSheet);
 
-  if (managerEmail) {
-    const managerHtml = `<p>Evaluation for ${user.name} completed.</p>`;
-    GmailApp.sendEmail(managerEmail, 'Evaluation Completed: ' + user.name, '', { htmlBody: managerHtml });
-  }
-}
+    // Log the retrieved questions
+    console.log('Retrieved questions:', questions);
 
-// EVALUATIONS VIEW
-function getCompletedEvaluations() {
-  const all = getSheetDataAsObjects('evalSummary');
-  return all.filter(e => e.status === 'completed');
-}
+    // Group the questions by evalId
+    var questionsMap = {};
+    questions.forEach(function(q) {
+      if (!questionsMap[q.evalId]) {
+        questionsMap[q.evalId] = [];
+      }
+      questionsMap[q.evalId].push({
+        id: q.id,
+        questionId: q.questionId,
+        questionText: q.questionText,
+        response: q.response,
+        pointsEarned: q.pointsEarned,
+        pointsPossible: q.pointsPossible,
+        feedback: q.feedback
+      });
+    });
 
-// DISPUTES
-function prepareDisputeForm(evalId) {
-  const evalData = getSheetDataAsObjects('evalSummary').find(e => e.evalId === evalId);
-  const questionData = getSheetDataAsObjects('evalQuest').filter(q => q.evalId === evalId);
-  return { evaluation: evalData, questions: questionData };
-}
+    // Attach questions to summaries
+    summaries.forEach(function(summary) {
+      summary.questions = questionsMap[summary.id] || [];
+    });
 
-function submitDispute(payload) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+     // Log the final summaries with questions attached
+    console.log('Final summaries with questions:', summaries);
 
-  const newRow = headers.map(h => {
-    if (h === 'id') return 'dispute_' + new Date().getTime();
-    if (h === 'evalId') return payload.evalId;
-    if (h === 'userEmail') return payload.userEmail;
-    if (h === 'disputeTimestamp') return payload.timestamp;
-    if (h === 'reason') return payload.reason;
-    if (h === 'questionIds') return payload.questionIds.join(',');
-    if (h === 'status') return 'pending';
-    return '';
+    return summaries;
   });
-
-  sheet.appendRow(newRow);
-  return { success: true };
 }
 
 function getAllDisputes() {
-  return getSheetDataAsObjects('disputesQueue').filter(d => d.status === 'pending');
+  return getCachedOrFetch('all_disputes', function() {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+    var data = getSheetDataAsObjects(sheet);
+
+    // Parse the questionIds string into an array
+    data.forEach(function(dispute) {
+      if (dispute.questionIds) {
+        dispute.questionIds = dispute.questionIds.split(',');
+      }
+    });
+
+    return data;
+  });
 }
 
-function resolveDispute(disputeId, resolution, feedback) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+// More efficient helper function to convert sheet data to an array of objects
+function getSheetDataAsObjects(sheet) {
+  if (!sheet) return [];
 
-  const idIndex = headers.indexOf('id');
-  const statusIndex = headers.indexOf('status');
-  const resolutionIndex = headers.indexOf('resolution');
-  const feedbackIndex = headers.indexOf('resolutionFeedback');
-  const resolvedAtIndex = headers.indexOf('resolutionTimestamp');
+  // Get all data at once to minimize API calls
+  var dataRange = sheet.getDataRange();
+  var values = dataRange.getValues();
 
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idIndex] === disputeId) {
-      sheet.getRange(i + 1, statusIndex + 1).setValue('resolved');
-      sheet.getRange(i + 1, resolutionIndex + 1).setValue(resolution);
-      sheet.getRange(i + 1, feedbackIndex + 1).setValue(feedback);
-      sheet.getRange(i + 1, resolvedAtIndex + 1).setValue(new Date().toISOString()); // renamed to resolutionTimestamp
-      return { success: true };
+  if (values.length <= 1) return []; // Just headers or empty
+
+  var headers = values[0];
+  var objects = [];
+
+  // Process in batches for large datasets
+  var batchSize = 1000;
+  for (var i = 1; i < values.length; i += batchSize) {
+    var endIdx = Math.min(i + batchSize, values.length);
+    for (var j = i; j < endIdx; j++) {
+      var obj = {};
+      for (var k = 0; k < headers.length; k++) {
+        // Skip empty headers
+        if (headers[k]) {
+          obj[headers[k]] = values[j][k];
+        }
+      }
+      objects.push(obj);
     }
   }
-  throw new Error('Dispute not found');
+
+  return objects;
+}
+
+// Function to save a new evaluation - updated for new schema
+function saveEvaluation(evaluationData) {
+  var evalSummarySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalSummary');
+  var evalQuestSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalQuest');
+
+  // Create a unique ID for the evaluation
+  var evalId = 'eval' + (new Date().getTime());
+  var stopTimestamp = new Date().toISOString(); // Store in UTC
+
+  // Calculate evalScore as a decimal
+  var evalScore = evaluationData.totalPoints / evaluationData.totalPointsPossible;
+
+  // Save the summary
+  evalSummarySheet.appendRow([
+    evalId,
+    evaluationData.evalId || evaluationData.auditId,
+    evaluationData.referenceNumber,
+    evaluationData.taskType,
+    evaluationData.outcome,
+    evaluationData.qaEmail || Session.getActiveUser().getEmail(),
+    evaluationData.startTimestamp || evaluationData.date || new Date().toISOString(), // UTC
+    stopTimestamp,
+    evaluationData.totalPoints,
+    evaluationData.totalPointsPossible,
+    evaluationData.status || 'completed',
+    evaluationData.feedback || '',
+    evalScore
+  ]);
+
+  // Prepare batch insert for questions
+  var questRows = [];
+  evaluationData.questions.forEach(function(question, index) {
+    var questId = evalId + '-q' + (index + 1);
+    questRows.push([
+      questId,
+      evalId,
+      question.questionId,
+      question.questionText,
+      question.response,
+      question.pointsEarned,
+      question.pointsPossible,
+      question.feedback || ''
+    ]);
+  });
+
+  // Batch insert all question responses at once
+  if (questRows.length > 0) {
+    evalQuestSheet.getRange(evalQuestSheet.getLastRow() + 1, 1, questRows.length, 8)
+      .setValues(questRows);
+  }
+
+  // Update the audit status in the auditQueue sheet
+  updateAuditStatus(evaluationData.evalId || evaluationData.auditId, 'evaluated');
+
+  // Invalidate relevant caches
+  var cache = CacheService.getScriptCache();
+  cache.remove('all_evaluations');
+
+  return {
+    id: evalId,
+    evalId: evaluationData.evalId || evaluationData.auditId,
+    referenceNumber: evaluationData.referenceNumber,
+    taskType: evaluationData.taskType,
+    outcome: evaluationData.outcome,
+    qaEmail: evaluationData.qaEmail || Session.getActiveUser().getEmail(),
+    startTimestamp: evaluationData.startTimestamp || evaluationData.date || new Date().toISOString(),
+    stopTimestamp: stopTimestamp,
+    totalPoints: evaluationData.totalPoints,
+    totalPointsPossible: evaluationData.totalPointsPossible,
+    status: evaluationData.status || 'completed',
+    feedback: evaluationData.feedback || '',
+    evalScore: evalScore,
+    questions: evaluationData.questions
+  };
+}
+
+// Function to save a new dispute - updated for new schema
+function saveDispute(disputeData) {
+  var disputesQueueSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+
+  // Create a unique ID for the dispute
+  var disputeId = 'dispute' + (new Date().getTime());
+  var disputeTimestamp = new Date().toISOString(); // Store in UTC
+
+  // Convert questionIds array to string for storage
+  var questionIdsString = disputeData.questionIds.join(',');
+
+  // Log dispute data for debugging
+  Logger.log('Saving dispute with data: ' + JSON.stringify(disputeData));
+
+  disputesQueueSheet.appendRow([
+    disputeId,
+    disputeData.evalId,
+    disputeData.userEmail || Session.getActiveUser().getEmail(),
+    disputeTimestamp,
+    disputeData.reason,
+    questionIdsString,
+    disputeData.status || 'pending'
+  ]);
+
+  // Update the evaluation status in the evalSummary sheet
+  updateEvaluationStatus(disputeData.evalId, 'disputed');
+
+  // Invalidate relevant caches
+  var cache = CacheService.getScriptCache();
+  cache.remove('all_disputes');
+  cache.remove('all_evaluations');
+
+  return {
+    id: disputeId,
+    evalId: disputeData.evalId,
+    userEmail: disputeData.userEmail || Session.getActiveUser().getEmail(),
+    disputeTimestamp: disputeTimestamp,
+    reason: disputeData.reason,
+    questionIds: disputeData.questionIds,
+    status: disputeData.status || 'pending'
+  };
+}
+
+// Function to update audit status with improved performance
+function updateAuditStatus(auditId, newStatus) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+  var data = sheet.getDataRange().getValues();
+  var headers = data.shift();
+  var idColIndex = headers.indexOf('auditId');
+  var statusColIndex = headers.indexOf('auditStatus');
+
+  if (idColIndex === -1 || statusColIndex === -1) {
+    Logger.log('Warning: Could not find required columns in auditQueue sheet');
+    return;
+  }
+
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][idColIndex] === auditId) {
+      sheet.getRange(i + 2, statusColIndex + 1).setValue(newStatus);
+
+      // Invalidate audits cache
+      CacheService.getScriptCache().remove('all_audits');
+      return;
+    }
+  }
+
+  Logger.log('Warning: Could not find audit with ID ' + auditId);
+}
+
+// Function to update evaluation status with improved performance
+function updateEvaluationStatus(evalId, newStatus) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalSummary');
+  var data = sheet.getDataRange().getValues();
+  var headers = data.shift();
+  var idColIndex = headers.indexOf('evalId');
+  var statusColIndex = headers.indexOf('status');
+
+  if (idColIndex === -1 || statusColIndex === -1) {
+    Logger.log('Warning: Could not find required columns in evalSummary sheet');
+    return;
+  }
+
+  Logger.log('Updating evaluation status: ' + evalId + ' to ' + newStatus);
+
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][idColIndex] === evalId) {
+      sheet.getRange(i + 2, statusColIndex + 1).setValue(newStatus);
+      Logger.log('Updated evaluation status successfully');
+
+      // Invalidate evaluations cache
+      CacheService.getScriptCache().remove('all_evaluations');
+      return;
+    }
+  }
+
+  Logger.log('Warning: Could not find evaluation with ID ' + evalId);
+}
+
+// Get pending audits for evaluation with improved performance
+function getPendingAudits() {
+  Logger.log('Fetching pending audits...');
+  return getCachedOrFetch('pending_audits', function() {
+    var audits = getAllAudits();
+    Logger.log('Total audits fetched: ' + audits.length);
+
+    var evaluations = getAllEvaluations();
+    Logger.log('Total evaluations fetched: ' + evaluations.length);
+
+    // Create a Set of evaluated audit IDs for faster lookups
+    var evaluatedAuditIds = new Set(evaluations.map(evaluation => evaluation.evalId));
+    Logger.log('Evaluated audit IDs: ' + Array.from(evaluatedAuditIds).join(', '));
+
+    // Filter audits efficiently
+    var pendingAudits = audits.filter(audit =>
+      (audit.auditStatus.toLowerCase() === 'pending') && !evaluatedAuditIds.has(audit.auditId)
+    );
+    Logger.log('Pending audits count: ' + pendingAudits.length);
+
+    return pendingAudits;
+  });
+}
+
+// Function to get current user information
+function getCurrentUser() {
+  var email = Session.getActiveUser().getEmail();
+  var users = getAllUsers();
+  var user = users.find(function(user) {
+    return user.email === email;
+  });
+
+  // Default to the first user for testing/demo purposes if no matching user
+  if (!user && users.length > 0) {
+    user = users[0];
+  }
+
+  return user || {
+    id: 'unknown',
+    name: 'Unknown User',
+    email: email,
+    role: 'qa_analyst'
+  };
+}
+
+function prepareEvaluation(auditId) {
+    // Update the audit status to "In Process" and lock the record
+    var audit = updateAuditStatusAndLock(auditId, 'In Process');
+    if (!audit) {
+        throw new Error('Failed to update audit status');
+    }
+
+    // Get the audit details
+    var audits = getAllAudits();
+    var auditDetails = audits.find(function(a) { return a.auditId === auditId; });
+
+    if (!auditDetails) {
+        throw new Error('Audit not found');
+    }
+
+    return auditDetails;
 }
