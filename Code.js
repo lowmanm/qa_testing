@@ -1121,4 +1121,19 @@ function getAllEvaluationsAndDisputes() {
   };
 }
 
+function updateDisputeStatus(disputeId, newStatus) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName("Disputes");
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == disputeId) { // assuming column A has the dispute ID
+      sheet.getRange(i + 1, 5).setValue(newStatus); // assuming column E is 'status'
+      return { success: true };
+    }
+  }
+
+  return { success: false, message: "Dispute not found." };
+}
+
+
 
