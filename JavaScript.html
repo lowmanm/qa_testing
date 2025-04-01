@@ -813,7 +813,7 @@ function loadQuestionsForDispute(evaluation) {
           <td>${formatDate(dispute.disputeTimestamp)}</td>
           <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
           <td>
-            <button class="view-dispute-button btn btn-sm btn-primary"
+            <button class="resolve-dispute-button btn btn-sm btn-primary"
               data-dispute-id="${dispute.id}">View</button>
           </td>
         `;
@@ -822,12 +822,12 @@ function loadQuestionsForDispute(evaluation) {
       });
 
       // Add event listeners to view dispute buttons
-      document.querySelectorAll('.view-dispute-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var disputeId = this.getAttribute('data-dispute-id');
-          viewDispute(disputeId);
-        });
-      });
+      document.querySelectorAll('.resolve-dispute-button').forEach(button => {
+  button.addEventListener('click', function () {
+    const id = this.getAttribute('data-dispute-id');
+    resolveDispute(id);
+  });
+});
 
     }).getAllDisputes();
   }
