@@ -697,53 +697,47 @@ function showDisputeForm(evaluationId) {
 
 // Load questions for dispute
 function loadQuestionsForDispute(evaluation) {
-  var disputeQuestionsContainer = document.getElementById('disputeQuestions');
-  disputeQuestionsContainer.innerHTML = '';
+  const container = document.getElementById('disputeQuestions');
+  container.innerHTML = '';
 
   if (!evaluation.questions || evaluation.questions.length === 0) {
-    disputeQuestionsContainer.innerHTML = '<div class="alert alert-warning">No questions found for this evaluation.</div>';
+    container.innerHTML = '<div class="alert alert-warning">No questions found for this evaluation.</div>';
     return;
   }
 
-  evaluation.questions.forEach(function(question) {
-    var questionElement = document.createElement('div');
-    questionElement.className = 'question-card';
+  evaluation.questions.forEach(q => {
+    const responseLabel = q.response === 'yes' ? 'Yes' : 'No';
+    const highlightClass = q.response === 'no' ? 'highlight-no' : '';
 
-    var responseText = question.response;
-    if (!isNaN(parseInt(responseText))) {
-      var value = parseInt(responseText);
-      var labels = ['Poor', 'Below Average', 'Average', 'Good', 'Excellent'];
-      responseText = value + ' - ' + (labels[value - 1] || '');
-    }
-
-    questionElement.innerHTML = `
+    const card = document.createElement('div');
+    card.className = `question-card ${highlightClass}`;
+    card.innerHTML = `
       <div class="question-header">
-        <h3 class="question-text">${question.questionText}</h3>
-        <span class="question-points">Score: ${question.pointsEarned}/${question.pointsPossible}</span>
+        <h3 class="question-text">${q.questionText}</h3>
+        <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
       </div>
       <div class="question-body">
         <div class="response-display">
           <p class="field-label">Response:</p>
-          <p class="field-value">${responseText}</p>
+          <p class="field-value">${responseLabel}</p>
         </div>
-        ${question.feedback ? `
+        ${q.feedback ? `
         <div class="feedback-display">
           <p class="field-label">Feedback:</p>
-          <p class="field-value">${question.feedback}</p>
-        </div>
-        ` : ''}
+          <p class="field-value">${q.feedback}</p>
+        </div>` : ''}
         <div class="dispute-checkbox">
           <label>
-            <input type="checkbox" name="dispute_question_${question.questionId}" value="${question.questionId}">
+            <input type="checkbox" name="dispute_question_${q.questionId}" value="${q.questionId}">
             <span>Dispute this question</span>
           </label>
         </div>
       </div>
     `;
-
-    disputeQuestionsContainer.appendChild(questionElement);
+    container.appendChild(card);
   });
 }
+
 
   // Handle dispute form submission
   function handleDisputeSubmit(e) {
