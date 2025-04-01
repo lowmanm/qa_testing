@@ -1053,3 +1053,76 @@ function prepareEvaluation(auditId) {
 
     return auditDetails;
 }
+
+function resolveDispute(payload) {
+  const { disputeId, evalId, decisions, resolutionNotes, status } = payload;
+  const now = new Date().toISOString();
+  const user = Session.getActiveUser().getEmail() || 'system';
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const disputesSheet = ss.getSheetByName('disputesQueue');
+  const evalSheet = ss.getSheetByName('evalSummary');
+  const questSheet = ss.getSheetByName('evalQuest');
+
+  // Update question-level scores
+  const questData = questSheet.getDataRange().getValues();
+  const questHeaders = questData[0];
+  const evalIdCol = questHeaders.indexOf('evalId');
+  const qIdCol = questHeaders.indexOf('questionId');
+  const earnedCol = questHeaders.indexOf('pointsEarned');
+  const feedbackCol = questHeaders.indexOf('feedback');
+
+  decisions.forEach(dec => {
+    for (let i = 1; i < questData.length; i++) {
+      if (questData[i][evalIdCol] === evalId && questData[i][qIdCol] === dec.questionId) {
+        if (dec.resolution === 'overturned') {
+          questSheet.getRange(i + 1, earnedCol + 1).setValue(questData[i][questHeaders.indexOf('pointsPossible')]);
+        }
+        if (dec.note) {
+          questSheet.getRange(i + 1, feedbackCol + 1).setValue(dec.note);
+        }
+        break;
+      }
+    }
+  });
+
+  // Recalculate evaluation score
+  const updatedData = questSheet.getDataRange().getValues().filter(r => r[evalIdCol] === evalId);
+  const totalEarned = updatedData.reduce((sum, r) => sum + (parseInt(r[earnedCol]) || 0), 0);
+  const totalPossible = updatedData.reduce((sum, r) => sum + (parseInt(r[questHeaders.indexOf('pointsPossible')]) || 0), 0);
+
+  const evalData = evalSheet.getDataRange().getValues();
+  const evalHeaders = evalData[0];
+  const idCol = evalHeaders.indexOf('id');
+  const earnedIdx = evalHeaders.indexOf('totalPoints');
+  const possibleIdx = evalHeaders.indexOf('totalPointsPossible');
+  const scoreCol = evalHeaders.indexOf('evalScore');
+
+  for (let i = 1; i < evalData.length; i++) {
+    if (evalData[i][idCol] === evalId) {
+      evalSheet.getRange(i + 1, earnedIdx + 1).setValue(totalEarned);
+      evalSheet.getRange(i + 1, possibleIdx + 1).setValue(totalPossible);
+      evalSheet.getRange(i + 1, scoreCol + 1).setValue(`${Math.round((totalEarned / totalPossible) * 100)}%`);
+      break;
+    }
+  }
+
+  // Update dispute record
+  const dispData = disputesSheet.getDataRange().getValues();
+  const dispHeaders = dispData[0];
+  const dispIdCol = dispHeaders.indexOf('id');
+
+  for (let i = 1; i < dispData.length; i++) {
+    if (dispData[i][dispIdCol] === disputeId) {
+      disputesSheet.getRange(i + 1, dispHeaders.indexOf('status') + 1).setValue(status);
+      disputesSheet.getRange(i + 1, dispHeaders.indexOf('resolutionNotes') + 1).setValue(resolutionNotes || '');
+      disputesSheet.getRange(i + 1, dispHeaders.indexOf('resolvedBy') + 1).setValue(user);
+      disputesSheet.getRange(i + 1, dispHeaders.indexOf('resolutionTimestamp') + 1).setValue(now);
+      break;
+    }
+  }
+
+  CacheService.getScriptCache().removeAll(['all_audits', 'all_evaluations', 'all_disputes']);
+  return true;
+}
+
