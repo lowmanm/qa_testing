@@ -365,18 +365,18 @@ function loadQuestionsForEvaluation(taskType, attempt = 1) {
     setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
   } else {
     const evalFormView = document.getElementById('evaluationFormView');
-    if (evalFormView) {
-      evalFormView.innerHTML = `
-        <div class="alert alert-danger">
-          Failed to load questions for this task. Please try again.
-          <button id="retryLoadQuestions" class="btn btn-sm btn-warning ml-2">Try Again</button>
-        </div>
-      `;
-      document.getElementById('retryLoadQuestions').addEventListener('click', () => {
-        // Reload the view and try again
-        showEvaluationForm(document.getElementById('evaluationForm').getAttribute('data-audit-id'));
-      });
-    } else {
+if (evalFormView) {
+  evalFormView.innerHTML = `
+    <div class="alert alert-danger">
+      Failed to load questions for this task. Please try again.
+      <button id="retryLoadQuestions" class="btn btn-sm btn-warning ml-2">Try Again</button>
+    </div>
+  `;
+  document.getElementById('retryLoadQuestions').addEventListener('click', () => {
+    // Reload the view and try again
+    showEvaluationForm(document.getElementById('evaluationForm').getAttribute('data-audit-id'));
+  });
+} else {
       alert('Unable to load questions. Please return to the Audit Queue and try again.');
     }
   }
