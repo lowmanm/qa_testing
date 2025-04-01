@@ -569,9 +569,70 @@ function handleEvaluationSubmit(e) {
   }
 
   // View an evaluation
-  function viewEvaluation(evaluationId) {
-    alert('View evaluation ' + evaluationId + ' - This feature is not yet implemented');
-  }
+function viewEvaluation(evaluationId) {
+  hideAllViews();
+  document.getElementById('viewEvaluationView').classList.remove('hidden');
+
+  google.script.run.withSuccessHandler(function(evaluations) {
+    var evaluation = evaluations.find(e => e.id === evaluationId);
+    if (!evaluation) {
+      alert("Evaluation not found.");
+      return;
+    }
+
+    const detailsHTML = `
+      <div class="grid-2">
+        <div>
+          <p class="field-label">Task Type</p>
+          <p class="field-value">${formatTaskType(evaluation.taskType)}</p>
+        </div>
+        <div>
+          <p class="field-label">Date</p>
+          <p class="field-value">${formatDate(evaluation.stopTimestamp)}</p>
+        </div>
+        <div>
+          <p class="field-label">Reference</p>
+          <p class="field-value">${evaluation.referenceNumber || 'N/A'}</p>
+        </div>
+        <div>
+          <p class="field-label">QA Agent</p>
+          <p class="field-value">${evaluation.qaEmail}</p>
+        </div>
+        <div class="grid-span-2">
+          <p class="field-label">Feedback</p>
+          <p class="field-value">${evaluation.feedback || 'No feedback provided.'}</p>
+        </div>
+      </div>
+    `;
+    document.getElementById('viewEvaluationDetails').innerHTML = detailsHTML;
+
+    const container = document.getElementById('viewEvaluationQuestions');
+    container.innerHTML = '';
+    evaluation.questions.forEach(q => {
+      const responseLabel = q.response === 'yes' ? 'Yes' : 'No';
+      container.innerHTML += `
+        <div class="question-card">
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
+          </div>
+          <div class="question-body">
+            <p class="field-label">Response:</p>
+            <p class="field-value">${responseLabel}</p>
+            ${q.feedback ? `
+              <p class="field-label">Feedback:</p>
+              <p class="field-value">${q.feedback}</p>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    });
+  }).getAllEvaluations();
+}
+
+document.getElementById('closeViewEvaluation').addEventListener('click', function() {
+  showEvaluations();
+});
 
   // Show dispute form
   // Show dispute form
