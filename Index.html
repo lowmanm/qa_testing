@@ -1,85 +1,352 @@
-<!-- Updated Index.html -->
+
 <!DOCTYPE html>
 <html>
   <head>
     <base target="_top">
-    <style><?!= include('Styles'); ?></style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?!= include('Styles'); ?>
   </head>
   <body>
-    <nav>
-      <button id="navDashboard">Dashboard</button>
-      <button id="navAuditQueue">Audit Queue</button>
-      <button id="navEvaluations">Evaluations</button>
-      <button id="navDisputes">Disputes</button>
-      <button id="navAdmin" style="display: none;">Admin</button>
-    </nav>
+    <div class="container">
+      <header>
+        <h1>QA Evaluation System</h1>
+        <div class="user-info">
+          <span id="userName">Loading...</span>
+          <span class="badge" id="userRole">loading...</span>
+        </div>
+      </header>
 
-    <div id="dashboardView" class="view hidden">
-      <h2>Dashboard</h2>
+      <nav class="tabs">
+        <button id="navDashboard" class="tab-item">Dashboard</button>
+        <button id="navAuditQueue" class="tab-item">Audit Queue</button>
+        <button id="navEvaluations" class="tab-item">Evaluations</button>
+        <button id="navDisputes" class="tab-item">Disputes</button>
+        <button id="navAdmin" class="tab-item">Admin</button>
+      </nav>
+
+      <div id="dashboardView" class="view hidden">
+        <div class="card">
+          <h2>Dashboard</h2>
+          <div id="dashboardStats" class="stats-container">
+            <div class="stat-card">
+              <h3>Pending Audits</h3>
+              <div class="stat-value" id="pendingAuditsCount">-</div>
+            </div>
+            <div class="stat-card">
+              <h3>Completed Evaluations</h3>
+              <div class="stat-value" id="completedEvalsCount">-</div>
+            </div>
+            <div class="stat-card">
+              <h3>Disputed Evaluations</h3>
+              <div class="stat-value" id="disputedEvalsCount">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Import Audit Data</h2>
+          <p>Import audits from the latest email with subject "NVS Audit File" containing an attachment named "nvs_qa_audit.csv".</p>
+          <button id="importButton" class="btn btn-primary">Import Data from Email</button>
+          <div id="importStatus" class="mt-3"></div>
+        </div>
+      </div>
+
+
+      <div id="auditQueueView" class="view hidden">
+        <div class="card">
+          <h2>Pending Audits</h2>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Agent</th>
+                  <th>Task Type</th>
+                  <th>Reference</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pendingTasksBody">
+                <tr>
+                  <td colspan="6" class="text-center">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="evaluationFormView" class="view hidden">
+        <div class="card">
+          <h2>Evaluation Form</h2>
+          <div id="taskDetails" class="task-details mb-4">
+            Loading task details...
+          </div>
+
+          <form id="evaluationForm">
+            <div id="questions" class="questions-container mb-4">
+              Loading questions...
+            </div>
+
+            <div class="form-group mb-4">
+              <label for="feedback">Overall Feedback</label>
+              <textarea id="feedback" name="feedback" rows="3" class="form-control"></textarea>
+            </div>
+
+            <div class="button-group">
+              <button type="button" id="cancelEvaluation" class="btn btn-secondary">Cancel</button>
+              <button type="submit" class="btn btn-primary">Submit Evaluation</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="evaluationsView" class="view hidden">
+        <div class="card">
+          <h2>Completed Evaluations</h2>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Task Type</th>
+                  <th>Agent</th>
+                  <th>Date</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="evaluationsBody">
+                <tr>
+                  <td colspan="6" class="text-center">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="disputeFormView" class="view hidden">
+  <div class="card">
+    <h2>Dispute Evaluation</h2>
+    <p>Please provide the details for your dispute below. Ensure all required fields are filled out.</p>
+    <div id="evaluationDetails" class="evaluation-details mb-4">
+      Loading evaluation details...
     </div>
 
-    <div id="auditQueueView" class="view hidden">
-      <h2>Audit Queue</h2>
-      <table>
-        <thead>
-          <tr><th>Agent</th><th>Task Type</th><th>Ref #</th><th>Date</th><th>Status</th><th>Action</th></tr>
-        </thead>
-        <tbody id="pendingTasksBody"></tbody>
-      </table>
+    <form id="disputeForm">
+      <div id="disputeQuestions" class="questions-container mb-4">
+        Loading questions...
+      </div>
+
+      <div class="form-group mb-4">
+        <label for="disputeReason">Reason for Dispute <span class="required">*</span></label>
+        <textarea id="disputeReason" name="disputeReason" rows="3" class="form-control" required></textarea>
+        <div class="invalid-feedback">Please provide a reason for the dispute.</div>
+      </div>
+
+      <div class="button-group">
+        <button type="button" id="cancelDispute" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Dispute</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+      <div id="disputesView" class="view hidden">
+        <div class="card">
+          <h2>Dispute Requests</h2>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Evaluation</th>
+                  <th>Requested By</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="disputesBody">
+                <tr>
+                  <td colspan="5" class="text-center">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="adminView" class="view hidden">
+        <div class="card">
+          <h2>Admin Panel</h2>
+          <div class="admin-tabs">
+            <button id="adminUsers" class="admin-tab-item active">Users</button>
+            <button id="adminQuestions" class="admin-tab-item">Questions</button>
+            <button id="adminSettings" class="admin-tab-item">Settings</button>
+          </div>
+
+          <div id="adminUsersView" class="admin-tab-content">
+            <div class="admin-actions mb-3">
+              <button id="addUserBtn" class="btn btn-primary">Add User</button>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Manager</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersBody">
+                  <tr>
+                    <td colspan="5" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="userForm" class="form-modal hidden">
+              <div class="form-modal-content">
+                <h3 id="userFormTitle">Add User</h3>
+                <form id="userFormElement">
+                  <input type="hidden" id="userId" name="userId">
+
+                  <div class="form-group">
+                    <label for="userName">Name</label>
+                    <input type="text" id="userName" name="userName" class="form-control" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="userEmail">Email</label>
+                    <input type="email" id="userEmail" name="userEmail" class="form-control" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="userRole">Role</label>
+                    <select id="userRole" name="userRole" class="form-control" required>
+                      <option value="agent">Agent</option>
+                      <option value="manager">Manager</option>
+                      <option value="qa_analyst">QA Analyst</option>
+                      <option value="qa_manager">QA Manager</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="userManager">Manager Email</label>
+                    <input type="email" id="userManager" name="userManager" class="form-control">
+                  </div>
+
+                  <div class="button-group">
+                    <button type="button" id="cancelUserForm" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div id="adminQuestionsView" class="admin-tab-content hidden">
+            <div class="admin-actions mb-3">
+              <button id="addQuestionBtn" class="btn btn-primary">Add Question</button>
+              <div class="filter-group">
+                <label for="taskTypeFilter">Filter by Task Type:</label>
+                <select id="taskTypeFilter" class="form-control">
+                  <option value="">All Types</option>
+                  <option value="phone_call">Phone Call</option>
+                  <option value="email">Email</option>
+                  <option value="chat">Chat</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Task Type</th>
+                    <th>Points</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="questionsBody">
+                  <tr>
+                    <td colspan="4" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="questionForm" class="form-modal hidden">
+              <div class="form-modal-content">
+                <h3 id="questionFormTitle">Add Question</h3>
+                <form id="questionFormElement">
+                  <input type="hidden" id="questionId" name="questionId">
+
+                  <div class="form-group">
+                    <label for="questionText">Question Text</label>
+                    <textarea id="questionText" name="questionText" class="form-control" required></textarea>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="questionTaskType">Task Type</label>
+                    <select id="questionTaskType" name="questionTaskType" class="form-control" required>
+                      <option value="phone_call">Phone Call</option>
+                      <option value="email">Email</option>
+                      <option value="chat">Chat</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="questionPoints">Points Possible</label>
+                    <input type="number" id="questionPoints" name="questionPoints" class="form-control" min="1" max="100" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="questionSetId">Question Set ID (optional)</label>
+                    <input type="text" id="questionSetId" name="questionSetId" class="form-control">
+                    <small class="form-text">Questions in the same set will be grouped together during evaluation.</small>
+                  </div>
+
+                  <div class="button-group">
+                    <button type="button" id="cancelQuestionForm" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div id="adminSettingsView" class="admin-tab-content hidden">
+            <h3>System Settings</h3>
+            <form id="settingsForm">
+              <div class="form-group">
+                <label for="emailSubject">Email Subject for Imports</label>
+                <input type="text" id="emailSubject" name="emailSubject" class="form-control" value="NVS Audit File">
+              </div>
+
+              <div class="form-group">
+                <label for="csvFilename">CSV Filename for Imports</label>
+                <input type="text" id="csvFilename" name="csvFilename" class="form-control" value="nvs_qa_audit.csv">
+              </div>
+
+              <div class="form-group">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div id="evaluationFormView" class="view hidden">
-      <h2>Evaluation Form</h2>
-      <div id="taskDetails"></div>
-      <form id="evaluationForm">
-        <div id="questions"></div>
-        <label for="feedback">General Feedback:</label>
-        <textarea id="feedback" name="feedback" rows="3" class="form-control"></textarea>
-        <button type="submit" class="btn btn-primary">Submit Evaluation</button>
-        <button type="button" id="cancelEvaluation" class="btn">Cancel</button>
-      </form>
-    </div>
-
-    <div id="evaluationsView" class="view hidden">
-      <h2>Completed Evaluations</h2>
-      <table>
-        <thead>
-          <tr><th>Type</th><th>Agent</th><th>Date</th><th>Score</th><th>Status</th><th>Action</th></tr>
-        </thead>
-        <tbody id="evaluationsBody"></tbody>
-      </table>
-    </div>
-
-    <div id="disputeFormView" class="view hidden">
-      <h2>Dispute Evaluation</h2>
-      <div id="evaluationDetails"></div>
-      <form id="disputeForm">
-        <div id="disputeQuestions"></div>
-        <label for="disputeReason">Reason:</label>
-        <textarea id="disputeReason" name="disputeReason" rows="3" class="form-control"></textarea>
-        <button type="submit" class="btn btn-warning">Submit Dispute</button>
-      </form>
-      <div id="disputeResolutionForm"></div>
-    </div>
-
-    <div id="disputesView" class="view hidden">
-      <h2>Dispute Queue</h2>
-      <table>
-        <thead>
-          <tr><th>Eval ID</th><th>Agent</th><th>Submitted</th><th>Questions</th><th>Status</th><th>Action</th></tr>
-        </thead>
-        <tbody id="disputesBody"></tbody>
-      </table>
-    </div>
-
-    <div id="adminView" class="view hidden">
-      <h2>Admin Panel</h2>
-    </div>
-
-    <footer>
-      Logged in as: <span id="userName"></span> (<span id="userRole"></span>)
-    </footer>
-
-    <script><?!= include('JavaScript'); ?></script>
+    <?!= include('JavaScript'); ?>
   </body>
 </html>
