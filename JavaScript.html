@@ -120,28 +120,29 @@
 
   // Load dashboard statistics
   function loadDashboardStats() {
-    // Get pending audits count
-    google.script.run.withSuccessHandler(function(audits) {
-      document.getElementById('pendingAuditsCount').textContent = audits.length;
-    }).getPendingAudits();
+  // Get pending audits count
+  google.script.run.withSuccessHandler(function(audits) {
+    document.getElementById('pendingAuditsCount').textContent = audits.length;
+  }).getPendingAudits();
 
-    // Get all evaluations
-    google.script.run.withSuccessHandler(function(evaluations) {
-      var completed = 0;
-      var disputed = 0;
+  // Get completed evaluations count
+  google.script.run.withSuccessHandler(function(evaluations) {
+    const completed = evaluations.filter(e => e.status === 'completed').length;
+    document.getElementById('completedEvalsCount').textContent = completed;
+  }).getAllEvaluations();
 
-      evaluations.forEach(function(eval) {
-        if (eval.status === 'disputed') {
-          disputed++;
-        } else if (eval.status === 'completed') {
-          completed++;
-        }
-      });
-
-      document.getElementById('completedEvalsCount').textContent = completed;
-      document.getElementById('disputedEvalsCount').textContent = disputed;
-    }).getAllEvaluations();
-  }
+  // Get detailed dispute stats
+  google.script.run.withSuccessHandler(function(stats) {
+    document.getElementById('disputedEvalsCount').innerHTML = `
+      ${stats.total}
+      <div style="font-size: 12px; margin-top: 5px; color: #6b7280;">
+        Partial Overturns: ${stats.partialOverturns}<br>
+        Total Overturned: ${stats.totalOverturned}<br>
+        Disputes Upheld: ${stats.disputesUpheld}
+      </div>
+    `;
+  }).getDisputeStats();
+}
 
   // Show audit queue view
   function showAuditQueue() {
