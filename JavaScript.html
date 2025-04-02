@@ -149,9 +149,12 @@ function loadDashboardStats() {
       else if (percentage < 90) progressClass = 'progress-yellow';
 
       const barFill = document.getElementById('evalProgressBar');
+      const progressText = document.getElementById('evalProgressText');
+
       barFill.style.width = percentage + '%';
-      barFill.textContent = percentage + '%';
       barFill.className = `progress-bar-fill ${progressClass}`;
+
+      progressText.textContent = percentage + '%';
 
     }).getAllEvaluations();
   }).getPendingAudits();
