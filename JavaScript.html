@@ -116,6 +116,8 @@
     document.getElementById('dashboardView').classList.remove('hidden');
     highlightNavItem('navDashboard');
     loadDashboardStats();
+    document.getElementById('dashboardStatsCard')?.classList.remove('hidden');
+    document.getElementById('importAuditCard')?.classList.remove('hidden');
   }
   
 // Helper to hide dashboard cards when navigating via stat card click
