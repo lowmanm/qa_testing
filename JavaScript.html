@@ -1272,7 +1272,7 @@ function hideUserForm() {
     // Convert from UTC to CST
     // CST is UTC-6 hours (or UTC-5 during daylight saving time)
     // For simplicity, we're using a fixed offset of -6 hours
-    var cstOffset = -6;
+    var cstOffset = -5;
     var utc = date.getTime() + (date.getTimezoneOffset() * 60000);
     var cstDate = new Date(utc + (3600000 * cstOffset));
 
