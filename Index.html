@@ -25,55 +25,44 @@
         <button id="navAdmin" class="tab-item">Admin</button>
       </nav>
 
-      <div id="dashboardView" class="view hidden">
+<div id="dashboardView" class="view hidden">
   <div class="card">
     <h2>Dashboard</h2>
-
     <div class="stats-container">
 
-      <div class="stat-card" id="pendingAuditsCard" style="cursor: pointer;" onclick="showAuditQueue()">
-  <h3>Pending Audits</h3>
-  <div class="stat-value" id="pendingAuditsCount">0</div>
-</div>
-
-<div class="stat-card" id="completedEvalsCard" style="cursor: pointer;" onclick="showEvaluations()">
-  <h3>Completed Evaluations</h3>
-  <div class="stat-value" id="completedEvalsCount">0</div>
-  <div class="progress-container mt-2">
-    <div class="progress-bar" id="evaluationProgressBar"></div>
-    <div class="progress-text" id="evaluationProgressText">0%</div>
-  </div>
-</div>
-
-<div class="stat-card" id="disputedEvalsCard" style="cursor: pointer;" onclick="showDisputes()">
-  <h3>Total Disputes</h3>
-  <div class="stat-value" id="disputedEvalsCount">0</div>
-  <div style="font-size: 13px; color: #6b7280; margin-top: 10px;">
-    <div>Partial Overturns: <span id="partialOverturns">0</span></div>
-    <div>Total Overturned: <span id="totalOverturned">0</span></div>
-    <div>Disputes Upheld: <span id="disputesUpheld">0</span></div>
-  </div>
-</div>
-      <div class="stat-card" id="progressCard">
-        <h3>Evaluation Progress</h3>
-        <div class="progress-bar-wrapper">
-        <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="evaluationProgressBar" style="width: 0%;"></div>
+      <div class="stat-card" id="pendingAuditsCard" onclick="showAuditQueue()" style="cursor: pointer;">
+        <h3>Pending Audits</h3>
+        <div class="stat-value" id="pendingAuditsCount">0</div>
       </div>
-    <div class="progress-bar-text" id="evaluationProgressText">0% Complete</div>
-  </div>
-</div>
-    </div>
-  </div>
-</div>
 
-        <div class="card">
-          <h2>Import Audit Data</h2>
-          <p>Import audits from the latest email with subject "NVS Audit File" containing an attachment named "nvs_qa_audit.csv".</p>
-          <button id="importButton" class="btn btn-primary">Import Data from Email</button>
-          <div id="importStatus" class="mt-3"></div>
+      <div class="stat-card" id="completedEvalsCard" onclick="showEvaluations()" style="cursor: pointer;">
+        <h3>Completed Evaluations</h3>
+        <div class="stat-value" id="completedEvalsCount">0</div>
+        <div class="progress-bar-container">
+          <div id="evalProgressBar" class="progress-bar"></div>
         </div>
       </div>
+
+      <div class="stat-card" id="disputedEvalsCard" onclick="showDisputes()" style="cursor: pointer;">
+        <h3>Total Disputes</h3>
+        <div class="stat-value" id="disputedEvalsCount">0</div>
+        <div style="font-size: 13px; color: #6b7280; margin-top: 10px;">
+          <div>Partial Overturns: <span id="partialOverturns">0</span></div>
+          <div>Total Overturned: <span id="totalOverturned">0</span></div>
+          <div>Disputes Upheld: <span id="disputesUpheld">0</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Import Audit Data</h2>
+    <p>Import audits from the latest email with subject "NVS Audit File" containing an attachment named "nvs_qa_audit.csv".</p>
+    <button id="importButton" class="btn btn-primary">Import Data from Email</button>
+    <div id="importStatus" class="mt-3"></div>
+  </div>
+</div>
 
 
       <div id="auditQueueView" class="view hidden">
