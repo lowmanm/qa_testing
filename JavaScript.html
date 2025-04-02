@@ -120,27 +120,20 @@
 
   // Load dashboard statistics
   function loadDashboardStats() {
-  // Get pending audits count
   google.script.run.withSuccessHandler(function(audits) {
     document.getElementById('pendingAuditsCount').textContent = audits.length;
   }).getPendingAudits();
 
-  // Get completed evaluations count
   google.script.run.withSuccessHandler(function(evaluations) {
     const completed = evaluations.filter(e => e.status === 'completed').length;
     document.getElementById('completedEvalsCount').textContent = completed;
   }).getAllEvaluations();
 
-  // Get detailed dispute stats
   google.script.run.withSuccessHandler(function(stats) {
-    document.getElementById('disputedEvalsCount').innerHTML = `
-      ${stats.total}
-      <div style="font-size: 12px; margin-top: 5px; color: #6b7280;">
-        Partial Overturns: ${stats.partialOverturns}<br>
-        Total Overturned: ${stats.totalOverturned}<br>
-        Disputes Upheld: ${stats.disputesUpheld}
-      </div>
-    `;
+    document.getElementById('disputedEvalsCount').textContent = stats.total;
+    document.getElementById('partialOverturns').textContent = stats.partialOverturns;
+    document.getElementById('totalOverturned').textContent = stats.totalOverturned;
+    document.getElementById('disputesUpheld').textContent = stats.disputesUpheld;
   }).getDisputeStats();
 }
 
