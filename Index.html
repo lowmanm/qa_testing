@@ -26,24 +26,30 @@
       </nav>
 
 <div id="dashboardView" class="view hidden">
-  <div class="card">
+  <!-- Dashboard Card -->
+  <div class="card" id="dashboardStatsCard">
     <h2>Dashboard</h2>
     <div class="stats-container">
-
-      <div class="stat-card" id="pendingAuditsCard" onclick="showAuditQueue()" style="cursor: pointer;">
+      <!-- Pending Audits -->
+      <div class="stat-card" id="pendingAuditsCard" onclick="handleDashboardNav(showAuditQueue)">
         <h3>Pending Audits</h3>
         <div class="stat-value" id="pendingAuditsCount">0</div>
       </div>
 
-      <div class="stat-card" id="completedEvalsCard" onclick="showEvaluations()" style="cursor: pointer;">
+      <!-- Completed Evaluations -->
+      <div class="stat-card" id="completedEvalsCard" onclick="handleDashboardNav(showEvaluations)">
         <h3>Completed Evaluations</h3>
         <div class="stat-value" id="completedEvalsCount">0</div>
-        <div class="progress-bar-container">
-          <div id="evalProgressBar" class="progress-bar"></div>
+        <div class="progress-bar-wrapper">
+          <div class="progress-bar-bg">
+            <div id="evalProgressBar" class="progress-bar-fill progress-green" style="width: 0%">0%</div>
+          </div>
+          <div class="progress-bar-text">Completion Rate</div>
         </div>
       </div>
 
-      <div class="stat-card" id="disputedEvalsCard" onclick="showDisputes()" style="cursor: pointer;">
+      <!-- Total Disputes -->
+      <div class="stat-card" id="disputedEvalsCard" onclick="handleDashboardNav(showDisputes)">
         <h3>Total Disputes</h3>
         <div class="stat-value" id="disputedEvalsCount">0</div>
         <div style="font-size: 13px; color: #6b7280; margin-top: 10px;">
@@ -52,11 +58,11 @@
           <div>Disputes Upheld: <span id="disputesUpheld">0</span></div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <div class="card">
+  <!-- Import Audit Data Card -->
+  <div class="card" id="importAuditCard">
     <h2>Import Audit Data</h2>
     <p>Import audits from the latest email with subject "NVS Audit File" containing an attachment named "nvs_qa_audit.csv".</p>
     <button id="importButton" class="btn btn-primary">Import Data from Email</button>
