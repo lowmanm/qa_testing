@@ -438,24 +438,36 @@ function getAllUsers() {
 function createUser(userData) {
   var usersSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
 
-  // Generate ID and metadata
+  // Generate ID if not provided
   if (!userData.id) {
     userData.id = 'user' + new Date().getTime();
   }
+
+  // Add metadata
   userData.createdTimestamp = new Date().toISOString();
   userData.createdBy = userData.createdBy || Session.getActiveUser().getEmail() || 'system';
 
-  // Log userData for inspection
-  Logger.log('userData:', JSON.stringify(userData, null, 2));
+  // Log input object
+  Logger.log('[createUser] userData received:\n' + JSON.stringify(userData, null, 2));
 
-  // Read headers
+  // Get sheet headers
   var headers = usersSheet.getRange(1, 1, 1, usersSheet.getLastColumn()).getValues()[0];
-  Logger.log('Sheet Headers:', headers);
+  Logger.log('[createUser] Sheet Headers: ' + headers.join(', '));
 
-  var row = headers.map(h => userData[h] || '');
-  Logger.log('Row to insert:', row);
+  // Construct row based on header order
+  var row = headers.map(function(header) {
+    var value = userData[header] || '';
+    Logger.log(`[createUser] Mapping header "${header}" to value: "${value}"`);
+    return value;
+  });
 
+  // Log the full row before insertion
+  Logger.log('[createUser] Row to insert: ' + JSON.stringify(row));
+
+  // Append row to sheet
   usersSheet.appendRow(row);
+
+  // Clear cache
   CacheService.getScriptCache().remove('all_users');
 
   return userData;
