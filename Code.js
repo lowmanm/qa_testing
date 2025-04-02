@@ -1134,5 +1134,28 @@ function updateDisputeStatus(disputeId, newStatus) {
   return { success: false, message: "Dispute not found." };
 }
 
+function getDisputeStats() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+  const data = getSheetDataAsObjects(sheet);
 
+  let total = 0;
+  let partialOverturns = 0;
+  let totalOverturned = 0;
+  let disputesUpheld = 0;
+
+  data.forEach(row => {
+    total++;
+    const status = (row.status || '').toLowerCase();
+    if (status === 'partial overturn') partialOverturns++;
+    else if (status === 'overturned') totalOverturned++;
+    else if (status === 'upheld') disputesUpheld++;
+  });
+
+  return {
+    total,
+    partialOverturns,
+    totalOverturned,
+    disputesUpheld
+  };
+}
 
