@@ -120,31 +120,32 @@
 
   // Load dashboard statistics
   function loadDashboardStats() {
-  // Load pending audits count
+  // Load pending audits
   google.script.run.withSuccessHandler(function (audits) {
-    document.getElementById('pendingAuditsCount').textContent = audits.length;
+    const totalAudits = audits.length;
+
+    // Save this for use with evaluation stats
+    window.totalAuditCount = totalAudits;
+
+    document.getElementById('pendingAuditsCount').textContent = totalAudits;
   }).getPendingAudits();
 
-  // Load completed evaluations and update progress bar
+  // Load completed evaluations and calculate percentage
   google.script.run.withSuccessHandler(function (evaluations) {
     const completed = evaluations.filter(e => e.status === 'completed').length;
     document.getElementById('completedEvalsCount').textContent = completed;
 
-    // Assume a goal of 100 evaluations per period
-    const goal = 100;
-    const percent = Math.min(Math.round((completed / goal) * 100), 100);
+    const total = window.totalAuditCount || (completed + 1); // fallback to avoid divide-by-zero
+    const percent = Math.min(Math.round((completed / total) * 100), 100);
 
     const bar = document.getElementById('evaluationProgressBar');
     const text = document.getElementById('evaluationProgressText');
 
-    // Set width and label
     bar.style.width = percent + '%';
     text.textContent = `${percent}% Complete`;
 
-    // Remove existing color classes
     bar.classList.remove('progress-green', 'progress-yellow', 'progress-red');
 
-    // Apply color based on percentage
     if (percent >= 80) {
       bar.classList.add('progress-green');
     } else if (percent >= 50) {
@@ -154,7 +155,7 @@
     }
   }).getAllEvaluations();
 
-  // Load dispute statistics and update breakdown
+  // Load dispute statistics
   google.script.run.withSuccessHandler(function (stats) {
     document.getElementById('disputedEvalsCount').textContent = stats.total;
     document.getElementById('partialOverturns').textContent = stats.partialOverturns;
