@@ -438,37 +438,24 @@ function getAllUsers() {
 function createUser(userData) {
   var usersSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
 
-  // Create a unique user ID if not provided
+  // Generate ID and metadata
   if (!userData.id) {
     userData.id = 'user' + new Date().getTime();
   }
-
-  // Set created timestamp in UTC
   userData.createdTimestamp = new Date().toISOString();
+  userData.createdBy = userData.createdBy || Session.getActiveUser().getEmail() || 'system';
 
-  // Set createdBy if not provided
-  if (!userData.createdBy) {
-    userData.createdBy = Session.getActiveUser().getEmail() || 'system';
-  }
+  // Log userData for inspection
+  Logger.log('userData:', JSON.stringify(userData, null, 2));
 
-  // Get the headers
+  // Read headers
   var headers = usersSheet.getRange(1, 1, 1, usersSheet.getLastColumn()).getValues()[0];
+  Logger.log('Sheet Headers:', headers);
 
-  // Create a row with data in the correct order
-  var row = [];
-  headers.forEach(function(header) {
-    row.push(userData[header] || '');
-  });
+  var row = headers.map(h => userData[h] || '');
+  Logger.log('Row to insert:', row);
 
-  // Log for debugging
-  Logger.log('Creating user with data: ' + JSON.stringify(userData));
-  Logger.log('Headers: ' + JSON.stringify(headers));
-  Logger.log('Row data to insert: ' + JSON.stringify(row));
-
-  // Append the row
   usersSheet.appendRow(row);
-
-  // Invalidate users cache
   CacheService.getScriptCache().remove('all_users');
 
   return userData;
