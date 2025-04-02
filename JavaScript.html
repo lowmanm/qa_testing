@@ -120,31 +120,42 @@
 
   // Load dashboard statistics
   function loadDashboardStats() {
-  google.script.run.withSuccessHandler(function(audits) {
-    const totalAudits = audits.length;
-    document.getElementById('pendingAuditsCount').textContent = totalAudits;
-
-    // Nested to ensure sync data
-    google.script.run.withSuccessHandler(function(evals) {
-      const completed = evals.filter(e => e.status === 'completed').length;
-      document.getElementById('completedEvalsCount').textContent = completed;
-
-      // Calculate and show progress
-      const total = totalAudits + completed;
-      const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-      const bar = document.getElementById('evaluationProgressBar');
-      const text = document.getElementById('evaluationProgressText');
-
-      bar.style.width = percent + '%';
-      text.textContent = `${percent}% Complete`;
-
-    }).getAllEvaluations();
-
+  // Load pending audits count
+  google.script.run.withSuccessHandler(function (audits) {
+    document.getElementById('pendingAuditsCount').textContent = audits.length;
   }).getPendingAudits();
 
-  // Load dispute breakdown
-  google.script.run.withSuccessHandler(function(stats) {
+  // Load completed evaluations and update progress bar
+  google.script.run.withSuccessHandler(function (evaluations) {
+    const completed = evaluations.filter(e => e.status === 'completed').length;
+    document.getElementById('completedEvalsCount').textContent = completed;
+
+    // Assume a goal of 100 evaluations per period
+    const goal = 100;
+    const percent = Math.min(Math.round((completed / goal) * 100), 100);
+
+    const bar = document.getElementById('evaluationProgressBar');
+    const text = document.getElementById('evaluationProgressText');
+
+    // Set width and label
+    bar.style.width = percent + '%';
+    text.textContent = `${percent}% Complete`;
+
+    // Remove existing color classes
+    bar.classList.remove('progress-green', 'progress-yellow', 'progress-red');
+
+    // Apply color based on percentage
+    if (percent >= 80) {
+      bar.classList.add('progress-green');
+    } else if (percent >= 50) {
+      bar.classList.add('progress-yellow');
+    } else {
+      bar.classList.add('progress-red');
+    }
+  }).getAllEvaluations();
+
+  // Load dispute statistics and update breakdown
+  google.script.run.withSuccessHandler(function (stats) {
     document.getElementById('disputedEvalsCount').textContent = stats.total;
     document.getElementById('partialOverturns').textContent = stats.partialOverturns;
     document.getElementById('totalOverturned').textContent = stats.totalOverturned;
