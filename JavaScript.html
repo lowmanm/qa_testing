@@ -126,44 +126,36 @@ function handleDashboardNav(targetFn) {
 }
 
   // Load dashboard statistics
-  function loadDashboardStats() {
-  // Load pending audits
-  google.script.run.withSuccessHandler(function (audits) {
-    const totalAudits = audits.length;
+function loadDashboardStats() {
+  // First, get all audits
+  google.script.run.withSuccessHandler(function(audits) {
+    const total = audits.length;
 
-    // Save this for use with evaluation stats
-    window.totalAuditCount = totalAudits;
+    document.getElementById('pendingAuditsCount').textContent = total;
 
-    document.getElementById('pendingAuditsCount').textContent = totalAudits;
+    // Then, get all evaluations
+    google.script.run.withSuccessHandler(function(evaluations) {
+      const completed = evaluations.filter(e => e.status === 'completed').length;
+      document.getElementById('completedEvalsCount').textContent = completed;
+
+      // Calculate completion %
+      const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+      // Determine color
+      let progressClass = 'progress-green';
+      if (percentage < 70) progressClass = 'progress-red';
+      else if (percentage < 90) progressClass = 'progress-yellow';
+
+      const barFill = document.getElementById('dashboardProgressFill');
+      barFill.style.width = percentage + '%';
+      barFill.textContent = percentage + '%';
+      barFill.className = `progress-bar-fill ${progressClass}`;
+
+    }).getAllEvaluations();
   }).getPendingAudits();
 
-  // Load completed evaluations and calculate percentage
-  google.script.run.withSuccessHandler(function (evaluations) {
-    const completed = evaluations.filter(e => e.status === 'completed').length;
-    document.getElementById('completedEvalsCount').textContent = completed;
-
-    const total = window.totalAuditCount || (completed + 1); // fallback to avoid divide-by-zero
-    const percent = Math.min(Math.round((completed / total) * 100), 100);
-
-    const bar = document.getElementById('evaluationProgressBar');
-    const text = document.getElementById('evaluationProgressText');
-
-    bar.style.width = percent + '%';
-    text.textContent = `${percent}% Complete`;
-
-    bar.classList.remove('progress-green', 'progress-yellow', 'progress-red');
-
-    if (percent >= 80) {
-      bar.classList.add('progress-green');
-    } else if (percent >= 50) {
-      bar.classList.add('progress-yellow');
-    } else {
-      bar.classList.add('progress-red');
-    }
-  }).getAllEvaluations();
-
-  // Load dispute statistics
-  google.script.run.withSuccessHandler(function (stats) {
+  // Load dispute stats separately
+  google.script.run.withSuccessHandler(function(stats) {
     document.getElementById('disputedEvalsCount').textContent = stats.total;
     document.getElementById('partialOverturns').textContent = stats.partialOverturns;
     document.getElementById('totalOverturned').textContent = stats.totalOverturned;
