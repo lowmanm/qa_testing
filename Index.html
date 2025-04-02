@@ -40,12 +40,13 @@
       <div class="stat-card" id="completedEvalsCard" onclick="handleDashboardNav(showEvaluations)">
         <h3>Completed Evaluations</h3>
         <div class="stat-value" id="completedEvalsCount">0</div>
-        <div class="progress-bar-wrapper">
-          <div class="progress-bar-bg">
-            <div id="evalProgressBar" class="progress-bar-fill progress-green" style="width: 0%">0%</div>
-          </div>
-          <div class="progress-bar-text">Completion Rate</div>
-        </div>
+<div class="progress-bar-wrapper">
+  <div class="progress-bar-text" id="evalProgressText">0%</div>
+  <div class="progress-bar-bg">
+    <div id="evalProgressBar" class="progress-bar-fill progress-green" style="width: 0%"></div>
+  </div>
+  <div class="progress-bar-text">Completion Rate</div>
+</div>
       </div>
 
       <!-- Total Disputes -->
