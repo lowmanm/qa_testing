@@ -146,7 +146,7 @@ function loadDashboardStats() {
       if (percentage < 70) progressClass = 'progress-red';
       else if (percentage < 90) progressClass = 'progress-yellow';
 
-      const barFill = document.getElementById('dashboardProgressFill');
+      const barFill = document.getElementById('evalProgressBar');
       barFill.style.width = percentage + '%';
       barFill.textContent = percentage + '%';
       barFill.className = `progress-bar-fill ${progressClass}`;
