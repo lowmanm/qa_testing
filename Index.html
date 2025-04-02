@@ -26,23 +26,32 @@
       </nav>
 
       <div id="dashboardView" class="view hidden">
-        <div class="card">
-          <h2>Dashboard</h2>
-          <div id="dashboardStats" class="stats-container">
-            <div class="stat-card">
-              <h3>Pending Audits</h3>
-              <div class="stat-value" id="pendingAuditsCount">-</div>
-            </div>
-            <div class="stat-card">
-              <h3>Completed Evaluations</h3>
-              <div class="stat-value" id="completedEvalsCount">-</div>
-            </div>
-            <div class="stat-card">
-              <h3>Disputed Evaluations</h3>
-              <div class="stat-value" id="disputedEvalsCount">-</div>
-            </div>
-          </div>
-        </div>
+  <h2>Dashboard</h2>
+
+  <div class="stats-container">
+
+    <div class="stat-card" id="pendingAuditsCard">
+      <h3>Pending Audits</h3>
+      <div class="stat-value" id="pendingAuditsCount">0</div>
+    </div>
+
+    <div class="stat-card" id="completedEvalsCard">
+      <h3>Completed Evaluations</h3>
+      <div class="stat-value" id="completedEvalsCount">0</div>
+    </div>
+
+    <div class="stat-card" id="disputedEvalsCard">
+      <h3>Total Disputes</h3>
+      <div class="stat-value" id="disputedEvalsCount">0</div>
+      <div style="font-size: 13px; color: #6b7280; margin-top: 10px;">
+        <div>Partial Overturns: <span id="partialOverturns">0</span></div>
+        <div>Total Overturned: <span id="totalOverturned">0</span></div>
+        <div>Disputes Upheld: <span id="disputesUpheld">0</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
 
         <div class="card">
           <h2>Import Audit Data</h2>
