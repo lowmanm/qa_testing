@@ -117,6 +117,13 @@
     highlightNavItem('navDashboard');
     loadDashboardStats();
   }
+  
+// Helper to hide dashboard cards when navigating via stat card click
+function handleDashboardNav(targetFn) {
+  document.getElementById('dashboardStatsCard')?.classList.add('hidden');
+  document.getElementById('importAuditCard')?.classList.add('hidden');
+  targetFn(); // navigate to Audit Queue, Evaluations, etc.
+}
 
   // Load dashboard statistics
   function loadDashboardStats() {
