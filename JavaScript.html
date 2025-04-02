@@ -121,14 +121,29 @@
   // Load dashboard statistics
   function loadDashboardStats() {
   google.script.run.withSuccessHandler(function(audits) {
-    document.getElementById('pendingAuditsCount').textContent = audits.length;
+    const totalAudits = audits.length;
+    document.getElementById('pendingAuditsCount').textContent = totalAudits;
+
+    // Nested to ensure sync data
+    google.script.run.withSuccessHandler(function(evals) {
+      const completed = evals.filter(e => e.status === 'completed').length;
+      document.getElementById('completedEvalsCount').textContent = completed;
+
+      // Calculate and show progress
+      const total = totalAudits + completed;
+      const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+      const bar = document.getElementById('evaluationProgressBar');
+      const text = document.getElementById('evaluationProgressText');
+
+      bar.style.width = percent + '%';
+      text.textContent = `${percent}% Complete`;
+
+    }).getAllEvaluations();
+
   }).getPendingAudits();
 
-  google.script.run.withSuccessHandler(function(evaluations) {
-    const completed = evaluations.filter(e => e.status === 'completed').length;
-    document.getElementById('completedEvalsCount').textContent = completed;
-  }).getAllEvaluations();
-
+  // Load dispute breakdown
   google.script.run.withSuccessHandler(function(stats) {
     document.getElementById('disputedEvalsCount').textContent = stats.total;
     document.getElementById('partialOverturns').textContent = stats.partialOverturns;
