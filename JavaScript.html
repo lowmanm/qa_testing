@@ -650,25 +650,78 @@ function showAddQuestionForm() {
 
   function showDisputeForm(evaluationId) {
   hideAllViews();
-  document.getElementById('disputeFormView').classList.remove('hidden');
 
+  const disputeFormView = document.getElementById('disputeFormView');
+  disputeFormView.classList.remove('hidden');
+
+  // 🔄 Rebuild the form HTML to reset previous "Submitting..." or stale state
+  disputeFormView.innerHTML = `
+    <div class="card">
+      <h2>Dispute Evaluation</h2>
+      <p>Please provide the details for your dispute below. Ensure all required fields are filled out.</p>
+      <div id="evaluationDetails" class="evaluation-details mb-4">Loading evaluation details...</div>
+
+      <form id="disputeForm">
+        <div id="disputeQuestions" class="questions-container mb-4">Loading questions...</div>
+
+        <div class="form-group mb-4">
+          <label for="disputeReason">Reason for Dispute <span class="required">*</span></label>
+          <textarea id="disputeReason" name="disputeReason" rows="3" class="form-control" required></textarea>
+          <div class="invalid-feedback">Please provide a reason for the dispute.</div>
+        </div>
+
+        <div class="button-group">
+          <button type="button" id="cancelDispute" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit Dispute</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  // 🧩 Re-attach event listeners after DOM was rebuilt
+  document.getElementById('cancelDispute').addEventListener('click', showEvaluations);
+  document.getElementById('disputeForm').addEventListener('submit', handleDisputeSubmit);
+
+  // 🔍 Load evaluation details and questions
   google.script.run.withSuccessHandler(function(evaluations) {
     const evaluation = evaluations.find(e => e.id === evaluationId);
-    if (!evaluation) return alert("Evaluation not found");
 
-    document.getElementById('disputeForm').setAttribute('data-evaluation-id', evaluationId);
+    if (!evaluation) {
+      console.error("Evaluation not found:", evaluationId);
+      return;
+    }
+
+    const scorePercentage = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
 
     document.getElementById('evaluationDetails').innerHTML = `
       <div class="grid-2">
-        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
-        <div><p class="field-label">Evaluation Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
-        <div><p class="field-label">Reference Number</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
-        <div><p class="field-label">Score</p><p class="field-value">${evaluation.totalPoints}/${evaluation.totalPointsPossible}</p></div>
-        <div class="grid-span-2"><p class="field-label">Feedback</p><p class="field-value">${evaluation.feedback || 'None'}</p></div>
+        <div>
+          <p class="field-label">Task Type</p>
+          <p class="field-value">${formatTaskType(evaluation.taskType)}</p>
+        </div>
+        <div>
+          <p class="field-label">Evaluation Date</p>
+          <p class="field-value">${formatDate(evaluation.stopTimestamp)}</p>
+        </div>
+        <div>
+          <p class="field-label">Reference Number</p>
+          <p class="field-value">${evaluation.referenceNumber || 'N/A'}</p>
+        </div>
+        <div>
+          <p class="field-label">Score</p>
+          <p class="field-value">${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</p>
+        </div>
+        <div class="grid-span-2">
+          <p class="field-label">Feedback</p>
+          <p class="field-value">${evaluation.feedback || 'No feedback provided.'}</p>
+        </div>
       </div>
     `;
 
+    document.getElementById('disputeForm').setAttribute('data-evaluation-id', evaluationId);
+
     loadQuestionsForDispute(evaluation);
+
   }).getAllEvaluations();
 }
 
