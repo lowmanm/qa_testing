@@ -321,55 +321,69 @@
     margin-top: 10px;
   }
 
-/* Style the radio buttons */
+/* Ensure .radio-group lays out buttons inline with spacing */
 .radio-group {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
 
-.radio-group label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-}
-
+/* Hide the native radio input (but still accessible) */
 .radio-group input[type="radio"] {
-    display: none;
+  display: none;
 }
 
+/* Style the span that follows each hidden radio */
 .radio-group input[type="radio"] + span {
-    display: inline-block;
-    padding: 5px 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #f9f9f9;
-    transition: background-color 0.3s, border-color 0.3s, transform 0.3s;
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: background-color 0.3s, border-color 0.3s, transform 0.3s;
+  font-size: 14px;
+  user-select: none;
 }
 
-.radio-group input[type="radio"]:checked + span {
-    color: #fff;
-    animation: scaleUp 0.3s ease-in-out;
+/* Hover style for unselected buttons */
+.radio-group input[type="radio"] + span:hover {
+  background-color: #f0f0f0;
 }
 
+/* Selected YES — green theme */
 .radio-group input[type="radio"]:checked[value="yes"] + span {
-    background-color: #45842a;
-    border-color: #45842a;
+  background-color: #45842a;
+  border-color: #45842a;
+  color: white;
 }
 
+/* Selected NO — red theme */
 .radio-group input[type="radio"]:checked[value="no"] + span {
-    background-color: #9e1b32;
-    border-color: #9e1b32;
+  background-color: #9e1b32;
+  border-color: #9e1b32;
+  color: white;
 }
 
+/* Selected UPHELD — red */
+.radio-group input[type="radio"]:checked[value="upheld"] + span {
+  background-color: #9e1b32;
+  border-color: #9e1b32;
+  color: white;
+}
+
+/* Selected OVERTURNED — green */
+.radio-group input[type="radio"]:checked[value="overturned"] + span {
+  background-color: #45842a;
+  border-color: #45842a;
+  color: white;
+}
+
+/* Optional focus state for accessibility */
 .radio-group input[type="radio"]:focus + span {
-    outline: 2px solid #007bff;
-    outline-offset: 2px;
-}
-
-/* Hover effects */
-.radio-group label:hover span {
-    background-color: #e0e0e0;
-    border-color: #b0b0b0;
+  outline: 2px solid #333;
+  outline-offset: 2px;
 }
 
 /* Keyframe animation for scale effect */
