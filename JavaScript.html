@@ -601,6 +601,48 @@
   }).getAllEvaluations();
 }
 
+  // Load disputes
+  function loadDisputes() {
+    var tableBody = document.getElementById('disputesBody');
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+
+    // Get disputes
+    google.script.run.withSuccessHandler(function(disputes) {
+      if (disputes.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No disputes found</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = '';
+
+      disputes.forEach(function(dispute) {
+        var row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>Evaluation #${dispute.evalId}</td>
+          <td>${dispute.userEmail}</td>
+          <td>${formatDate(dispute.disputeTimestamp)}</td>
+          <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
+          <td>
+            <button class="resolve-dispute-button btn btn-sm btn-primary"
+              data-dispute-id="${dispute.id}">View</button>
+          </td>
+        `;
+
+        tableBody.appendChild(row);
+      });
+
+      // Add event listeners to view dispute buttons
+      document.querySelectorAll('.resolve-dispute-button').forEach(button => {
+  button.addEventListener('click', function () {
+    const id = this.getAttribute('data-dispute-id');
+    resolveDispute(id);
+  });
+});
+
+    }).getAllDisputes();
+  }
+
   function showDisputeForm(evaluationId) {
   hideAllViews();
   document.getElementById('disputeFormView').classList.remove('hidden');
