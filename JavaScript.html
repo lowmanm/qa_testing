@@ -424,34 +424,44 @@ function showAddQuestionForm() {
   e.preventDefault();
 
   const form = document.getElementById('evaluationForm');
-  const questionsContainer = document.getElementById('questions');
+  if (!form) return alert("Evaluation form not found.");
+
   const auditId = form.getAttribute('data-audit-id');
+  const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
   const referenceNumber = form.getAttribute('data-reference-number');
   const taskType = form.getAttribute('data-task-type');
   const outcome = form.getAttribute('data-outcome');
-  const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
-  const feedback = document.getElementById('feedback').value;
+  const feedbackField = document.getElementById('feedback');
+  const feedback = feedbackField ? feedbackField.value : '';
 
+  // Validation: all questions must be answered
   let allAnswered = true;
-  const questions = [];
+  document.querySelectorAll('.question-card').forEach(function (questionCard) {
+    const questionId = questionCard.getAttribute('data-question-id');
+    const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
+    if (!selectedOption) allAnswered = false;
+  });
+
+  if (!allAnswered) {
+    alert("Please answer all questions before submitting the evaluation.");
+    return;
+  }
+
+  // Compile responses
   let score = 0;
+  const questions = [];
 
-  document.querySelectorAll('.question-card').forEach(q => {
-    const questionId = q.getAttribute('data-question-id');
-    const questionText = q.getAttribute('data-question-text');
-    const pointsPossible = parseInt(q.getAttribute('data-points-possible'));
-    const responseEl = document.querySelector(`input[name="question_${questionId}"]:checked`);
-    const questionFeedback = document.getElementById(`feedback_${questionId}`).value;
-
-    if (!responseEl) {
-      allAnswered = false;
-      return;
-    }
-
-    const response = responseEl.value;
+  document.querySelectorAll('.question-card').forEach(function (questionCard) {
+    const questionId = questionCard.getAttribute('data-question-id');
+    const questionText = questionCard.getAttribute('data-question-text');
+    const pointsPossible = parseInt(questionCard.getAttribute('data-points-possible') || 0);
+    const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
+    const response = selectedOption ? selectedOption.value : 'no';
+    const questionFeedbackField = document.getElementById(`feedback_${questionId}`);
+    const questionFeedback = questionFeedbackField ? questionFeedbackField.value : '';
     const pointsEarned = response === 'yes' ? pointsPossible : 0;
-    score += pointsEarned;
 
+    score += pointsEarned;
     questions.push({
       questionId,
       questionText,
@@ -462,16 +472,13 @@ function showAddQuestionForm() {
     });
   });
 
-  if (!allAnswered) {
-    alert("Please answer all questions before submitting the evaluation.");
-    return;
-  }
-
   const evaluationData = {
     auditId,
     referenceNumber,
     taskType,
     outcome,
+    qaEmail: '',
+    startTimestamp: new Date().toISOString(),
     totalPoints: score,
     totalPointsPossible: maxPossibleScore,
     status: 'completed',
@@ -479,33 +486,37 @@ function showAddQuestionForm() {
     questions
   };
 
-  // Show loading indicator
+  // UI: Show loading state
   form.classList.add('hidden');
-  const loading = document.createElement('div');
-  loading.className = 'loading';
-  loading.id = 'evaluationLoadingIndicator';
-  loading.textContent = 'Saving evaluation...';
-  document.getElementById('evaluationFormView').appendChild(loading);
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.id = 'evaluationLoadingIndicator';
+  loadingIndicator.className = 'loading';
+  loadingIndicator.innerText = 'Saving evaluation...';
+  document.getElementById('evaluationFormView').appendChild(loadingIndicator);
 
-  // Save and update
-  google.script.run.withSuccessHandler(function() {
-    updateAuditStatusAndLock(auditId, 'evaluated')
-      .then(() => {
-        alert('Evaluation saved successfully!');
-        resetEvaluationForm();
-        showAuditQueue();
-      })
-      .catch(err => alert('Audit saved but failed to unlock: ' + err.message))
-      .finally(() => {
-        document.getElementById('evaluationLoadingIndicator')?.remove();
-        form.classList.remove('hidden');
-      });
-  }).withFailureHandler(function(error) {
-    alert('Error saving evaluation: ' + error.message);
-    document.getElementById('evaluationLoadingIndicator')?.remove();
-    form.classList.remove('hidden');
-    showAuditQueue();
-  }).saveEvaluation(evaluationData);
+  google.script.run
+    .withSuccessHandler(function () {
+      updateAuditStatusAndLock(auditId, 'evaluated')
+        .then(() => {
+          alert('Evaluation saved and audit unlocked successfully!');
+          resetEvaluationForm();
+          document.getElementById('evaluationLoadingIndicator')?.remove();
+          form.classList.remove('hidden');
+          showAuditQueue();
+        })
+        .catch(error => {
+          console.error('Error updating audit status:', error);
+          alert('Failed to unlock the record. Try again.');
+          document.getElementById('evaluationLoadingIndicator')?.remove();
+          form.classList.remove('hidden');
+        });
+    })
+    .withFailureHandler(function (error) {
+      alert('Error saving evaluation: ' + error.message);
+      document.getElementById('evaluationLoadingIndicator')?.remove();
+      form.classList.remove('hidden');
+    })
+    .saveEvaluation(evaluationData);
 }
 
   function resetEvaluationForm() {
@@ -762,30 +773,48 @@ function showAddQuestionForm() {
   e.preventDefault();
 
   const form = document.getElementById('disputeForm');
+  if (!form) return alert("Dispute form not found.");
+
   const evaluationId = form.getAttribute('data-evaluation-id');
-  const reason = document.getElementById('disputeReason').value;
-  const questionIds = Array.from(document.querySelectorAll('input[name^="dispute_question_"]:checked')).map(cb => cb.value);
+  const reasonField = document.getElementById('disputeReason');
+  const reason = reasonField ? reasonField.value : '';
 
-  if (!questionIds.length) return alert('Select at least one question to dispute.');
-  if (!reason.trim()) return alert('Please provide a reason for the dispute.');
+  if (!reason) {
+    alert('Please provide a reason for the dispute.');
+    return;
+  }
 
-  const payload = {
+  const disputedQuestionIds = [];
+  document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(checkbox => {
+    disputedQuestionIds.push(checkbox.value);
+  });
+
+  if (disputedQuestionIds.length === 0) {
+    alert('Please select at least one question to dispute.');
+    return;
+  }
+
+  const disputeData = {
     evalId: evaluationId,
     reason,
-    questionIds,
+    questionIds: disputedQuestionIds,
     status: 'pending'
   };
 
   form.innerHTML = '<div class="loading">Submitting dispute...</div>';
 
-  google.script.run.withSuccessHandler(() => {
-    alert('Dispute submitted!');
-    showEvaluations();
-  }).withFailureHandler(error => {
-    form.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-    setTimeout(() => showEvaluations(), 3000);
-  }).saveDispute(payload);
+  google.script.run
+    .withSuccessHandler(() => {
+      alert('Dispute submitted successfully!');
+      showEvaluations();
+    })
+    .withFailureHandler(error => {
+      form.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
+      setTimeout(() => showEvaluations(), 3000);
+    })
+    .saveDispute(disputeData);
 }
+
 
   function resolveDispute(disputeId) {
   hideAllViews();
@@ -857,33 +886,31 @@ container.appendChild(card);
   }).getAllEvaluationsAndDisputes();
 }
 
- document.getElementById('resolveDisputeForm').addEventListener('submit', function(e) {
+ document.getElementById('resolveDisputeForm').addEventListener('submit', function (e) {
   e.preventDefault();
+
   const form = e.target;
   const evalId = form.getAttribute('data-eval-id');
   const disputeId = form.getAttribute('data-dispute-id');
-  const resolutionNotes = document.getElementById('resolutionNotes').value;
+  const notesField = document.getElementById('resolutionNotes');
+  const resolutionNotes = notesField ? notesField.value : '';
 
   const decisions = [];
   let overturnCount = 0;
-  let invalid = false;
 
   document.querySelectorAll('#resolveDisputeQuestions .question-card').forEach(card => {
-    const qid = card.querySelector('input[type="radio"]').name.split('_')[1];
-    const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
-    const note = form.querySelector(`#note_${qid}`).value;
+    const qid = card.querySelector('input[type="radio"]')?.name.split('_')[1];
+    if (!qid) return;
 
-    if (!selected) {
-      alert("Please select a resolution for all disputed questions.");
-      invalid = true;
-      return;
-    }
+    const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
+    if (!selected) return;
 
     const resolution = selected.value;
+    const noteField = form.querySelector(`#note_${qid}`);
+    const note = noteField ? noteField.value.trim() : '';
 
-    if (resolution === 'upheld' && !note.trim()) {
-      alert("Please provide justification for upheld questions.");
-      invalid = true;
+    if (resolution === 'upheld' && !note) {
+      alert("Justification is required for upheld questions.");
       return;
     }
 
@@ -892,16 +919,20 @@ container.appendChild(card);
     decisions.push({ questionId: qid, resolution, note });
   });
 
-  if (invalid) return;
-
-  let newStatus = 'upheld';
-  if (overturnCount === decisions.length) newStatus = 'overturned';
-  else if (overturnCount > 0) newStatus = 'partial overturn';
+  const newStatus = overturnCount === 0
+    ? 'upheld'
+    : overturnCount === decisions.length
+    ? 'overturned'
+    : 'partial overturn';
 
   google.script.run
     .withSuccessHandler(() => {
       alert("Dispute resolved successfully.");
       showDisputes();
+    })
+    .withFailureHandler(error => {
+      console.error('Resolution error:', error);
+      alert("Failed to resolve dispute: " + error.message);
     })
     .resolveDispute({
       disputeId,
@@ -911,6 +942,7 @@ container.appendChild(card);
       status: newStatus
     });
 });
+
 
   function loadUsers() {
   const tableBody = document.getElementById('usersBody');
