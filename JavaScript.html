@@ -53,30 +53,38 @@
     targetFn();
   }
 
-  function loadDashboardStats() {
-    google.script.run.withSuccessHandler(audits => {
+   function loadDashboardStats() {
+    // Step 1: Get pending audits
+    google.script.run.withSuccessHandler(function(audits) {
       const total = audits.length;
       document.getElementById('pendingAuditsCount').textContent = total;
 
-      google.script.run.withSuccessHandler(evaluations => {
+      // Step 2: Get completed evaluations
+      google.script.run.withSuccessHandler(function(evaluations) {
         const completed = evaluations.filter(e => e.status === 'completed').length;
-        const percent = total ? Math.round((completed / total) * 100) : 0;
+        document.getElementById('completedEvalsCount').textContent = completed;
+
+        // Step 3: Calculate completion %
+        const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
 
         const bar = document.getElementById('evalProgressBar');
         const text = document.getElementById('evalProgressText');
 
+        // Determine progress bar color class
         let progressClass = 'progress-green';
-        if (percent < 70) progressClass = 'progress-red';
-        else if (percent < 90) progressClass = 'progress-yellow';
+        if (percentage < 70) progressClass = 'progress-red';
+        else if (percentage < 90) progressClass = 'progress-yellow';
 
-        bar.style.width = `${percent}%`;
+        // Update bar and text
+        bar.style.width = percentage + '%';
         bar.className = `progress-bar-fill ${progressClass}`;
-        text.textContent = `${percent}%`;
-      }).getAllEvaluations();
+        text.textContent = percentage + '%';
 
+      }).getAllEvaluations();
     }).getPendingAudits();
 
-    google.script.run.withSuccessHandler(stats => {
+    // Step 4: Load dispute stats
+    google.script.run.withSuccessHandler(function(stats) {
       document.getElementById('disputedEvalsCount').textContent = stats.total;
       document.getElementById('partialOverturns').textContent = stats.partialOverturns;
       document.getElementById('totalOverturned').textContent = stats.totalOverturned;
@@ -222,45 +230,6 @@
     };
     const activeBtn = tabButtonMap[tabId];
     document.getElementById(activeBtn)?.classList.add('active');
-  }
-
-  function loadDashboardStats() {
-    // Step 1: Get pending audits
-    google.script.run.withSuccessHandler(function(audits) {
-      const total = audits.length;
-      document.getElementById('pendingAuditsCount').textContent = total;
-
-      // Step 2: Get completed evaluations
-      google.script.run.withSuccessHandler(function(evaluations) {
-        const completed = evaluations.filter(e => e.status === 'completed').length;
-        document.getElementById('completedEvalsCount').textContent = completed;
-
-        // Step 3: Calculate completion %
-        const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-        const bar = document.getElementById('evalProgressBar');
-        const text = document.getElementById('evalProgressText');
-
-        // Determine progress bar color class
-        let progressClass = 'progress-green';
-        if (percentage < 70) progressClass = 'progress-red';
-        else if (percentage < 90) progressClass = 'progress-yellow';
-
-        // Update bar and text
-        bar.style.width = percentage + '%';
-        bar.className = `progress-bar-fill ${progressClass}`;
-        text.textContent = percentage + '%';
-
-      }).getAllEvaluations();
-    }).getPendingAudits();
-
-    // Step 4: Load dispute stats
-    google.script.run.withSuccessHandler(function(stats) {
-      document.getElementById('disputedEvalsCount').textContent = stats.total;
-      document.getElementById('partialOverturns').textContent = stats.partialOverturns;
-      document.getElementById('totalOverturned').textContent = stats.totalOverturned;
-      document.getElementById('disputesUpheld').textContent = stats.disputesUpheld;
-    }).getDisputeStats();
   }
 
   function showAuditQueue() {
