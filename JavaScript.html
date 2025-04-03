@@ -101,56 +101,78 @@
    /* document.getElementById('resolveDisputeForm')?.addEventListener('submit', handleResolveDisputeSubmit);*/
   }
 
-  function attachAdminHandlers() {
-    document.getElementById('importButton')?.addEventListener('click', () => {
-      const statusDiv = document.getElementById('importStatus');
-      statusDiv.innerHTML = '<div class="alert alert-info">Importing data from email... This may take a moment.</div>';
+ function attachAdminHandlers() {
+  // Users tab
+  const addUserBtn = document.getElementById('addUserBtn');
+  if (addUserBtn) {
+    addUserBtn.addEventListener('click', showAddUserForm);
+  }
 
-      google.script.run
-        .withSuccessHandler(result => {
-          statusDiv.innerHTML = result.success
-            ? `<div class="alert alert-success">${result.message}</div>`
-            : `<div class="alert alert-danger">${result.message}</div>`;
-          loadDashboardStats(); // refresh
-        })
-        .withFailureHandler(error => {
-          statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-        })
-        .importDataFromEmail();
-    });
+  const cancelUserFormBtn = document.getElementById('cancelUserForm');
+  if (cancelUserFormBtn) {
+    cancelUserFormBtn.addEventListener('click', hideUserForm);
+  }
 
-    document.getElementById('adminUsers')?.addEventListener('click', () => {
-      showAdminTab('adminUsersView');
-      loadUsers();
-      hideUserForm();
-    });
+  const userFormElement = document.getElementById('userFormElement');
+  if (userFormElement) {
+    userFormElement.addEventListener('submit', handleUserFormSubmit);
+  }
 
-    document.getElementById('adminQuestions')?.addEventListener('click', () => {
-      showAdminTab('adminQuestionsView');
-      loadQuestions();
-    });
+  // Questions tab
+  const addQuestionBtn = document.getElementById('addQuestionBtn');
+  if (addQuestionBtn) {
+    addQuestionBtn.addEventListener('click', showAddQuestionForm);
+  }
 
-    document.getElementById('adminSettings')?.addEventListener('click', () => {
-      showAdminTab('adminSettingsView');
-    });
+  const cancelQuestionFormBtn = document.getElementById('cancelQuestionForm');
+  if (cancelQuestionFormBtn) {
+    cancelQuestionFormBtn.addEventListener('click', hideQuestionForm);
+  }
 
-    // User form events
-    document.getElementById('addUserBtn')?.addEventListener('click', showAddUserForm);
-    document.getElementById('cancelUserForm')?.addEventListener('click', hideUserForm);
-    document.getElementById('userFormElement')?.addEventListener('submit', handleUserFormSubmit);
+  const questionFormElement = document.getElementById('questionFormElement');
+  if (questionFormElement) {
+    questionFormElement.addEventListener('submit', handleQuestionFormSubmit);
+  }
 
-    // Question form events
-    document.getElementById('addQuestionBtn')?.addEventListener('click', showAddQuestionForm);
-    document.getElementById('cancelQuestionForm')?.addEventListener('click', hideQuestionForm);
-    document.getElementById('questionFormElement')?.addEventListener('submit', handleQuestionFormSubmit);
-    document.getElementById('taskTypeFilter')?.addEventListener('change', loadQuestions);
+  const taskTypeFilter = document.getElementById('taskTypeFilter');
+  if (taskTypeFilter) {
+    taskTypeFilter.addEventListener('change', loadQuestions);
+  }
 
-    // Settings
-    document.getElementById('settingsForm')?.addEventListener('submit', function(e) {
+  // Settings form
+  const settingsForm = document.getElementById('settingsForm');
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', function (e) {
       e.preventDefault();
       alert('Settings saved successfully!');
     });
   }
+
+  // Admin tab navigation
+  const adminUsersTab = document.getElementById('adminUsers');
+  if (adminUsersTab) {
+    adminUsersTab.addEventListener('click', function () {
+      showAdminTab('adminUsersView');
+      loadUsers();
+      hideUserForm();
+    });
+  }
+
+  const adminQuestionsTab = document.getElementById('adminQuestions');
+  if (adminQuestionsTab) {
+    adminQuestionsTab.addEventListener('click', function () {
+      showAdminTab('adminQuestionsView');
+      loadQuestions();
+    });
+  }
+
+  const adminSettingsTab = document.getElementById('adminSettings');
+  if (adminSettingsTab) {
+    adminSettingsTab.addEventListener('click', function () {
+      showAdminTab('adminSettingsView');
+    });
+  }
+}
 
   // == View Management ==
   function hideAllViews() {
