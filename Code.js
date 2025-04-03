@@ -558,7 +558,7 @@ function resolveDispute(resolution) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const questSheet = ss.getSheetByName('evalQuest');
   const summarySheet = ss.getSheetByName('evalSummary');
-  const disputeSheet = ss.getSheetByName('disputes');
+  const disputeSheet = ss.getSheetByName('disputesQueue');
 
   const { disputeId, evalId, decisions, resolutionNotes, status } = resolution;
 
