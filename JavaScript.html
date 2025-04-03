@@ -1065,4 +1065,57 @@ function formatTaskType(type) {
   });
 }
 
+  // Ensure all navigation and admin event listeners are defined after DOM loads
+document.addEventListener('DOMContentLoaded', function () {
+  // Fix missing Disputes loader
+  if (typeof loadDisputes === 'function') {
+    document.getElementById('navDisputes').addEventListener('click', showDisputes);
+  }
+
+  // Fix back button on viewEvaluationView
+  const closeEvalBtn = document.getElementById('closeViewEvaluation');
+  if (closeEvalBtn) {
+    closeEvalBtn.addEventListener('click', function () {
+      showEvaluations();
+    });
+  }
+
+  // Ensure admin tab buttons are wired up correctly
+  const adminUsersBtn = document.getElementById('adminUsers');
+  const adminQuestionsBtn = document.getElementById('adminQuestions');
+  const adminSettingsBtn = document.getElementById('adminSettings');
+
+  if (adminUsersBtn) {
+    adminUsersBtn.addEventListener('click', () => {
+      showAdminTab('adminUsersView');
+      loadUsers();
+      hideUserForm();
+    });
+  }
+
+  if (adminQuestionsBtn) {
+    adminQuestionsBtn.addEventListener('click', () => {
+      showAdminTab('adminQuestionsView');
+      loadQuestions();
+    });
+  }
+
+  if (adminSettingsBtn) {
+    adminSettingsBtn.addEventListener('click', () => {
+      showAdminTab('adminSettingsView');
+    });
+  }
+
+  // Ensure Cancel buttons on forms work
+  const cancelUserBtn = document.getElementById('cancelUserForm');
+  if (cancelUserBtn) {
+    cancelUserBtn.addEventListener('click', hideUserForm);
+  }
+
+  const cancelQuestionBtn = document.getElementById('cancelQuestionForm');
+  if (cancelQuestionBtn) {
+    cancelQuestionBtn.addEventListener('click', hideQuestionForm);
+  }
+});
+
 </script>
