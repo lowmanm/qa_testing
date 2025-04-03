@@ -554,68 +554,81 @@ function updateDisputeStatus(disputeId, newStatus) {
   return { success: true };
 }
 
-function resolveDispute(payload) {
-  const { disputeId, evalId, decisions, resolutionNotes, status } = payload;
-  const now = new Date().toISOString();
-  const user = Session.getActiveUser().getEmail();
-
+function resolveDispute(resolution) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const disputeSheet = ss.getSheetByName('disputesQueue');
-  const evalSheet = ss.getSheetByName('evalSummary');
   const questSheet = ss.getSheetByName('evalQuest');
+  const summarySheet = ss.getSheetByName('evalSummary');
+  const disputeSheet = ss.getSheetByName('disputes');
 
-  // Update question scores and notes
-  const qHeaders = questSheet.getRange(1, 1, 1, questSheet.getLastColumn()).getValues()[0];
-  const data = questSheet.getDataRange().getValues();
+  const { disputeId, evalId, decisions, resolutionNotes, status } = resolution;
 
-  const evalIdIdx = qHeaders.indexOf('evalId');
-  const qIdIdx = qHeaders.indexOf('questionId');
-  const earnedIdx = qHeaders.indexOf('pointsEarned');
-  const possibleIdx = qHeaders.indexOf('pointsPossible');
-  const feedbackIdx = qHeaders.indexOf('feedback');
+  // Update disputed questions
+  const questData = questSheet.getDataRange().getValues();
+  const headers = questData[0];
+  const idIndex = headers.indexOf('evalId');
+  const questionIdIndex = headers.indexOf('questionId');
+  const responseIndex = headers.indexOf('response');
+  const pointsEarnedIndex = headers.indexOf('pointsEarned');
+  const feedbackIndex = headers.indexOf('feedback');
 
-  data.forEach((row, i) => {
-    if (row[evalIdIdx] !== evalId) return;
-    const decision = decisions.find(d => d.questionId === row[qIdIdx]);
-    if (!decision) return;
+  for (let i = 1; i < questData.length; i++) {
+    const row = questData[i];
+    if (row[idIndex] !== evalId) continue;
 
-    const rowNum = i + 1;
-    if (decision.resolution === 'overturned') {
-      questSheet.getRange(rowNum, earnedIdx + 1).setValue(row[possibleIdx]);
+    const matching = decisions.find(d => d.questionId === row[questionIdIndex]);
+    if (!matching) continue;
+
+    // Apply resolution logic
+    if (matching.resolution === 'overturned') {
+      row[responseIndex] = 'yes';
+      row[pointsEarnedIndex] = row[headers.indexOf('pointsPossible')]; // full score
     }
-    if (decision.note) {
-      questSheet.getRange(rowNum, feedbackIdx + 1).setValue(decision.note);
-    }
-  });
 
-  // Update evaluation score
-  const filtered = data.filter(r => r[evalIdIdx] === evalId);
-  const totalEarned = filtered.reduce((sum, r) => sum + (parseInt(r[earnedIdx]) || 0), 0);
-  const totalPossible = filtered.reduce((sum, r) => sum + (parseInt(r[possibleIdx]) || 0), 0);
-
-  const evalHeaders = evalSheet.getRange(1, 1, 1, evalSheet.getLastColumn()).getValues()[0];
-  const rowIndex = evalSheet.getDataRange().getValues().findIndex(r => r[evalHeaders.indexOf('id')] === evalId);
-
-  if (rowIndex >= 1) {
-    evalSheet.getRange(rowIndex + 1, evalHeaders.indexOf('totalPoints') + 1).setValue(totalEarned);
-    evalSheet.getRange(rowIndex + 1, evalHeaders.indexOf('totalPointsPossible') + 1).setValue(totalPossible);
-    evalSheet.getRange(rowIndex + 1, evalHeaders.indexOf('evalScore') + 1)
-      .setValue(Math.round((totalEarned / totalPossible) * 100) + '%');
+    // Update feedback/notes regardless
+    row[feedbackIndex] = matching.note || '';
+    questSheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
   }
 
-  // Update dispute row
-  const dHeaders = disputeSheet.getRange(1, 1, 1, disputeSheet.getLastColumn()).getValues()[0];
-  const dIndex = disputeSheet.getDataRange().getValues().findIndex(r => r[dHeaders.indexOf('id')] === disputeId);
+  // Recalculate total points and evalScore
+  const updatedQuestData = questSheet.getDataRange().getValues().filter(r => r[idIndex] === evalId);
+  const newTotal = updatedQuestData.reduce((acc, row) => acc + (parseFloat(row[pointsEarnedIndex]) || 0), 0);
+  const possible = updatedQuestData.reduce((acc, row) => acc + (parseFloat(row[headers.indexOf('pointsPossible')]) || 0), 0);
+  const newScore = possible > 0 ? newTotal / possible : 0;
 
-  if (dIndex >= 1) {
-    disputeSheet.getRange(dIndex + 1, dHeaders.indexOf('status') + 1).setValue(status);
-    disputeSheet.getRange(dIndex + 1, dHeaders.indexOf('resolutionNotes') + 1).setValue(resolutionNotes);
-    disputeSheet.getRange(dIndex + 1, dHeaders.indexOf('resolvedBy') + 1).setValue(user);
-    disputeSheet.getRange(dIndex + 1, dHeaders.indexOf('resolutionTimestamp') + 1).setValue(now);
+  // Update summary row
+  const summaryData = summarySheet.getDataRange().getValues();
+  const evalIdIndex = summaryData[0].indexOf('evalId');
+  const totalPointsIndex = summaryData[0].indexOf('totalPoints');
+  const scoreIndex = summaryData[0].indexOf('evalScore');
+
+  for (let i = 1; i < summaryData.length; i++) {
+    if (summaryData[i][evalIdIndex] === evalId) {
+      summarySheet.getRange(i + 1, totalPointsIndex + 1).setValue(newTotal);
+      summarySheet.getRange(i + 1, scoreIndex + 1).setValue(newScore);
+      break;
+    }
   }
 
-  CacheService.getScriptCache().removeAll(['all_evaluations', 'all_disputes']);
+  // Mark dispute as resolved
+  const disputesData = disputeSheet.getDataRange().getValues();
+  const dIdIndex = disputesData[0].indexOf('id');
+  const statusIndex = disputesData[0].indexOf('status');
+  const notesIndex = disputesData[0].indexOf('resolutionNotes');
+
+  for (let i = 1; i < disputesData.length; i++) {
+    if (disputesData[i][dIdIndex] === disputeId) {
+      disputeSheet.getRange(i + 1, statusIndex + 1).setValue(status || 'resolved');
+      disputeSheet.getRange(i + 1, notesIndex + 1).setValue(resolutionNotes || '');
+      break;
+    }
+  }
+
+  // Clear caches
+  CacheService.getScriptCache().removeAll(['all_disputes', 'all_evaluations']);
+
+  return true;
 }
+
 
 function getAllEvaluationsAndDisputes() {
   return {
