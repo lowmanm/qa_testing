@@ -333,34 +333,68 @@ function showEvaluationForm(auditId) {
   hideAllViews();
   document.getElementById('evaluationFormView').classList.remove('hidden');
 
-  // ✅ Immediately clear stale data
   const questionsContainer = document.getElementById('questions');
+  const taskDetailsElement = document.getElementById('taskDetails');
   const evalForm = document.getElementById('evaluationForm');
-  if (questionsContainer) questionsContainer.innerHTML = '';
-  if (evalForm) evalForm.reset();
-
-  // ✅ Clear overall feedback field (in case it's sticky)
   const feedbackField = document.getElementById('feedback');
+
+  // ✅ Clear previous state BEFORE loading new audit
+  if (questionsContainer) questionsContainer.innerHTML = '';
+  if (taskDetailsElement) taskDetailsElement.innerHTML = 'Loading task details...';
+  if (evalForm) {
+    evalForm.reset();
+    evalForm.removeAttribute('data-audit-id');
+    evalForm.removeAttribute('data-reference-number');
+    evalForm.removeAttribute('data-task-type');
+    evalForm.removeAttribute('data-outcome');
+    evalForm.removeAttribute('data-max-score');
+  }
   if (feedbackField) feedbackField.value = '';
 
-  // ✅ Clear any loading or retry messages
-  questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
-
-  // ✅ Proceed to fetch task details
+  // ✅ Fetch audit details and load questions
   google.script.run.withSuccessHandler(function(audit) {
-    // existing audit detail rendering logic here...
+    // Render task details
+    taskDetailsElement.innerHTML = `
+      <div class="grid-2">
+        <div>
+          <p class="field-label">Agent</p>
+          <p class="field-value">${audit.agentEmail}</p>
+        </div>
+        <div>
+          <p class="field-label">Task Type</p>
+          <p class="field-value">${formatTaskType(audit.taskType)}</p>
+        </div>
+        <div>
+          <p class="field-label">Reference Number</p>
+          <p class="field-value">${audit.referenceNumber || 'N/A'}</p>
+        </div>
+        <div>
+          <p class="field-label">Date</p>
+          <p class="field-value">${formatDate(audit.taskTimestamp)}</p>
+        </div>
+        <div>
+          <p class="field-label">Request Type</p>
+          <p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p>
+        </div>
+        <div>
+          <p class="field-label">Outcome</p>
+          <p class="field-value">${audit.outcome || 'N/A'}</p>
+        </div>
+      </div>
+    `;
 
-    // Store metadata on form
+    // Set form metadata for later
     evalForm.setAttribute('data-audit-id', auditId);
     evalForm.setAttribute('data-reference-number', audit.referenceNumber || '');
     evalForm.setAttribute('data-task-type', audit.taskType || '');
     evalForm.setAttribute('data-outcome', audit.outcome || '');
 
-    // Now load questions
+    // Load the questions
     loadQuestionsForEvaluation(audit.taskType);
 
   }).prepareEvaluation(auditId);
 }
+
 
 // Load questions for evaluation
 function loadQuestionsForEvaluation(taskType, attempt = 1) {
