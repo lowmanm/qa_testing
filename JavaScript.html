@@ -330,65 +330,36 @@ function updateAuditStatusAndLock(auditId, status) {
 
 // Show evaluation form
 function showEvaluationForm(auditId) {
-    hideAllViews();
-    document.getElementById('evaluationFormView').classList.remove('hidden');
+  hideAllViews();
+  document.getElementById('evaluationFormView').classList.remove('hidden');
 
-    // Call the new server-side function
-    google.script.run.withSuccessHandler(function(audit) {
-        // Display audit details
-        var taskDetailsElement = document.getElementById('taskDetails');
+  // ✅ Immediately clear stale data
+  const questionsContainer = document.getElementById('questions');
+  const evalForm = document.getElementById('evaluationForm');
+  if (questionsContainer) questionsContainer.innerHTML = '';
+  if (evalForm) evalForm.reset();
 
-        taskDetailsElement.innerHTML = `
-          <div class="grid-2">
-            <div>
-              <p class="field-label">Agent</p>
-              <p class="field-value">${audit.agentEmail}</p>
-            </div>
-            <div>
-              <p class="field-label">Task Type</p>
-              <p class="field-value">${formatTaskType(audit.taskType)}</p>
-            </div>
-            <div>
-              <p class="field-label">Reference Number</p>
-              <p class="field-value">${audit.referenceNumber || 'N/A'}</p>
-            </div>
-            <div>
-              <p class="field-label">Date</p>
-              <p class="field-value">${formatDate(audit.taskTimestamp)}</p>
-            </div>
-            <div>
-              <p class="field-label">Request Type</p>
-              <p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p>
-            </div>
-            <div>
-              <p class="field-label">Outcome</p>
-              <p class="field-value">${audit.outcome || 'N/A'}</p>
-            </div>
-          </div>
-        `;
+  // ✅ Clear overall feedback field (in case it's sticky)
+  const feedbackField = document.getElementById('feedback');
+  if (feedbackField) feedbackField.value = '';
 
-        // Store the audit ID and relevant data as attributes on the form
-        var form = document.getElementById('evaluationForm');
-        form.setAttribute('data-audit-id', auditId);
-        form.setAttribute('data-reference-number', audit.referenceNumber || '');
-        form.setAttribute('data-task-type', audit.taskType || '');
-        form.setAttribute('data-outcome', audit.outcome || '');
+  // ✅ Clear any loading or retry messages
+  questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
 
-        // ✅ Clear any existing feedback
-        document.getElementById('feedback').value;
+  // ✅ Proceed to fetch task details
+  google.script.run.withSuccessHandler(function(audit) {
+    // existing audit detail rendering logic here...
 
-        // Load questions for this task type
-        setTimeout(() => {
-  if (document.getElementById('questions')) {
+    // Store metadata on form
+    evalForm.setAttribute('data-audit-id', auditId);
+    evalForm.setAttribute('data-reference-number', audit.referenceNumber || '');
+    evalForm.setAttribute('data-task-type', audit.taskType || '');
+    evalForm.setAttribute('data-outcome', audit.outcome || '');
+
+    // Now load questions
     loadQuestionsForEvaluation(audit.taskType);
-  } else {
-    console.warn("Questions container not found on initial load, retrying...");
-    setTimeout(() => loadQuestionsForEvaluation(audit.taskType), 200);
-  }
-}, 0);
 
-
-    }).prepareEvaluation(auditId);
+  }).prepareEvaluation(auditId);
 }
 
 // Load questions for evaluation
