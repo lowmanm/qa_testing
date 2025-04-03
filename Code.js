@@ -569,6 +569,7 @@ function resolveDispute(resolution) {
   const questionIdIndex = headers.indexOf('questionId');
   const responseIndex = headers.indexOf('response');
   const pointsEarnedIndex = headers.indexOf('pointsEarned');
+  const pointsPossibleIndex = headers.indexOf('pointsPossible');
   const feedbackIndex = headers.indexOf('feedback');
 
   for (let i = 1; i < questData.length; i++) {
@@ -581,7 +582,7 @@ function resolveDispute(resolution) {
     // Apply resolution logic
     if (matching.resolution === 'overturned') {
       row[responseIndex] = 'yes';
-      row[pointsEarnedIndex] = row[headers.indexOf('pointsPossible')]; // full score
+      row[pointsEarnedIndex] = row[pointsPossibleIndex]; // full score
     }
 
     // Update feedback/notes regardless
@@ -592,14 +593,15 @@ function resolveDispute(resolution) {
   // Recalculate total points and evalScore
   const updatedQuestData = questSheet.getDataRange().getValues().filter(r => r[idIndex] === evalId);
   const newTotal = updatedQuestData.reduce((acc, row) => acc + (parseFloat(row[pointsEarnedIndex]) || 0), 0);
-  const possible = updatedQuestData.reduce((acc, row) => acc + (parseFloat(row[headers.indexOf('pointsPossible')]) || 0), 0);
+  const possible = updatedQuestData.reduce((acc, row) => acc + (parseFloat(row[pointsPossibleIndex]) || 0), 0);
   const newScore = possible > 0 ? newTotal / possible : 0;
 
   // Update summary row
   const summaryData = summarySheet.getDataRange().getValues();
-  const evalIdIndex = summaryData[0].indexOf('evalId');
-  const totalPointsIndex = summaryData[0].indexOf('totalPoints');
-  const scoreIndex = summaryData[0].indexOf('evalScore');
+  const summaryHeaders = summaryData[0];
+  const evalIdIndex = summaryHeaders.indexOf('evalId');
+  const totalPointsIndex = summaryHeaders.indexOf('totalPoints');
+  const scoreIndex = summaryHeaders.indexOf('evalScore');
 
   for (let i = 1; i < summaryData.length; i++) {
     if (summaryData[i][evalIdIndex] === evalId) {
@@ -611,14 +613,22 @@ function resolveDispute(resolution) {
 
   // Mark dispute as resolved
   const disputesData = disputeSheet.getDataRange().getValues();
-  const dIdIndex = disputesData[0].indexOf('id');
-  const statusIndex = disputesData[0].indexOf('status');
-  const notesIndex = disputesData[0].indexOf('resolutionNotes');
+  const disputeHeaders = disputesData[0];
+  const dIdIndex = disputeHeaders.indexOf('id');
+  const statusIndex = disputeHeaders.indexOf('status');
+  const notesIndex = disputeHeaders.indexOf('resolutionNotes');
+  const resolvedByIndex = disputeHeaders.indexOf('resolvedBy');
+  const resolvedAtIndex = disputeHeaders.indexOf('resolutionTimestamp');
+
+  const resolver = Session.getActiveUser().getEmail();
+  const timestamp = new Date().toISOString();
 
   for (let i = 1; i < disputesData.length; i++) {
     if (disputesData[i][dIdIndex] === disputeId) {
       disputeSheet.getRange(i + 1, statusIndex + 1).setValue(status || 'resolved');
       disputeSheet.getRange(i + 1, notesIndex + 1).setValue(resolutionNotes || '');
+      disputeSheet.getRange(i + 1, resolvedByIndex + 1).setValue(resolver);
+      disputeSheet.getRange(i + 1, resolvedAtIndex + 1).setValue(timestamp);
       break;
     }
   }
@@ -628,6 +638,7 @@ function resolveDispute(resolution) {
 
   return true;
 }
+
 
 
 function getAllEvaluationsAndDisputes() {
