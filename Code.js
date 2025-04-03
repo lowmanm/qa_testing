@@ -561,6 +561,8 @@ function resolveDispute(resolution) {
   const disputeSheet = ss.getSheetByName('disputesQueue');
 
   const { disputeId, evalId, decisions, resolutionNotes, status } = resolution;
+  const resolvedBy = Session.getActiveUser().getEmail();
+  const resolvedAt = new Date().toISOString();
 
   // Update disputed questions
   const questData = questSheet.getDataRange().getValues();
@@ -569,75 +571,74 @@ function resolveDispute(resolution) {
   const questionIdIndex = headers.indexOf('questionId');
   const responseIndex = headers.indexOf('response');
   const pointsEarnedIndex = headers.indexOf('pointsEarned');
-  const pointsPossibleIndex = headers.indexOf('pointsPossible');
   const feedbackIndex = headers.indexOf('feedback');
+  const pointsPossibleIndex = headers.indexOf('pointsPossible');
 
   for (let i = 1; i < questData.length; i++) {
     const row = questData[i];
     if (row[idIndex] !== evalId) continue;
 
-    const matching = decisions.find(d => d.questionId === row[questionIdIndex]);
-    if (!matching) continue;
+    const match = decisions.find(d => d.questionId === row[questionIdIndex]);
+    if (!match) continue;
 
-    // Apply resolution logic
-    if (matching.resolution === 'overturned') {
+    if (match.resolution === 'overturned') {
       row[responseIndex] = 'yes';
-      row[pointsEarnedIndex] = row[pointsPossibleIndex]; // full score
+      row[pointsEarnedIndex] = row[pointsPossibleIndex]; // Full points
     }
 
-    // Update feedback/notes regardless
-    row[feedbackIndex] = matching.note || '';
+    row[feedbackIndex] = match.note || '';
     questSheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
   }
 
-  // Recalculate total points and evalScore
-  const updatedQuestData = questSheet.getDataRange().getValues().filter(r => r[idIndex] === evalId);
-  const newTotal = updatedQuestData.reduce((acc, row) => acc + (parseFloat(row[pointsEarnedIndex]) || 0), 0);
-  const possible = updatedQuestData.reduce((acc, row) => acc + (parseFloat(row[pointsPossibleIndex]) || 0), 0);
-  const newScore = possible > 0 ? newTotal / possible : 0;
+  // Recalculate totalPoints and evalScore
+  const updatedRows = questSheet.getDataRange().getValues().filter(row => row[idIndex] === evalId);
+  const totalPoints = updatedRows.reduce((sum, row) => sum + (parseFloat(row[pointsEarnedIndex]) || 0), 0);
+  const totalPossible = updatedRows.reduce((sum, row) => sum + (parseFloat(row[pointsPossibleIndex]) || 0), 0);
+  const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
 
-  // Update summary row
+  // Update evalSummary
   const summaryData = summarySheet.getDataRange().getValues();
-  const summaryHeaders = summaryData[0];
-  const evalIdIndex = summaryHeaders.indexOf('evalId');
-  const totalPointsIndex = summaryHeaders.indexOf('totalPoints');
-  const scoreIndex = summaryHeaders.indexOf('evalScore');
+  const sHeaders = summaryData[0];
+  const sIdIndex = sHeaders.indexOf('evalId');
+  const totalPtsIndex = sHeaders.indexOf('totalPoints');
+  const evalScoreIndex = sHeaders.indexOf('evalScore');
+  const statusIndex = sHeaders.indexOf('status');
 
   for (let i = 1; i < summaryData.length; i++) {
-    if (summaryData[i][evalIdIndex] === evalId) {
-      summarySheet.getRange(i + 1, totalPointsIndex + 1).setValue(newTotal);
-      summarySheet.getRange(i + 1, scoreIndex + 1).setValue(newScore);
+    const row = summaryData[i];
+    if (row[sIdIndex] === evalId) {
+      summarySheet.getRange(i + 1, totalPtsIndex + 1).setValue(totalPoints);
+      summarySheet.getRange(i + 1, evalScoreIndex + 1).setValue(evalScore);
+      summarySheet.getRange(i + 1, statusIndex + 1).setValue(status);
       break;
     }
   }
 
-  // Mark dispute as resolved
-  const disputesData = disputeSheet.getDataRange().getValues();
-  const disputeHeaders = disputesData[0];
-  const dIdIndex = disputeHeaders.indexOf('id');
-  const statusIndex = disputeHeaders.indexOf('status');
-  const notesIndex = disputeHeaders.indexOf('resolutionNotes');
-  const resolvedByIndex = disputeHeaders.indexOf('resolvedBy');
-  const resolvedAtIndex = disputeHeaders.indexOf('resolutionTimestamp');
+  // Update dispute row
+  const disputeData = disputeSheet.getDataRange().getValues();
+  const dHeaders = disputeData[0];
+  const dIdIndex = dHeaders.indexOf('id');
+  const dStatusIndex = dHeaders.indexOf('status');
+  const dNotesIndex = dHeaders.indexOf('resolutionNotes');
+  const dByIndex = dHeaders.indexOf('resolvedBy');
+  const dTimeIndex = dHeaders.indexOf('resolutionTimestamp');
 
-  const resolver = Session.getActiveUser().getEmail();
-  const timestamp = new Date().toISOString();
-
-  for (let i = 1; i < disputesData.length; i++) {
-    if (disputesData[i][dIdIndex] === disputeId) {
-      disputeSheet.getRange(i + 1, statusIndex + 1).setValue(status || 'resolved');
-      disputeSheet.getRange(i + 1, notesIndex + 1).setValue(resolutionNotes || '');
-      disputeSheet.getRange(i + 1, resolvedByIndex + 1).setValue(resolver);
-      disputeSheet.getRange(i + 1, resolvedAtIndex + 1).setValue(timestamp);
+  for (let i = 1; i < disputeData.length; i++) {
+    const row = disputeData[i];
+    if (row[dIdIndex] === disputeId) {
+      disputeSheet.getRange(i + 1, dStatusIndex + 1).setValue(status || 'resolved');
+      disputeSheet.getRange(i + 1, dNotesIndex + 1).setValue(resolutionNotes || '');
+      disputeSheet.getRange(i + 1, dByIndex + 1).setValue(resolvedBy);
+      disputeSheet.getRange(i + 1, dTimeIndex + 1).setValue(resolvedAt);
       break;
     }
   }
 
-  // Clear caches
+  // Clear cache
   CacheService.getScriptCache().removeAll(['all_disputes', 'all_evaluations']);
-
   return true;
 }
+
 
 
 
