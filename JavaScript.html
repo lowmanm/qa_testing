@@ -1,11 +1,15 @@
 <script>
   // == Initialization ==
-  document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-    attachNavigationHandlers();
-    attachFormHandlers();
-    attachAdminHandlers();
-  });
+  document.addEventListener('DOMContentLoaded', function () {
+  // Initialize app and load user context
+  initializeApp();
+  // Attach all nav button handlers
+  attachNavHandlers();
+  // Attach form event listeners (evaluation + disputes)
+  attachFormHandlers();
+  // Attach all admin tab handlers (users, questions, settings)
+  attachAdminHandlers();
+});
 
   function initializeApp() {
     google.script.run.withSuccessHandler(user => {
