@@ -41,16 +41,6 @@
   document.getElementById('navAdmin')?.addEventListener('click', showAdmin);
 }
 
-
-  // == Navigation ==
-  function attachNavigationHandlers() {
-    document.getElementById('navDashboard')?.addEventListener('click', showDashboard);
-    document.getElementById('navAuditQueue')?.addEventListener('click', showAuditQueue);
-    document.getElementById('navEvaluations')?.addEventListener('click', showEvaluations);
-    document.getElementById('navDisputes')?.addEventListener('click', showDisputes);
-    document.getElementById('navAdmin')?.addEventListener('click', showAdmin);
-  }
-
   function showDashboard() {
     hideAllViews();
     document.getElementById('dashboardView')?.classList.remove('hidden');
@@ -186,6 +176,17 @@
     });
   }
 }
+
+  // Show the Add User form with cleared values
+function showAddUserForm() {
+  showUserForm();  // This calls the already defined generic showUserForm()
+}
+
+// Show the Add Question form with cleared values
+function showAddQuestionForm() {
+  showQuestionForm(); // This calls the already defined generic showQuestionForm()
+}
+
 
   // == View Management ==
   function hideAllViews() {
