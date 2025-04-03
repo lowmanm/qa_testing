@@ -168,6 +168,27 @@ function getAllUsers() {
   });
 }
 
+function getCurrentUser() {
+  var email = Session.getActiveUser().getEmail();
+  var users = getAllUsers();
+  var user = users.find(function(user) {
+    return user.email === email;
+  });
+
+  // Default to the first user for testing/demo purposes if no matching user
+  if (!user && users.length > 0) {
+    user = users[0];
+  }
+
+  return user || {
+    id: 'unknown',
+    name: 'Unknown User',
+    email: email,
+    role: 'qa_analyst'
+  };
+}
+
+
 function createUser(userData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
 
