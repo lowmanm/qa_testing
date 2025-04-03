@@ -599,7 +599,7 @@ function resolveDispute(resolution) {
   // Update evalSummary
   const summaryData = summarySheet.getDataRange().getValues();
   const sHeaders = summaryData[0];
-  const sIdIndex = sHeaders.indexOf('evalId');
+  const sIdIndex = sHeaders.indexOf('id');
   const totalPtsIndex = sHeaders.indexOf('totalPoints');
   const evalScoreIndex = sHeaders.indexOf('evalScore');
   const statusIndex = sHeaders.indexOf('status');
