@@ -1,97 +1,20 @@
 <script>
-  // On page load
-  document.addEventListener('DOMContentLoaded', function() {
-    // Initialize the app
+  // == Initialization ==
+  document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
-
-    // Add event listeners to navigation buttons
-    document.getElementById('navDashboard').addEventListener('click', showDashboard);
-    document.getElementById('navAuditQueue').addEventListener('click', showAuditQueue);
-    document.getElementById('navEvaluations').addEventListener('click', showEvaluations);
-    document.getElementById('navDisputes').addEventListener('click', showDisputes);
-    document.getElementById('navAdmin').addEventListener('click', showAdmin);
-
-    // Add event listeners to form buttons
-    document.getElementById('cancelEvaluation').addEventListener('click', showAuditQueue);
-    document.getElementById('evaluationForm').addEventListener('submit', handleEvaluationSubmit);
-
-    document.getElementById('cancelDispute').addEventListener('click', showEvaluations);
-    document.getElementById('disputeForm').addEventListener('submit', handleDisputeSubmit);
-
-    // Add event listener for the import button
-    document.getElementById('importButton').addEventListener('click', function() {
-      // Show loading state
-      var statusDiv = document.getElementById('importStatus');
-      statusDiv.innerHTML = '<div class="alert alert-info">Importing data from email... This may take a moment.</div>';
-
-      // Call the server-side function
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            statusDiv.innerHTML = '<div class="alert alert-success">' + result.message + '</div>';
-            loadDashboardStats(); // Refresh the dashboard stats
-          } else {
-            statusDiv.innerHTML = '<div class="alert alert-danger">' + result.message + '</div>';
-          }
-        })
-        .withFailureHandler(function(error) {
-          statusDiv.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
-        })
-        .importDataFromEmail();
-    });
-
-    // Admin panel event listeners
-    document.getElementById('adminUsers').addEventListener('click', function() {
-      console.log('Navigating to Admin view');
-      showAdminTab('adminUsersView');
-      loadUsers();
-      hideUserForm();
-      console.log('addUserBtn:', document.getElementById('addUserBtn'));
-    });
-
-    document.getElementById('adminQuestions').addEventListener('click', function() {
-      showAdminTab('adminQuestionsView');
-      loadQuestions();
-    });
-
-    document.getElementById('adminSettings').addEventListener('click', function() {
-      showAdminTab('adminSettingsView');
-    });
-
-    // User form event listeners
-    document.getElementById('addUserBtn').addEventListener('click', showAddUserForm);
-    document.getElementById('cancelUserForm').addEventListener('click', hideUserForm);
-    document.getElementById('userFormElement').addEventListener('submit', handleUserFormSubmit);
-
-    // Question form event listeners
-    document.getElementById('addQuestionBtn').addEventListener('click', showAddQuestionForm);
-    document.getElementById('cancelQuestionForm').addEventListener('click', hideQuestionForm);
-    document.getElementById('questionFormElement').addEventListener('submit', handleQuestionFormSubmit);
-    document.getElementById('taskTypeFilter').addEventListener('change', loadQuestions);
-
-    // Settings form event listener
-    document.getElementById('settingsForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      alert('Settings saved successfully!');
-    });
+    attachNavigationHandlers();
+    attachFormHandlers();
+    attachAdminHandlers();
   });
 
-
-  // Initialize the app
   function initializeApp() {
-    // Load the current user information
-    google.script.run.withSuccessHandler(function(user) {
+    google.script.run.withSuccessHandler(user => {
       document.getElementById('userName').textContent = user.name;
       document.getElementById('userRole').textContent = formatRole(user.role);
 
-      // Show/hide admin tab based on role
-      if (user.role === 'admin' || user.role === 'qa_manager') {
-        document.getElementById('navAdmin').style.display = 'block';
-      } else {
-        document.getElementById('navAdmin').style.display = 'none';
-      }
+      const isAdmin = user.role === 'admin' || user.role === 'qa_manager';
+      document.getElementById('navAdmin').style.display = isAdmin ? 'block' : 'none';
 
-      // Show different views based on user role
       if (user.role === 'qa_analyst' || user.role === 'qa_manager') {
         showAuditQueue();
       } else {
@@ -100,167 +23,266 @@
     }).getCurrentUser();
   }
 
-  // Format role for display
   function formatRole(role) {
-    if (!role) return 'Unknown';
-
-    // Convert snake_case to Title Case
-    return role.split('_').map(function(word) {
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    }).join(' ');
+    return role
+      ? role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+      : 'Unknown';
   }
 
-  // Show dashboard view
+  // == Navigation ==
+  function attachNavigationHandlers() {
+    document.getElementById('navDashboard')?.addEventListener('click', showDashboard);
+    document.getElementById('navAuditQueue')?.addEventListener('click', showAuditQueue);
+    document.getElementById('navEvaluations')?.addEventListener('click', showEvaluations);
+    document.getElementById('navDisputes')?.addEventListener('click', showDisputes);
+    document.getElementById('navAdmin')?.addEventListener('click', showAdmin);
+  }
+
   function showDashboard() {
     hideAllViews();
-    document.getElementById('dashboardView').classList.remove('hidden');
+    document.getElementById('dashboardView')?.classList.remove('hidden');
     highlightNavItem('navDashboard');
+    document.getElementById('dashboardStatsCard')?.classList.remove('hidden');
+    document.getElementById('importAuditCard')?.classList.remove('hidden');
     loadDashboardStats();
   }
 
-  // Load dashboard statistics
-  function loadDashboardStats() {
-    // Get pending audits count
-    google.script.run.withSuccessHandler(function(audits) {
-      document.getElementById('pendingAuditsCount').textContent = audits.length;
-    }).getPendingAudits();
-
-    // Get all evaluations
-    google.script.run.withSuccessHandler(function(evaluations) {
-      var completed = 0;
-      var disputed = 0;
-
-      evaluations.forEach(function(eval) {
-        if (eval.status === 'disputed') {
-          disputed++;
-        } else if (eval.status === 'completed') {
-          completed++;
-        }
-      });
-
-      document.getElementById('completedEvalsCount').textContent = completed;
-      document.getElementById('disputedEvalsCount').textContent = disputed;
-    }).getAllEvaluations();
+  function handleDashboardNav(targetFn) {
+    document.getElementById('dashboardStatsCard')?.classList.add('hidden');
+    document.getElementById('importAuditCard')?.classList.add('hidden');
+    targetFn();
   }
 
-  // Show audit queue view
+  function loadDashboardStats() {
+    google.script.run.withSuccessHandler(audits => {
+      const total = audits.length;
+      document.getElementById('pendingAuditsCount').textContent = total;
+
+      google.script.run.withSuccessHandler(evaluations => {
+        const completed = evaluations.filter(e => e.status === 'completed').length;
+        const percent = total ? Math.round((completed / total) * 100) : 0;
+
+        const bar = document.getElementById('evalProgressBar');
+        const text = document.getElementById('evalProgressText');
+
+        let progressClass = 'progress-green';
+        if (percent < 70) progressClass = 'progress-red';
+        else if (percent < 90) progressClass = 'progress-yellow';
+
+        bar.style.width = `${percent}%`;
+        bar.className = `progress-bar-fill ${progressClass}`;
+        text.textContent = `${percent}%`;
+      }).getAllEvaluations();
+
+    }).getPendingAudits();
+
+    google.script.run.withSuccessHandler(stats => {
+      document.getElementById('disputedEvalsCount').textContent = stats.total;
+      document.getElementById('partialOverturns').textContent = stats.partialOverturns;
+      document.getElementById('totalOverturned').textContent = stats.totalOverturned;
+      document.getElementById('disputesUpheld').textContent = stats.disputesUpheld;
+    }).getDisputeStats();
+  }
+
+  // == Form + Button Event Handlers ==
+  function attachFormHandlers() {
+    document.getElementById('evaluationForm')?.addEventListener('submit', handleEvaluationSubmit);
+    document.getElementById('disputeForm')?.addEventListener('submit', handleDisputeSubmit);
+    document.getElementById('cancelEvaluation')?.addEventListener('click', showAuditQueue);
+    document.getElementById('cancelDispute')?.addEventListener('click', showEvaluations);
+    document.getElementById('resolveDisputeForm')?.addEventListener('submit', handleResolveDisputeSubmit);
+  }
+
+  function attachAdminHandlers() {
+    document.getElementById('importButton')?.addEventListener('click', () => {
+      const statusDiv = document.getElementById('importStatus');
+      statusDiv.innerHTML = '<div class="alert alert-info">Importing data from email... This may take a moment.</div>';
+
+      google.script.run
+        .withSuccessHandler(result => {
+          statusDiv.innerHTML = result.success
+            ? `<div class="alert alert-success">${result.message}</div>`
+            : `<div class="alert alert-danger">${result.message}</div>`;
+          loadDashboardStats(); // refresh
+        })
+        .withFailureHandler(error => {
+          statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        })
+        .importDataFromEmail();
+    });
+
+    document.getElementById('adminUsers')?.addEventListener('click', () => {
+      showAdminTab('adminUsersView');
+      loadUsers();
+      hideUserForm();
+    });
+
+    document.getElementById('adminQuestions')?.addEventListener('click', () => {
+      showAdminTab('adminQuestionsView');
+      loadQuestions();
+    });
+
+    document.getElementById('adminSettings')?.addEventListener('click', () => {
+      showAdminTab('adminSettingsView');
+    });
+
+    // User form events
+    document.getElementById('addUserBtn')?.addEventListener('click', showAddUserForm);
+    document.getElementById('cancelUserForm')?.addEventListener('click', hideUserForm);
+    document.getElementById('userFormElement')?.addEventListener('submit', handleUserFormSubmit);
+
+    // Question form events
+    document.getElementById('addQuestionBtn')?.addEventListener('click', showAddQuestionForm);
+    document.getElementById('cancelQuestionForm')?.addEventListener('click', hideQuestionForm);
+    document.getElementById('questionFormElement')?.addEventListener('submit', handleQuestionFormSubmit);
+    document.getElementById('taskTypeFilter')?.addEventListener('change', loadQuestions);
+
+    // Settings
+    document.getElementById('settingsForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      alert('Settings saved successfully!');
+    });
+  }
+
+  // == View Management ==
+  function hideAllViews() {
+    const viewIds = [
+      'dashboardView',
+      'auditQueueView',
+      'evaluationFormView',
+      'evaluationsView',
+      'disputesView',
+      'disputeFormView',
+      'adminView',
+      'viewEvaluationView',
+      'resolveDisputeView'
+    ];
+    viewIds.forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  }
+
+  function highlightNavItem(navId) {
+    document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(navId)?.classList.add('active');
+  }
+
+  function showDashboard() {
+    hideAllViews();
+    document.getElementById('dashboardView')?.classList.remove('hidden');
+    highlightNavItem('navDashboard');
+    loadDashboardStats();
+    document.getElementById('dashboardStatsCard')?.classList.remove('hidden');
+    document.getElementById('importAuditCard')?.classList.remove('hidden');
+  }
+
+  function handleDashboardNav(targetFn) {
+    document.getElementById('dashboardStatsCard')?.classList.add('hidden');
+    document.getElementById('importAuditCard')?.classList.add('hidden');
+    targetFn();
+  }
+
+  function showAuditQueue() {
+    hideAllViews();
+    document.getElementById('auditQueueView')?.classList.remove('hidden');
+    highlightNavItem('navAuditQueue');
+    loadPendingTasks();
+  }
+
+  function showEvaluations() {
+    hideAllViews();
+    document.getElementById('evaluationsView')?.classList.remove('hidden');
+    highlightNavItem('navEvaluations');
+    loadEvaluations();
+  }
+
+  function showDisputes() {
+    hideAllViews();
+    document.getElementById('disputesView')?.classList.remove('hidden');
+    highlightNavItem('navDisputes');
+    loadDisputes();
+  }
+
+  function showAdmin() {
+    hideAllViews();
+    document.getElementById('adminView')?.classList.remove('hidden');
+    highlightNavItem('navAdmin');
+    showAdminTab('adminUsersView');
+    loadUsers();
+    hideUserForm();
+  }
+
+  function showAdminTab(tabId) {
+    document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(tabId)?.classList.remove('hidden');
+
+    document.querySelectorAll('.admin-tab-item').forEach(tab => tab.classList.remove('active'));
+    const tabButtonMap = {
+      'adminUsersView': 'adminUsers',
+      'adminQuestionsView': 'adminQuestions',
+      'adminSettingsView': 'adminSettings'
+    };
+    const activeBtn = tabButtonMap[tabId];
+    document.getElementById(activeBtn)?.classList.add('active');
+  }
+
+  function loadDashboardStats() {
+    // Step 1: Get pending audits
+    google.script.run.withSuccessHandler(function(audits) {
+      const total = audits.length;
+      document.getElementById('pendingAuditsCount').textContent = total;
+
+      // Step 2: Get completed evaluations
+      google.script.run.withSuccessHandler(function(evaluations) {
+        const completed = evaluations.filter(e => e.status === 'completed').length;
+        document.getElementById('completedEvalsCount').textContent = completed;
+
+        // Step 3: Calculate completion %
+        const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+        const bar = document.getElementById('evalProgressBar');
+        const text = document.getElementById('evalProgressText');
+
+        // Determine progress bar color class
+        let progressClass = 'progress-green';
+        if (percentage < 70) progressClass = 'progress-red';
+        else if (percentage < 90) progressClass = 'progress-yellow';
+
+        // Update bar and text
+        bar.style.width = percentage + '%';
+        bar.className = `progress-bar-fill ${progressClass}`;
+        text.textContent = percentage + '%';
+
+      }).getAllEvaluations();
+    }).getPendingAudits();
+
+    // Step 4: Load dispute stats
+    google.script.run.withSuccessHandler(function(stats) {
+      document.getElementById('disputedEvalsCount').textContent = stats.total;
+      document.getElementById('partialOverturns').textContent = stats.partialOverturns;
+      document.getElementById('totalOverturned').textContent = stats.totalOverturned;
+      document.getElementById('disputesUpheld').textContent = stats.disputesUpheld;
+    }).getDisputeStats();
+  }
+
   function showAuditQueue() {
     hideAllViews();
     document.getElementById('auditQueueView').classList.remove('hidden');
     highlightNavItem('navAuditQueue');
-
-    // Load pending tasks
     loadPendingTasks();
-  }
-
-  // Show evaluations view
-  function showEvaluations() {
-    hideAllViews();
-    document.getElementById('evaluationsView').classList.remove('hidden');
-    highlightNavItem('navEvaluations');
-
-    // Load evaluations
-    loadEvaluations();
-  }
-
-  // Show disputes view
-  function showDisputes() {
-    hideAllViews();
-    document.getElementById('disputesView').classList.remove('hidden');
-    highlightNavItem('navDisputes');
-
-    // Load disputes
-    loadDisputes();
-  }
-
-  // Show admin view
-function showAdmin() {
-  console.log('showAdmin called');
-  hideAllViews();
-  document.getElementById('adminView').classList.remove('hidden');
-  highlightNavItem('navAdmin');
-
-  // Default to showing users tab
-  showAdminTab('adminUsersView');
-  loadUsers();
-  // Ensure the user form is hidden
-  hideUserForm();
-  console.log('hideUserForm should have been called');
 }
 
-  // Show admin tab
-  function showAdminTab(tabId) {
-    // Hide all admin tab content
-    document.querySelectorAll('.admin-tab-content').forEach(function(content) {
-      content.classList.add('hidden');
-    });
-
-    // Show the selected tab content
-    document.getElementById(tabId).classList.remove('hidden');
-
-    // Update active tab button
-    document.querySelectorAll('.admin-tab-item').forEach(function(tab) {
-      tab.classList.remove('active');
-    });
-
-    // Find the button that corresponds to this tab
-    var tabButton;
-    switch (tabId) {
-      case 'adminUsersView':
-        tabButton = document.getElementById('adminUsers');
-        break;
-      case 'adminQuestionsView':
-        tabButton = document.getElementById('adminQuestions');
-        break;
-      case 'adminSettingsView':
-        tabButton = document.getElementById('adminSettings');
-        break;
-    }
-
-    if (tabButton) {
-      tabButton.classList.add('active');
-    }
-  }
-
-  // Hide all views
-  function hideAllViews() {
-    document.getElementById('dashboardView').classList.add('hidden');
-    document.getElementById('auditQueueView').classList.add('hidden');
-    document.getElementById('evaluationFormView').classList.add('hidden');
-    document.getElementById('evaluationsView').classList.add('hidden');
-    document.getElementById('disputesView').classList.add('hidden');
-    document.getElementById('disputeFormView').classList.add('hidden');
-    document.getElementById('adminView').classList.add('hidden');
-  }
-
-  // Highlight the active navigation item
-  function highlightNavItem(navId) {
-    // Remove highlighting from all nav items
-    document.querySelectorAll('nav button').forEach(function(button) {
-      button.classList.remove('active');
-    });
-
-    // Add highlighting to the selected nav item
-    document.getElementById(navId).classList.add('active');
-  }
-
- // Load pending tasks
-function loadPendingTasks() {
-  var tableBody = document.getElementById('pendingTasksBody');
+  function loadPendingTasks() {
+  const tableBody = document.getElementById('pendingTasksBody');
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
-  // Get pending audits
   google.script.run.withSuccessHandler(function(audits) {
     if (audits.length === 0) {
       tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending audits found</td></tr>';
       return;
     }
 
-    var fragment = document.createDocumentFragment();
-
+    const fragment = document.createDocumentFragment();
     audits.forEach(function(audit) {
-      var row = document.createElement('tr');
-
+      const row = document.createElement('tr');
       row.innerHTML = `
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
@@ -268,30 +290,26 @@ function loadPendingTasks() {
         <td>${formatDate(audit.taskTimestamp)}</td>
         <td><span class="badge badge-${audit.auditStatus}">${audit.auditStatus}</span></td>
         <td>
-          <button class="evaluate-button btn btn-sm btn-primary"
-            data-audit-id="${audit.auditId}">Evaluate</button>
+          <button class="evaluate-button btn btn-sm btn-primary" data-audit-id="${audit.auditId}">Evaluate</button>
         </td>
       `;
-
       fragment.appendChild(row);
     });
 
     tableBody.innerHTML = '';
     tableBody.appendChild(fragment);
-
   }).getPendingAudits();
 
-  // Use event delegation for evaluate buttons
+  // Delegate event for all evaluate buttons
   tableBody.addEventListener('click', function(event) {
     if (event.target.classList.contains('evaluate-button')) {
-      var auditId = event.target.getAttribute('data-audit-id');
+      const auditId = event.target.getAttribute('data-audit-id');
       showEvaluationForm(auditId);
     }
   });
 }
 
-// Update audit status and lock the record
-function updateAuditStatusAndLock(auditId, status) {
+  function updateAuditStatusAndLock(auditId, status) {
   return new Promise((resolve, reject) => {
     google.script.run
       .withSuccessHandler(resolve)
@@ -300,835 +318,751 @@ function updateAuditStatusAndLock(auditId, status) {
   });
 }
 
-// Show evaluation form
-function showEvaluationForm(auditId) {
-    hideAllViews();
-    document.getElementById('evaluationFormView').classList.remove('hidden');
-
-    // Call the new server-side function
-    google.script.run.withSuccessHandler(function(audit) {
-        // Display audit details
-        var taskDetailsElement = document.getElementById('taskDetails');
-
-        taskDetailsElement.innerHTML = `
-          <div class="grid-2">
-            <div>
-              <p class="field-label">Agent</p>
-              <p class="field-value">${audit.agentEmail}</p>
-            </div>
-            <div>
-              <p class="field-label">Task Type</p>
-              <p class="field-value">${formatTaskType(audit.taskType)}</p>
-            </div>
-            <div>
-              <p class="field-label">Reference Number</p>
-              <p class="field-value">${audit.referenceNumber || 'N/A'}</p>
-            </div>
-            <div>
-              <p class="field-label">Date</p>
-              <p class="field-value">${formatDate(audit.taskTimestamp)}</p>
-            </div>
-            <div>
-              <p class="field-label">Request Type</p>
-              <p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p>
-            </div>
-            <div>
-              <p class="field-label">Outcome</p>
-              <p class="field-value">${audit.outcome || 'N/A'}</p>
-            </div>
-          </div>
-        `;
-
-        // Store the audit ID and relevant data as attributes on the form
-        var form = document.getElementById('evaluationForm');
-        form.setAttribute('data-audit-id', auditId);
-        form.setAttribute('data-reference-number', audit.referenceNumber || '');
-        form.setAttribute('data-task-type', audit.taskType || '');
-        form.setAttribute('data-outcome', audit.outcome || '');
-
-        // Load questions for this task type
-        loadQuestionsForEvaluation(audit.taskType);
-
-    }).prepareEvaluation(auditId);
-}
-
-
-  // Load questions for evaluation
-function loadQuestionsForEvaluation(taskType) {
-    var questionsContainer = document.getElementById('questions');
-
-    if (!questionsContainer) {
-        console.error('Questions container not found');
-        return;
-    }
-
-    questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
-
-    // Get questions for this task type
-    google.script.run.withSuccessHandler(function(questions) {
-        var maxPossibleScore = 0;
-
-        if (questions.length === 0) {
-            questionsContainer.innerHTML = '<div class="alert alert-warning">No questions found for this task type.</div>';
-            return;
-        }
-
-        questionsContainer.innerHTML = '';
-
-        questions.forEach(function(question) {
-            if (question.pointsPossible > 0) {
-                maxPossibleScore += parseInt(question.pointsPossible);
-            }
-
-            var questionElement = document.createElement('div');
-            questionElement.className = 'question-card';
-
-            var questionHtml = `
-                <div class="question-header">
-                    <h3 class="question-text">${question.questionText}</h3>
-                    <span class="question-points">Points: ${question.pointsPossible}</span>
-                </div>
-                <div class="question-body">
-                    <div class="radio-group">
-                        <label>
-                            <input type="radio" name="question_${question.id}" value="yes" required>
-                            <span>Yes</span>
-                        </label>
-                        <label>
-                            <input type="radio" name="question_${question.id}" value="no">
-                            <span>No</span>
-                        </label>
-                    </div>
-                    <div class="feedback-field">
-                        <label for="feedback_${question.id}">Specific Feedback:</label>
-                        <textarea id="feedback_${question.id}" name="feedback_${question.id}" rows="2" class="form-control"></textarea>
-                    </div>
-                </div>
-            `;
-
-            questionElement.innerHTML = questionHtml;
-            questionsContainer.appendChild(questionElement);
-
-            // Store the question data as a data attribute
-            questionElement.setAttribute('data-question-id', question.id);
-            questionElement.setAttribute('data-question-text', question.questionText);
-            questionElement.setAttribute('data-points-possible', question.pointsPossible);
-        });
-
-        // Store the maximum possible score as a data attribute on the form
-        document.getElementById('evaluationForm').setAttribute('data-max-score', maxPossibleScore);
-
-    }).getQuestionsForTaskType(taskType);
-}
-
-// Handle evaluation form submission
-function handleEvaluationSubmit(e) {
-    e.preventDefault();
-
-    // Get form data
-    var form = document.getElementById('evaluationForm');
-    var auditId = form.getAttribute('data-audit-id');
-    var maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
-    var referenceNumber = form.getAttribute('data-reference-number');
-    var taskType = form.getAttribute('data-task-type');
-    var outcome = form.getAttribute('data-outcome');
-    var feedback = document.getElementById('feedback').value;
-
-    // Calculate score and collect results
-    var score = 0;
-    var questions = [];
-
-    // Process each question
-    document.querySelectorAll('.question-card').forEach(function(questionCard) {
-        var questionId = questionCard.getAttribute('data-question-id');
-        var questionText = questionCard.getAttribute('data-question-text');
-        var pointsPossible = parseInt(questionCard.getAttribute('data-points-possible') || 0);
-
-        var selectedOption = document.querySelector('input[name="question_' + questionId + '"]:checked');
-        var response = selectedOption ? selectedOption.value : 'no';
-        var questionFeedback = document.getElementById('feedback_' + questionId).value;
-
-        // Calculate points earned based on response (yes/no) and possible points
-        var pointsEarned = response === 'yes' ? pointsPossible : 0;
-        score += pointsEarned;
-
-        questions.push({
-            questionId: questionId,
-            questionText: questionText,
-            response: response,
-            pointsEarned: pointsEarned,
-            pointsPossible: pointsPossible,
-            feedback: questionFeedback
-        });
-    });
-
-    // Create evaluation object
-    var evaluationData = {
-        auditId: auditId,
-        referenceNumber: referenceNumber,
-        taskType: taskType,
-        outcome: outcome,
-        qaEmail: '', // Will be set server-side to current user
-        startTimestamp: new Date().toISOString(), // UTC
-        totalPoints: score,
-        totalPointsPossible: maxPossibleScore,
-        status: 'completed',
-        feedback: feedback,
-        questions: questions
-    };
-
-    // Show loading state
-    form.innerHTML = '<div class="loading">Saving evaluation...</div>';
-
-    // Save the evaluation
-    google.script.run
-        .withSuccessHandler(function(result) {
-            // Update the audit status to "evaluated" and unlock the record
-            updateAuditStatusAndLock(auditId, 'evaluated')
-                .then(() => {
-                    alert('Evaluation saved and audit unlocked successfully!');
-                    showAuditQueue();
-                })
-                .catch(error => {
-                    console.error('Error updating audit status:', error);
-                    alert('Failed to unlock the record after saving evaluation. Please try again.');
-                });
-        })
-        .withFailureHandler(function(error) {
-            form.innerHTML = '<div class="alert alert-danger">Error saving evaluation: ' + error.message + '</div>';
-            setTimeout(function() {
-                showAuditQueue();
-            }, 3000);
-        })
-        .saveEvaluation(evaluationData);
-}
-
-  // Load evaluations
-  function loadEvaluations() {
-    var tableBody = document.getElementById('evaluationsBody');
-    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
-
-    // Get evaluations
-    google.script.run.withSuccessHandler(function(evaluations) {
-      if (evaluations.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No evaluations found</td></tr>';
-        return;
-      }
-
-      tableBody.innerHTML = '';
-
-      evaluations.forEach(function(evaluation) {
-        var row = document.createElement('tr');
-
-        // Calculate score percentage
-        var scorePercentage = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
-        var scoreClass = 'score-high';
-
-        if (scorePercentage < 70) {
-          scoreClass = 'score-low';
-        } else if (scorePercentage < 90) {
-          scoreClass = 'score-medium';
-        }
-
-        row.innerHTML = `
-          <td>${formatTaskType(evaluation.taskType)}</td>
-          <td>${evaluation.qaEmail}</td>
-          <td>${formatDate(evaluation.stopTimestamp)}</td>
-          <td class="evaluation-score ${scoreClass}">${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</td>
-          <td><span class="badge badge-${evaluation.status}">${evaluation.status}</span></td>
-          <td>
-            <button class="view-evaluation-button btn btn-sm btn-primary"
-              data-evaluation-id="${evaluation.id}">View</button>
-
-            ${evaluation.status === 'completed' ?
-              `<button class="dispute-button btn btn-sm btn-danger ml-2"
-                data-evaluation-id="${evaluation.id}">Dispute</button>` : ''}
-          </td>
-        `;
-
-        tableBody.appendChild(row);
-      });
-
-      // Add event listeners to buttons
-      document.querySelectorAll('.view-evaluation-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var evaluationId = this.getAttribute('data-evaluation-id');
-          viewEvaluation(evaluationId);
-        });
-      });
-
-      document.querySelectorAll('.dispute-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var evaluationId = this.getAttribute('data-evaluation-id');
-          console.log('Dispute button clicked, evaluationId:', evaluationId); // Logging the evaluationId
-          showDisputeForm(evaluationId);
-        });
-      });
-
-    }).getAllEvaluations();
-  }
-
-  // View an evaluation
-  function viewEvaluation(evaluationId) {
-    alert('View evaluation ' + evaluationId + ' - This feature is not yet implemented');
-  }
-
-  // Show dispute form
-  // Show dispute form
-function showDisputeForm(evaluationId) {
+  function showEvaluationForm(auditId) {
   hideAllViews();
-  document.getElementById('disputeFormView').classList.remove('hidden');
+  document.getElementById('evaluationFormView').classList.remove('hidden');
 
-  // Get evaluation details
-  google.script.run.withSuccessHandler(function(evaluations) {
-    var evaluation = evaluations.find(function(e) { return e.id === evaluationId; });
+  const form = document.getElementById('evaluationForm');
+  const taskDetails = document.getElementById('taskDetails');
+  const questionsContainer = document.getElementById('questions');
+  const feedbackField = document.getElementById('feedback');
 
-    if (!evaluation) {
-      console.error("Evaluation not found:", evaluationId);
-      return;
-    }
+  // Clear old state
+  form.reset();
+  questionsContainer.innerHTML = '';
+  taskDetails.innerHTML = 'Loading task details...';
+  feedbackField.value = '';
+  ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr => form.removeAttribute(attr));
 
-    // Display evaluation details
-    var evaluationDetailsElement = document.getElementById('evaluationDetails');
-
-    // Calculate score percentage
-    var scorePercentage = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
-
-    evaluationDetailsElement.innerHTML = `
+  // Fetch and render new audit
+  google.script.run.withSuccessHandler(function(audit) {
+    taskDetails.innerHTML = `
       <div class="grid-2">
-        <div>
-          <p class="field-label">Task Type</p>
-          <p class="field-value">${formatTaskType(evaluation.taskType)}</p>
-        </div>
-        <div>
-          <p class="field-label">Evaluation Date</p>
-          <p class="field-value">${formatDate(evaluation.stopTimestamp)}</p>
-        </div>
-        <div>
-          <p class="field-label">Reference Number</p>
-          <p class="field-value">${evaluation.referenceNumber || 'N/A'}</p>
-        </div>
-        <div>
-          <p class="field-label">Score</p>
-          <p class="field-value">${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</p>
-        </div>
-        <div class="grid-span-2">
-          <p class="field-label">Feedback</p>
-          <p class="field-value">${evaluation.feedback || 'No feedback provided.'}</p>
-        </div>
+        <div><p class="field-label">Agent</p><p class="field-value">${audit.agentEmail}</p></div>
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(audit.taskType)}</p></div>
+        <div><p class="field-label">Reference Number</p><p class="field-value">${audit.referenceNumber || 'N/A'}</p></div>
+        <div><p class="field-label">Date</p><p class="field-value">${formatDate(audit.taskTimestamp)}</p></div>
+        <div><p class="field-label">Request Type</p><p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p></div>
+        <div><p class="field-label">Outcome</p><p class="field-value">${audit.outcome || 'N/A'}</p></div>
       </div>
     `;
 
-    // Store the evaluation ID as a data attribute on the form
-    document.getElementById('disputeForm').setAttribute('data-evaluation-id', evaluationId);
+    // Form metadata
+    form.setAttribute('data-audit-id', auditId);
+    form.setAttribute('data-reference-number', audit.referenceNumber || '');
+    form.setAttribute('data-task-type', audit.taskType || '');
+    form.setAttribute('data-outcome', audit.outcome || '');
 
-    // Log the evaluation object to check its contents
-    console.log('Evaluation object:', evaluation);
-
-    // Load questions and responses for this evaluation
-    loadQuestionsForDispute(evaluation);
-
-  }).getAllEvaluations();
+    // Load relevant questions
+    loadQuestionsForEvaluation(audit.taskType);
+  }).prepareEvaluation(auditId);
 }
 
-// Load questions for dispute
-function loadQuestionsForDispute(evaluation) {
-  var disputeQuestionsContainer = document.getElementById('disputeQuestions');
-  disputeQuestionsContainer.innerHTML = '';
+  function loadQuestionsForEvaluation(taskType, attempt = 1) {
+  const maxRetries = 5;
+  const questionsContainer = document.getElementById('questions');
+  const form = document.getElementById('evaluationForm');
 
-  if (!evaluation.questions || evaluation.questions.length === 0) {
-    disputeQuestionsContainer.innerHTML = '<div class="alert alert-warning">No questions found for this evaluation.</div>';
+  if (!questionsContainer) {
+    if (attempt < maxRetries) {
+      return setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
+    } else {
+      alert('Failed to load questions. Please return to the Audit Queue and try again.');
+      return;
+    }
+  }
+
+  questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
+
+  google.script.run.withSuccessHandler(function(questions) {
+    let maxPossibleScore = 0;
+    questionsContainer.innerHTML = '';
+
+    if (questions.length === 0) {
+      questionsContainer.innerHTML = '<div class="alert alert-warning">No questions found for this task type.</div>';
+      return;
+    }
+
+    questions.forEach(q => {
+      maxPossibleScore += parseInt(q.pointsPossible || 0);
+
+      const questionCard = document.createElement('div');
+      questionCard.className = 'question-card';
+      questionCard.setAttribute('data-question-id', q.id);
+      questionCard.setAttribute('data-question-text', q.questionText);
+      questionCard.setAttribute('data-points-possible', q.pointsPossible);
+
+      questionCard.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Points: ${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label><input type="radio" name="question_${q.id}" value="yes"> <span>Yes</span></label>
+            <label><input type="radio" name="question_${q.id}" value="no"> <span>No</span></label>
+          </div>
+          <div class="feedback-field">
+            <label for="feedback_${q.id}">Specific Feedback:</label>
+            <textarea id="feedback_${q.id}" name="feedback_${q.id}" rows="2" class="form-control"></textarea>
+          </div>
+        </div>
+      `;
+      questionsContainer.appendChild(questionCard);
+    });
+
+    form.setAttribute('data-max-score', maxPossibleScore);
+  }).getQuestionsForTaskType(taskType);
+}
+
+  function handleEvaluationSubmit(e) {
+  e.preventDefault();
+
+  const form = document.getElementById('evaluationForm');
+  const questionsContainer = document.getElementById('questions');
+  const auditId = form.getAttribute('data-audit-id');
+  const referenceNumber = form.getAttribute('data-reference-number');
+  const taskType = form.getAttribute('data-task-type');
+  const outcome = form.getAttribute('data-outcome');
+  const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
+  const feedback = document.getElementById('feedback').value;
+
+  let allAnswered = true;
+  const questions = [];
+  let score = 0;
+
+  document.querySelectorAll('.question-card').forEach(q => {
+    const questionId = q.getAttribute('data-question-id');
+    const questionText = q.getAttribute('data-question-text');
+    const pointsPossible = parseInt(q.getAttribute('data-points-possible'));
+    const responseEl = document.querySelector(`input[name="question_${questionId}"]:checked`);
+    const questionFeedback = document.getElementById(`feedback_${questionId}`).value;
+
+    if (!responseEl) {
+      allAnswered = false;
+      return;
+    }
+
+    const response = responseEl.value;
+    const pointsEarned = response === 'yes' ? pointsPossible : 0;
+    score += pointsEarned;
+
+    questions.push({
+      questionId,
+      questionText,
+      response,
+      pointsEarned,
+      pointsPossible,
+      feedback: questionFeedback
+    });
+  });
+
+  if (!allAnswered) {
+    alert("Please answer all questions before submitting the evaluation.");
     return;
   }
 
-  evaluation.questions.forEach(function(question) {
-    var questionElement = document.createElement('div');
-    questionElement.className = 'question-card';
+  const evaluationData = {
+    auditId,
+    referenceNumber,
+    taskType,
+    outcome,
+    totalPoints: score,
+    totalPointsPossible: maxPossibleScore,
+    status: 'completed',
+    feedback,
+    questions
+  };
 
-    var responseText = question.response;
-    if (!isNaN(parseInt(responseText))) {
-      var value = parseInt(responseText);
-      var labels = ['Poor', 'Below Average', 'Average', 'Good', 'Excellent'];
-      responseText = value + ' - ' + (labels[value - 1] || '');
+  // Show loading indicator
+  form.classList.add('hidden');
+  const loading = document.createElement('div');
+  loading.className = 'loading';
+  loading.id = 'evaluationLoadingIndicator';
+  loading.textContent = 'Saving evaluation...';
+  document.getElementById('evaluationFormView').appendChild(loading);
+
+  // Save and update
+  google.script.run.withSuccessHandler(function() {
+    updateAuditStatusAndLock(auditId, 'evaluated')
+      .then(() => {
+        alert('Evaluation saved successfully!');
+        resetEvaluationForm();
+        showAuditQueue();
+      })
+      .catch(err => alert('Audit saved but failed to unlock: ' + err.message))
+      .finally(() => {
+        document.getElementById('evaluationLoadingIndicator')?.remove();
+        form.classList.remove('hidden');
+      });
+  }).withFailureHandler(function(error) {
+    alert('Error saving evaluation: ' + error.message);
+    document.getElementById('evaluationLoadingIndicator')?.remove();
+    form.classList.remove('hidden');
+    showAuditQueue();
+  }).saveEvaluation(evaluationData);
+}
+
+  function resetEvaluationForm() {
+  const form = document.getElementById('evaluationForm');
+  form.reset();
+
+  const questionsContainer = document.getElementById('questions');
+  if (questionsContainer) questionsContainer.innerHTML = '';
+
+  const feedbackField = document.getElementById('feedback');
+  if (feedbackField) feedbackField.value = '';
+
+  ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr =>
+    form.removeAttribute(attr)
+  );
+}
+
+  function loadEvaluations() {
+  const tableBody = document.getElementById('evaluationsBody');
+  tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+
+  google.script.run.withSuccessHandler(function(evaluations) {
+    if (!evaluations.length) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No evaluations found</td></tr>';
+      return;
     }
 
-    questionElement.innerHTML = `
-      <div class="question-header">
-        <h3 class="question-text">${question.questionText}</h3>
-        <span class="question-points">Score: ${question.pointsEarned}/${question.pointsPossible}</span>
-      </div>
-      <div class="question-body">
-        <div class="response-display">
-          <p class="field-label">Response:</p>
-          <p class="field-value">${responseText}</p>
-        </div>
-        ${question.feedback ? `
-        <div class="feedback-display">
-          <p class="field-label">Feedback:</p>
-          <p class="field-value">${question.feedback}</p>
-        </div>
-        ` : ''}
-        <div class="dispute-checkbox">
-          <label>
-            <input type="checkbox" name="dispute_question_${question.questionId}" value="${question.questionId}">
-            <span>Dispute this question</span>
-          </label>
-        </div>
+    tableBody.innerHTML = '';
+
+    evaluations.forEach(e => {
+      const percentage = Math.round((e.totalPoints / e.totalPointsPossible) * 100);
+      let scoreClass = 'score-high';
+      if (percentage < 70) scoreClass = 'score-low';
+      else if (percentage < 90) scoreClass = 'score-medium';
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${formatTaskType(e.taskType)}</td>
+        <td>${e.qaEmail}</td>
+        <td>${formatDate(e.stopTimestamp)}</td>
+        <td class="evaluation-score ${scoreClass}">${e.totalPoints}/${e.totalPointsPossible} (${percentage}%)</td>
+        <td><span class="badge badge-${e.status}">${e.status}</span></td>
+        <td>
+          <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
+          ${e.status === 'completed' ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>` : ''}
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+
+    // Delegate event listeners
+    document.querySelectorAll('.view-evaluation-button').forEach(btn =>
+      btn.addEventListener('click', () => viewEvaluation(btn.dataset.evaluationId))
+    );
+    document.querySelectorAll('.dispute-button').forEach(btn =>
+      btn.addEventListener('click', () => showDisputeForm(btn.dataset.evaluationId))
+    );
+  }).getAllEvaluations();
+}
+
+  function viewEvaluation(evaluationId) {
+  hideAllViews();
+  document.getElementById('viewEvaluationView').classList.remove('hidden');
+
+  google.script.run.withSuccessHandler(function(evaluations) {
+    const evaluation = evaluations.find(e => e.id === evaluationId);
+    if (!evaluation) return alert("Evaluation not found.");
+
+    document.getElementById('viewEvaluationDetails').innerHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+        <div><p class="field-label">Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
+        <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
+        <div><p class="field-label">QA Agent</p><p class="field-value">${evaluation.qaEmail}</p></div>
+        <div class="grid-span-2"><p class="field-label">Feedback</p><p class="field-value">${evaluation.feedback || 'No feedback provided.'}</p></div>
       </div>
     `;
 
-    disputeQuestionsContainer.appendChild(questionElement);
+    const container = document.getElementById('viewEvaluationQuestions');
+    container.innerHTML = '';
+
+    evaluation.questions.forEach(q => {
+      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+      container.innerHTML += `
+        <div class="question-card ${highlightClass}">
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
+          </div>
+          <div class="question-body">
+            <p class="field-label">Response:</p>
+            <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
+            ${q.feedback ? `<p class="field-label">Feedback:</p><p class="field-value">${q.feedback}</p>` : ''}
+          </div>
+        </div>
+      `;
+    });
+  }).getAllEvaluations();
+}
+
+  function showDisputeForm(evaluationId) {
+  hideAllViews();
+  document.getElementById('disputeFormView').classList.remove('hidden');
+
+  google.script.run.withSuccessHandler(function(evaluations) {
+    const evaluation = evaluations.find(e => e.id === evaluationId);
+    if (!evaluation) return alert("Evaluation not found");
+
+    document.getElementById('disputeForm').setAttribute('data-evaluation-id', evaluationId);
+
+    document.getElementById('evaluationDetails').innerHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+        <div><p class="field-label">Evaluation Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
+        <div><p class="field-label">Reference Number</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
+        <div><p class="field-label">Score</p><p class="field-value">${evaluation.totalPoints}/${evaluation.totalPointsPossible}</p></div>
+        <div class="grid-span-2"><p class="field-label">Feedback</p><p class="field-value">${evaluation.feedback || 'None'}</p></div>
+      </div>
+    `;
+
+    loadQuestionsForDispute(evaluation);
+  }).getAllEvaluations();
+}
+
+  function loadQuestionsForDispute(evaluation) {
+  const container = document.getElementById('disputeQuestions');
+  container.innerHTML = '';
+
+  if (!evaluation.questions.length) {
+    container.innerHTML = '<div class="alert alert-warning">No questions found for this evaluation.</div>';
+    return;
+  }
+
+  evaluation.questions.forEach(q => {
+    const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+    const feedbackHtml = q.feedback ? `<p class="field-label">Feedback:</p><p class="field-value">${q.feedback}</p>` : '';
+
+    const card = document.createElement('div');
+    card.className = `question-card ${highlightClass}`;
+    card.innerHTML = `
+      <div class="question-header">
+        <h3 class="question-text">${q.questionText}</h3>
+        <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
+      </div>
+      <div class="question-body">
+        <p class="field-label">Response:</p>
+        <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
+        ${feedbackHtml}
+        <div class="dispute-checkbox">
+          <label><input type="checkbox" name="dispute_question_${q.questionId}" value="${q.questionId}"> Dispute this question</label>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
   });
 }
 
-  // Handle dispute form submission
   function handleDisputeSubmit(e) {
-    e.preventDefault();
+  e.preventDefault();
 
-    // Get form data
-    var form = document.getElementById('disputeForm');
-    var evaluationId = form.getAttribute('data-evaluation-id');
-    var reason = document.getElementById('disputeReason').value;
+  const form = document.getElementById('disputeForm');
+  const evaluationId = form.getAttribute('data-evaluation-id');
+  const reason = document.getElementById('disputeReason').value;
+  const questionIds = Array.from(document.querySelectorAll('input[name^="dispute_question_"]:checked')).map(cb => cb.value);
 
-    // Get disputed question IDs
-    var disputedQuestionIds = [];
-    document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(function(checkbox) {
-      disputedQuestionIds.push(checkbox.value);
+  if (!questionIds.length) return alert('Select at least one question to dispute.');
+  if (!reason.trim()) return alert('Please provide a reason for the dispute.');
+
+  const payload = {
+    evalId: evaluationId,
+    reason,
+    questionIds,
+    status: 'pending'
+  };
+
+  form.innerHTML = '<div class="loading">Submitting dispute...</div>';
+
+  google.script.run.withSuccessHandler(() => {
+    alert('Dispute submitted!');
+    showEvaluations();
+  }).withFailureHandler(error => {
+    form.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+    setTimeout(() => showEvaluations(), 3000);
+  }).saveDispute(payload);
+}
+
+  function resolveDispute(disputeId) {
+  hideAllViews();
+  document.getElementById('resolveDisputeView').classList.remove('hidden');
+
+  google.script.run.withSuccessHandler(function(data) {
+    const { evaluations, disputes } = data;
+    const dispute = disputes.find(d => d.id === disputeId);
+    const evaluation = evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
+
+    if (!dispute || !evaluation) return alert("Dispute or evaluation not found");
+
+    // Update status to 'reviewing'
+    google.script.run.updateDisputeStatus(disputeId, 'reviewing');
+
+    // Show metadata
+    document.getElementById('resolveEvaluationDetails').innerHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+        <div><p class="field-label">QA Agent</p><p class="field-value">${evaluation.qaEmail}</p></div>
+        <div><p class="field-label">Dispute Reason</p><p class="field-value">${dispute.reason}</p></div>
+      </div>
+    `;
+
+    // Render disputed questions only
+    const container = document.getElementById('resolveDisputeQuestions');
+    container.innerHTML = '';
+
+    evaluation.questions
+      .filter(q => dispute.questionIds.includes(q.questionId))
+      .forEach(q => {
+        const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+        const card = document.createElement('div');
+        card.className = `question-card ${highlightClass}`;
+        card.innerHTML = `
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+          </div>
+          <div class="question-body">
+            <div class="radio-group">
+              <label><input type="radio" name="resolution_${q.questionId}" value="upheld" required> Uphold</label>
+              <label><input type="radio" name="resolution_${q.questionId}" value="overturned"> Overturn</label>
+            </div>
+            <div class="form-group mt-2">
+              <label for="note_${q.questionId}">Justification (required if Upheld)</label>
+              <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+    // Store IDs on form
+    const form = document.getElementById('resolveDisputeForm');
+    form.setAttribute('data-eval-id', evaluation.id);
+    form.setAttribute('data-dispute-id', dispute.id);
+  }).getAllEvaluationsAndDisputes();
+}
+
+  document.getElementById('resolveDisputeForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  const form = e.target;
+  const evalId = form.getAttribute('data-eval-id');
+  const disputeId = form.getAttribute('data-dispute-id');
+  const resolutionNotes = document.getElementById('resolutionNotes').value.trim();
+
+  const decisions = [];
+  let overturnCount = 0;
+  let invalid = false;
+
+  document.querySelectorAll('#resolveDisputeQuestions .question-card').forEach(card => {
+    const qid = card.querySelector('input[type="radio"]').name.split('_')[1];
+    const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
+    const note = form.querySelector(`#note_${qid}`).value.trim();
+
+    if (!selected) {
+      alert("Please make a decision for every disputed question.");
+      invalid = true;
+      return;
+    }
+
+    const resolution = selected.value;
+    if (resolution === 'upheld' && !note) {
+      alert("Please provide justification for upheld questions.");
+      invalid = true;
+      return;
+    }
+
+    if (resolution === 'overturned') overturnCount++;
+
+    decisions.push({ questionId: qid, resolution, note });
+  });
+
+  if (invalid) return;
+
+  let newStatus = 'upheld';
+  if (overturnCount === decisions.length) newStatus = 'overturned';
+  else if (overturnCount > 0) newStatus = 'partial overturn';
+
+  // Submit resolution
+  google.script.run
+    .withSuccessHandler(() => {
+      alert("Dispute resolved successfully.");
+      showDisputes();
+    })
+    .resolveDispute({
+      disputeId,
+      evalId,
+      decisions,
+      resolutionNotes,
+      status: newStatus
+    });
+});
+
+  function loadUsers() {
+  const tableBody = document.getElementById('usersBody');
+  tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+
+  google.script.run.withSuccessHandler(function(users) {
+    if (!users.length) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No users found</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = '';
+    users.forEach(user => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${user.name}</td>
+        <td>${user.email}</td>
+        <td>${formatRole(user.role)}</td>
+        <td>${user.managerEmail || 'N/A'}</td>
+        <td>
+          <button class="edit-user-button btn btn-sm btn-primary" data-user-id="${user.id}">Edit</button>
+          <button class="delete-user-button btn btn-sm btn-danger" data-user-id="${user.id}">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
     });
 
-    if (disputedQuestionIds.length === 0) {
-      alert('Please select at least one question to dispute.');
-      return;
-    }
-
-    if (!reason) {
-      alert('Please provide a reason for the dispute.');
-      return;
-    }
-
-    // Create dispute object
-    var disputeData = {
-      evalId: evaluationId,
-      reason: reason,
-      questionIds: disputedQuestionIds,
-      status: 'pending'
-    };
-
-    // Show loading state
-    form.innerHTML = '<div class="loading">Submitting dispute...</div>';
-
-    // Save the dispute
-    google.script.run
-      .withSuccessHandler(function(result) {
-        alert('Dispute submitted successfully!');
-        showEvaluations();
+    // Attach listeners
+    document.querySelectorAll('.edit-user-button').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const userId = btn.getAttribute('data-user-id');
+        const user = users.find(u => u.id === userId);
+        showUserForm(user);
       })
-      .withFailureHandler(function(error) {
-        form.innerHTML = '<div class="alert alert-danger">Error submitting dispute: ' + error.message + '</div>';
-        setTimeout(function() {
-          showEvaluations();
-        }, 3000);
+    );
+
+    document.querySelectorAll('.delete-user-button').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const userId = btn.getAttribute('data-user-id');
+        if (confirm('Delete this user?')) deleteUser(userId);
       })
-      .saveDispute(disputeData);
-  }
+    );
+  }).getAllUsers();
+}
 
-  // Load disputes
-  function loadDisputes() {
-    var tableBody = document.getElementById('disputesBody');
-    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+  function showUserForm(user = null) {
+  const isEdit = !!user;
+  document.getElementById('userFormTitle').textContent = isEdit ? 'Edit User' : 'Add User';
+  document.getElementById('userId').value = user?.id || '';
+  document.getElementById('userFormName').value = user?.name || '';
+  document.getElementById('userEmail').value = user?.email || '';
+  document.getElementById('userFormRole').value = user?.role || 'agent';
+  document.getElementById('userManager').value = user?.managerEmail || '';
 
-    // Get disputes
-    google.script.run.withSuccessHandler(function(disputes) {
-      if (disputes.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No disputes found</td></tr>';
-        return;
-      }
+  document.getElementById('userForm').classList.remove('hidden');
+}
 
-      tableBody.innerHTML = '';
-
-      disputes.forEach(function(dispute) {
-        var row = document.createElement('tr');
-
-        row.innerHTML = `
-          <td>Evaluation #${dispute.evalId}</td>
-          <td>${dispute.userEmail}</td>
-          <td>${formatDate(dispute.disputeTimestamp)}</td>
-          <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
-          <td>
-            <button class="view-dispute-button btn btn-sm btn-primary"
-              data-dispute-id="${dispute.id}">View</button>
-          </td>
-        `;
-
-        tableBody.appendChild(row);
-      });
-
-      // Add event listeners to view dispute buttons
-      document.querySelectorAll('.view-dispute-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var disputeId = this.getAttribute('data-dispute-id');
-          viewDispute(disputeId);
-        });
-      });
-
-    }).getAllDisputes();
-  }
-
-  // View a dispute
-  function viewDispute(disputeId) {
-    alert('View dispute ' + disputeId + ' - This feature is not yet implemented');
-  }
-
-  // Load users for admin panel
-  function loadUsers() {
-    var tableBody = document.getElementById('usersBody');
-    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
-
-    google.script.run.withSuccessHandler(function(users) {
-      if (users.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No users found</td></tr>';
-        return;
-      }
-
-      tableBody.innerHTML = '';
-
-      users.forEach(function(user) {
-        var row = document.createElement('tr');
-
-        row.innerHTML = `
-          <td>${user.name}</td>
-          <td>${user.email}</td>
-          <td>${formatRole(user.role)}</td>
-          <td>${user.managerEmail || 'N/A'}</td>
-          <td>
-            <button class="edit-user-button btn btn-sm btn-primary"
-              data-user-id="${user.id}">Edit</button>
-            <button class="delete-user-button btn btn-sm btn-danger"
-              data-user-id="${user.id}">Delete</button>
-          </td>
-        `;
-
-        tableBody.appendChild(row);
-      });
-
-      // Add event listeners to buttons
-      document.querySelectorAll('.edit-user-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var userId = this.getAttribute('data-user-id');
-          editUser(userId, users);
-        });
-      });
-
-      document.querySelectorAll('.delete-user-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var userId = this.getAttribute('data-user-id');
-          if (confirm('Are you sure you want to delete this user?')) {
-            deleteUser(userId);
-          }
-        });
-      });
-
-    }).getAllUsers();
-  }
-
-  // Show add user form
-  function showAddUserForm() {
-    console.log('showAddUserForm called');
-    document.getElementById('userFormTitle').textContent = 'Add User';
-    document.getElementById('userId').value = '';
-    document.getElementById('userName').value = '';
-    document.getElementById('userEmail').value = '';
-    document.getElementById('userRole').value = 'agent';
-    document.getElementById('userManager').value = '';
-
-    document.getElementById('userForm').classList.remove('hidden');
-  }
-
-  // Edit user
-  function editUser(userId, users) {
-    var user = users.find(function(u) { return u.id === userId; });
-
-    if (!user) {
-      console.error("User not found:", userId);
-      return;
-    }
-
-    document.getElementById('userFormTitle').textContent = 'Edit User';
-    document.getElementById('userId').value = user.id;
-    document.getElementById('userName').value = user.name;
-    document.getElementById('userEmail').value = user.email;
-    document.getElementById('userRole').value = user.role;
-    document.getElementById('userManager').value = user.managerEmail || '';
-    document.getElementById('userForm').classList.remove('hidden');
-  }
-
-  // Hide user form
 function hideUserForm() {
-  console.log('hideUserForm called');
-  var userForm = document.getElementById('userForm');
-  if (userForm) {
-    console.log('Before hiding, userForm classList:', userForm.classList);
-    userForm.classList.add('hidden');
-    console.log('After hiding, userForm classList:', userForm.classList);
+  document.getElementById('userForm').classList.add('hidden');
+}
+
+function handleUserFormSubmit(e) {
+  e.preventDefault();
+  const userId = document.getElementById('userId').value;
+  const userData = {
+    id: userId,
+    name: document.getElementById('userFormName').value,
+    email: document.getElementById('userEmail').value,
+    role: document.getElementById('userFormRole').value,
+    managerEmail: document.getElementById('userManager').value
+  };
+
+  const onSuccess = () => {
+    alert(`User ${userId ? 'updated' : 'created'} successfully!`);
+    hideUserForm();
+    loadUsers();
+  };
+
+  const onFailure = err => alert('Error saving user: ' + err.message);
+
+  if (userId) {
+    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).updateUser(userData);
   } else {
-    console.error('userForm element not found');
+    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).createUser(userData);
   }
 }
 
-  // Handle user form submit
-  function handleUserFormSubmit(e) {
-    e.preventDefault();
+function deleteUser(userId) {
+  google.script.run
+    .withSuccessHandler(() => {
+      alert('User deleted.');
+      loadUsers();
+    })
+    .withFailureHandler(err => alert('Error deleting user: ' + err.message))
+    .deleteUser(userId);
+}
 
-    var userId = document.getElementById('userId').value;
-    var userData = {
-      id: userId,
-      name: document.getElementById('userName').value,
-      email: document.getElementById('userEmail').value,
-      role: document.getElementById('userRole').value,
-      managerEmail: document.getElementById('userManager').value,
-    };
-
-    var isNewUser = !userId;
-
-    if (isNewUser) {
-      // Create new user
-      createUser(userData)
-        .then(function(result) {
-          alert('User created successfully!');
-          hideUserForm();
-          loadUsers();
-        })
-        .catch(function(error) {
-          alert('Error creating user: ' + error.message);
-        });
-    } else {
-      // Update existing user
-      google.script.run
-        .withSuccessHandler(function(result) {
-          alert('User updated successfully!');
-          hideUserForm();
-          loadUsers();
-        })
-        .withFailureHandler(function(error) {
-          alert('Error updating user: ' + error.message);
-        })
-        .updateUser(userData);
-    }
-  }
-
-  // Delete user
-  function deleteUser(userId) {
-    google.script.run
-      .withSuccessHandler(function(result) {
-        alert('User deleted successfully!');
-        loadUsers();
-      })
-      .withFailureHandler(function(error) {
-        alert('Error deleting user: ' + error.message);
-      })
-      .deleteUser(userId);
-  }
-
-  // Load questions for admin panel
   function loadQuestions() {
-    var tableBody = document.getElementById('questionsBody');
-    tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Loading...</td></tr>';
+  const tableBody = document.getElementById('questionsBody');
+  tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Loading...</td></tr>';
 
-    var taskTypeFilter = document.getElementById('taskTypeFilter').value;
+  const filter = document.getElementById('taskTypeFilter').value;
 
-    google.script.run.withSuccessHandler(function(questions) {
-      if (questions.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500">No questions found</td></tr>';
-        return;
-      }
+  google.script.run.withSuccessHandler(function(questions) {
+    const filtered = filter ? questions.filter(q => q.taskType === filter) : questions;
 
-      // Apply task type filter if selected
-      if (taskTypeFilter) {
-        questions = questions.filter(function(q) {
-          return q.taskType === taskTypeFilter;
-        });
-
-        if (questions.length === 0) {
-          tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500">No questions found for this task type</td></tr>';
-          return;
-        }
-      }
-
-      tableBody.innerHTML = '';
-
-      questions.forEach(function(question) {
-        var row = document.createElement('tr');
-
-        row.innerHTML = `
-          <td>${question.questionText}</td>
-          <td>${formatTaskType(question.taskType)}</td>
-          <td>${question.pointsPossible}</td>
-          <td>
-            <button class="edit-question-button btn btn-sm btn-primary"
-              data-question-id="${question.id}">Edit</button>
-            <button class="delete-question-button btn btn-sm btn-danger"
-              data-question-id="${question.id}">Delete</button>
-          </td>
-        `;
-
-        tableBody.appendChild(row);
-      });
-
-      // Add event listeners to buttons
-      document.querySelectorAll('.edit-question-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var questionId = this.getAttribute('data-question-id');
-          editQuestion(questionId, questions);
-        });
-      });
-
-      document.querySelectorAll('.delete-question-button').forEach(function(button) {
-        button.addEventListener('click', function() {
-          var questionId = this.getAttribute('data-question-id');
-          if (confirm('Are you sure you want to delete this question?')) {
-            deleteQuestion(questionId);
-          }
-        });
-      });
-
-    }).getAllQuestions();
-  }
-
-  // Show add question form
-  function showAddQuestionForm() {
-    document.getElementById('questionFormTitle').textContent = 'Add Question';
-    document.getElementById('questionId').value = '';
-    document.getElementById('questionText').value = '';
-    document.getElementById('questionTaskType').value = 'phone_call';
-    document.getElementById('questionPoints').value = '10';
-    document.getElementById('questionSetId').value = '';
-
-    document.getElementById('questionForm').classList.remove('hidden');
-  }
-
-  // Edit question
-  function editQuestion(questionId, questions) {
-    var question = questions.find(function(q) { return q.id === questionId; });
-
-    if (!question) {
-      console.error("Question not found:", questionId);
+    if (!filtered.length) {
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500">No questions found${filter ? ' for this task type' : ''}</td></tr>`;
       return;
     }
 
-    document.getElementById('questionFormTitle').textContent = 'Edit Question';
-    document.getElementById('questionId').value = question.id;
-    document.getElementById('questionText').value = question.questionText;
-    document.getElementById('questionTaskType').value = question.taskType;
-    document.getElementById('questionPoints').value = question.pointsPossible;
-    document.getElementById('questionSetId').value = question.setId || '';
-
-    document.getElementById('questionForm').classList.remove('hidden');
-  }
-
-  // Hide question form
-  function hideQuestionForm() {
-    document.getElementById('questionForm').classList.add('hidden');
-  }
-
-  // Handle question form submit
-  function handleQuestionFormSubmit(e) {
-    e.preventDefault();
-
-    var questionId = document.getElementById('questionId').value;
-    var questionData = {
-      id: questionId,
-      questionText: document.getElementById('questionText').value,
-      taskType: document.getElementById('questionTaskType').value,
-      pointsPossible: parseInt(document.getElementById('questionPoints').value),
-      setId: document.getElementById('questionSetId').value,
-    };
-
-    var isNewQuestion = !questionId;
-
-    if (isNewQuestion) {
-      // Create new question
-      google.script.run
-        .withSuccessHandler(function(result) {
-          alert('Question created successfully!');
-          hideQuestionForm();
-          loadQuestions();
-        })
-        .withFailureHandler(function(error) {
-          alert('Error creating question: ' + error.message);
-        })
-        .createQuestion(questionData);
-    } else {
-      // Update existing question
-      google.script.run
-        .withSuccessHandler(function(result) {
-          alert('Question updated successfully!');
-          hideQuestionForm();
-          loadQuestions();
-        })
-        .withFailureHandler(function(error) {
-          alert('Error updating question: ' + error.message);
-        })
-        .updateQuestion(questionData);
-    }
-  }
-
-  // Delete question
-  function deleteQuestion(questionId) {
-    google.script.run
-      .withSuccessHandler(function(result) {
-        alert('Question deleted successfully!');
-        loadQuestions();
-      })
-      .withFailureHandler(function(error) {
-        alert('Error deleting question: ' + error.message);
-      })
-      .deleteQuestion(questionId);
-  }
-
-  // Format task type for display
-  function formatTaskType(type) {
-    if (!type) return 'Unknown';
-
-    // Convert snake_case to Title Case
-    return type.split('_').map(function(word) {
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    }).join(' ');
-  }
-
-  // Format date for display
-  function formatDate(dateStr) {
-    if (!dateStr) return 'Unknown';
-
-    var date = new Date(dateStr);
-
-    if (isNaN(date.getTime())) {
-      return dateStr;
-    }
-
-    // Convert from UTC to CST
-    // CST is UTC-6 hours (or UTC-5 during daylight saving time)
-    // For simplicity, we're using a fixed offset of -6 hours
-    var cstOffset = -6;
-    var utc = date.getTime() + (date.getTimezoneOffset() * 60000);
-    var cstDate = new Date(utc + (3600000 * cstOffset));
-
-    return cstDate.toLocaleDateString() + ' ' + cstDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-  }
-
-  // API Function to create a user
-  function createUser(userData) {
-    console.log('Creating user with data:', userData);
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(function(result) {
-          console.log('User created:', result);
-          resolve(result);
-        })
-        .withFailureHandler(function(error) {
-          console.error('Error creating user:', error);
-          reject(error);
-        })
-        .createUser(userData);
+    tableBody.innerHTML = '';
+    filtered.forEach(q => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${q.questionText}</td>
+        <td>${formatTaskType(q.taskType)}</td>
+        <td>${q.pointsPossible}</td>
+        <td>
+          <button class="edit-question-button btn btn-sm btn-primary" data-question-id="${q.id}">Edit</button>
+          <button class="delete-question-button btn btn-sm btn-danger" data-question-id="${q.id}">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
     });
+
+    document.querySelectorAll('.edit-question-button').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const qid = btn.getAttribute('data-question-id');
+        const question = filtered.find(q => q.id === qid);
+        showQuestionForm(question);
+      })
+    );
+
+    document.querySelectorAll('.delete-question-button').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const qid = btn.getAttribute('data-question-id');
+        if (confirm('Delete this question?')) deleteQuestion(qid);
+      })
+    );
+  }).getAllQuestions();
+}
+
+  function showQuestionForm(question = null) {
+  const isEdit = !!question;
+  document.getElementById('questionFormTitle').textContent = isEdit ? 'Edit Question' : 'Add Question';
+  document.getElementById('questionId').value = question?.id || '';
+  document.getElementById('questionText').value = question?.questionText || '';
+  document.getElementById('questionTaskType').value = question?.taskType || 'phone_call';
+  document.getElementById('questionPoints').value = question?.pointsPossible || '10';
+  document.getElementById('questionSetId').value = question?.setId || '';
+
+  document.getElementById('questionForm').classList.remove('hidden');
+}
+
+function hideQuestionForm() {
+  document.getElementById('questionForm').classList.add('hidden');
+}
+
+function handleQuestionFormSubmit(e) {
+  e.preventDefault();
+
+  const id = document.getElementById('questionId').value;
+  const data = {
+    id,
+    questionText: document.getElementById('questionText').value,
+    taskType: document.getElementById('questionTaskType').value,
+    pointsPossible: parseInt(document.getElementById('questionPoints').value),
+    setId: document.getElementById('questionSetId').value
+  };
+
+  const onSuccess = () => {
+    alert(`Question ${id ? 'updated' : 'created'} successfully.`);
+    hideQuestionForm();
+    loadQuestions();
+  };
+
+  const onFailure = err => alert('Error saving question: ' + err.message);
+
+  if (id) {
+    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).updateQuestion(data);
+  } else {
+    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).createQuestion(data);
   }
+}
+
+function deleteQuestion(qid) {
+  google.script.run
+    .withSuccessHandler(() => {
+      alert('Question deleted.');
+      loadQuestions();
+    })
+    .withFailureHandler(err => alert('Error deleting question: ' + err.message))
+    .deleteQuestion(qid);
+}
+
+  function formatRole(role) {
+  if (!role) return 'Unknown';
+  return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function formatTaskType(type) {
+  if (!type) return 'Unknown';
+  return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+  function formatDate(dateStr) {
+  if (!dateStr) return 'Unknown';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+
+  const cstOffset = -5; // Adjust as needed for DST
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const cstDate = new Date(utc + (3600000 * cstOffset));
+
+  return cstDate.toLocaleDateString() + ' ' + cstDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+  function createUser(userData) {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .createUser(userData);
+  });
+}
+
+  function resetEvaluationForm() {
+  const form = document.getElementById('evaluationForm');
+  form.reset();
+
+  const questionsContainer = document.getElementById('questions');
+  if (questionsContainer) questionsContainer.innerHTML = '';
+
+  const feedbackField = document.getElementById('feedback');
+  if (feedbackField) feedbackField.value = '';
+
+  form.removeAttribute('data-audit-id');
+  form.removeAttribute('data-reference-number');
+  form.removeAttribute('data-task-type');
+  form.removeAttribute('data-outcome');
+  form.removeAttribute('data-max-score');
+}
+
+  function hideAllViews() {
+  const views = [
+    'dashboardView',
+    'auditQueueView',
+    'evaluationFormView',
+    'evaluationsView',
+    'disputesView',
+    'disputeFormView',
+    'adminView',
+    'viewEvaluationView',
+    'resolveDisputeView'
+  ];
+
+  views.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+}
+
 </script>
