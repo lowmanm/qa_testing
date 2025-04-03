@@ -597,17 +597,17 @@ function resolveDispute(resolution) {
   const totalPossible = updatedQuestData.reduce((sum, row) => sum + (parseFloat(row[pointsPossibleIndex]) || 0), 0);
   const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
 
-  // Update evalSummary — match auditId not evalId
+  // Update evalSummary —
   const summaryData = summarySheet.getDataRange().getValues();
   const sHeaders = summaryData[0];
-  const auditIdIndex = sHeaders.indexOf('auditId');
+  const sIdIndex = sHeaders.indexOf('id');
   const totalPointsIndex = sHeaders.indexOf('totalPoints');
   const evalScoreIndex = sHeaders.indexOf('evalScore');
   const statusIndex = sHeaders.indexOf('status');
 
   for (let i = 1; i < summaryData.length; i++) {
     const row = summaryData[i];
-    if (row[auditIdIndex] === evalId) {
+    if (row[sIdIndex] === evalId) {
       summarySheet.getRange(i + 1, totalPointsIndex + 1).setValue(totalPoints);
       summarySheet.getRange(i + 1, evalScoreIndex + 1).setValue(evalScore);
       summarySheet.getRange(i + 1, statusIndex + 1).setValue(status || 'resolved');
