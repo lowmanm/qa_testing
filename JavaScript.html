@@ -703,17 +703,19 @@
   document.getElementById('resolveDisputeView').classList.remove('hidden');
 
   google.script.run.withSuccessHandler(function(data) {
-    const { evaluations, disputes } = data;
-    const dispute = disputes.find(d => d.id === disputeId);
-    const evaluation = evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
+    const dispute = data.disputes.find(d => d.id === disputeId);
+    const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
 
-    if (!dispute || !evaluation) return alert("Dispute or evaluation not found");
+    if (!dispute || !evaluation) {
+      alert("Dispute or evaluation not found.");
+      return;
+    }
 
-    // Update status to 'reviewing'
-    google.script.run.updateDisputeStatus(disputeId, 'reviewing');
+    // Update status to "reviewing"
+    google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
-    // Show metadata
-    document.getElementById('resolveEvaluationDetails').innerHTML = `
+    // Show evaluation metadata
+    const detailsHTML = `
       <div class="grid-2">
         <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
         <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
@@ -721,50 +723,56 @@
         <div><p class="field-label">Dispute Reason</p><p class="field-value">${dispute.reason}</p></div>
       </div>
     `;
+    document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
 
-    // Render disputed questions only
+    // Load disputed questions only
     const container = document.getElementById('resolveDisputeQuestions');
     container.innerHTML = '';
 
-    evaluation.questions
-      .filter(q => dispute.questionIds.includes(q.questionId))
-      .forEach(q => {
-        const highlightClass = q.response === 'no' ? 'highlight-no' : '';
-        const card = document.createElement('div');
-        card.className = `question-card ${highlightClass}`;
-        card.innerHTML = `
-          <div class="question-header">
-            <h3 class="question-text">${q.questionText}</h3>
-            <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
-          </div>
-          <div class="question-body">
-            <div class="radio-group">
-              <label><input type="radio" name="resolution_${q.questionId}" value="upheld" required> Uphold</label>
-              <label><input type="radio" name="resolution_${q.questionId}" value="overturned"> Overturn</label>
-            </div>
-            <div class="form-group mt-2">
-              <label for="note_${q.questionId}">Justification (required if Upheld)</label>
-              <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
+    evaluation.questions.forEach(q => {
+      if (!dispute.questionIds.includes(q.questionId)) return;
 
-    // Store IDs on form
+      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+      const card = document.createElement('div');
+      card.className = `question-card ${highlightClass}`;
+      card.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
+              <span>Uphold</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="resolution_${q.questionId}" value="overturned">
+              <span>Overturn</span>
+            </label>
+          </div>
+          <div class="form-group mt-2">
+            <label for="note_${q.questionId}">Justification (required if Upheld)</label>
+            <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    // Store IDs
     const form = document.getElementById('resolveDisputeForm');
     form.setAttribute('data-eval-id', evaluation.id);
     form.setAttribute('data-dispute-id', dispute.id);
   }).getAllEvaluationsAndDisputes();
 }
 
-  document.getElementById('resolveDisputeForm').addEventListener('submit', function(e) {
+ document.getElementById('resolveDisputeForm').addEventListener('submit', function(e) {
   e.preventDefault();
-
   const form = e.target;
   const evalId = form.getAttribute('data-eval-id');
   const disputeId = form.getAttribute('data-dispute-id');
-  const resolutionNotes = document.getElementById('resolutionNotes').value.trim();
+  const resolutionNotes = document.getElementById('resolutionNotes').value;
 
   const decisions = [];
   let overturnCount = 0;
@@ -773,16 +781,17 @@
   document.querySelectorAll('#resolveDisputeQuestions .question-card').forEach(card => {
     const qid = card.querySelector('input[type="radio"]').name.split('_')[1];
     const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
-    const note = form.querySelector(`#note_${qid}`).value.trim();
+    const note = form.querySelector(`#note_${qid}`).value;
 
     if (!selected) {
-      alert("Please make a decision for every disputed question.");
+      alert("Please select a resolution for all disputed questions.");
       invalid = true;
       return;
     }
 
     const resolution = selected.value;
-    if (resolution === 'upheld' && !note) {
+
+    if (resolution === 'upheld' && !note.trim()) {
       alert("Please provide justification for upheld questions.");
       invalid = true;
       return;
@@ -799,7 +808,6 @@
   if (overturnCount === decisions.length) newStatus = 'overturned';
   else if (overturnCount > 0) newStatus = 'partial overturn';
 
-  // Submit resolution
   google.script.run
     .withSuccessHandler(() => {
       alert("Dispute resolved successfully.");
