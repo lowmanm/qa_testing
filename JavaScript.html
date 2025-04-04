@@ -31,20 +31,58 @@
   });
 
   function initializeApp() {
-    google.script.run.withSuccessHandler(user => {
-      document.getElementById('userName').textContent = user.name;
-      document.getElementById('userRole').textContent = formatRole(user.role);
+  // Load user info and role
+  google.script.run.withSuccessHandler(user => {
+    document.getElementById('userName').textContent = user.name;
+    document.getElementById('userRole').textContent = formatRole(user.role);
 
-      const isAdmin = user.role === 'admin' || user.role === 'qa_manager';
-      document.getElementById('navAdmin').style.display = isAdmin ? 'block' : 'none';
+    const isAdmin = user.role === 'admin' || user.role === 'qa_manager';
+    document.getElementById('navAdmin').style.display = isAdmin ? 'block' : 'none';
 
-      if (user.role === 'qa_analyst' || user.role === 'qa_manager') {
-        showAuditQueue();
-      } else {
-        showDashboard();
-      }
-    }).getCurrentUser();
-  }
+    if (user.role === 'qa_analyst' || user.role === 'qa_manager') {
+      showAuditQueue();
+    } else {
+      showDashboard();
+    }
+  }).getCurrentUser();
+
+  // Load system settings and apply character limits
+  google.script.run.withSuccessHandler(applySystemSettings).getSystemSettings();
+}
+
+function applySystemSettings(settings) {
+  const limit = settings.feedbackCharLimit || 300;
+
+  [
+    { id: 'feedback', label: 'evaluationFeedbackCounter' },
+    { id: 'disputeReason', label: 'disputeFeedbackCounter' },
+    { id: 'resolutionNotes', label: 'resolutionFeedbackCounter' }
+  ].forEach(({ id, label }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    // Set maxlength attribute
+    el.setAttribute('maxlength', limit);
+
+    // Create or find counter label
+    let counter = document.getElementById(label);
+    if (!counter) {
+      counter = document.createElement('div');
+      counter.id = label;
+      counter.className = 'form-text';
+      el.parentNode.appendChild(counter);
+    }
+
+    // Update text content initially and on input
+    const updateCounter = () => {
+      const currentLength = el.value.length;
+      counter.textContent = `${currentLength} / ${limit}`;
+    };
+
+    el.addEventListener('input', updateCounter);
+    updateCounter();
+  });
+}
 
   function formatRole(role) {
     return role
