@@ -262,16 +262,28 @@ function getQuestionsForTaskType(taskType) {
   });
 }
 
-function markAuditMisconfigured(auditId) {
-  const sheet = SpreadsheetApp.getActive().getSheetByName("auditQueue");
+function markAuditAsMisconfigured(auditId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+  if (!sheet) throw new Error('Sheet "auditsQueue" not found');
+
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const idCol = headers.indexOf('auditId');
+  const statusCol = headers.indexOf('auditStatus');
+
+  if (idCol === -1 || statusCol === -1) {
+    throw new Error('Missing auditId or auditStatus column.');
+  }
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === auditId) {
-      sheet.getRange(i + 1, 6).setValue("misconfigured"); // assuming status is column 6
-      break;
+    if (data[i][idCol] === auditId) {
+      sheet.getRange(i + 1, statusCol + 1).setValue('misconfigured');
+      return;
     }
   }
+
+  throw new Error('Audit ID not found in auditsQueue.');
 }
 
 function createQuestion(questionData) {
