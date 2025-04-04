@@ -392,23 +392,29 @@
           </div>
 
           <div id="adminSettingsView" class="admin-tab-content hidden">
-            <h3>System Settings</h3>
-            <form id="settingsForm">
-              <div class="form-group">
-                <label for="emailSubject">Email Subject for Imports</label>
-                <input type="text" id="emailSubject" name="emailSubject" class="form-control" value="NVS Audit File">
-              </div>
+  <h3>System Settings</h3>
+  <form id="settingsForm">
+    <div class="form-group">
+      <label for="emailSubject">Email Subject for Imports</label>
+      <input type="text" id="emailSubject" name="emailSubject" class="form-control" value="NVS Audit File">
+    </div>
 
-              <div class="form-group">
-                <label for="csvFilename">CSV Filename for Imports</label>
-                <input type="text" id="csvFilename" name="csvFilename" class="form-control" value="nvs_qa_audit.csv">
-              </div>
+    <div class="form-group">
+      <label for="csvFilename">CSV Filename for Imports</label>
+      <input type="text" id="csvFilename" name="csvFilename" class="form-control" value="nvs_qa_audit.csv">
+    </div>
 
-              <div class="form-group">
-                <button type="submit" class="btn btn-primary">Save Settings</button>
-              </div>
-            </form>
-          </div>
+    <div class="form-group">
+      <label for="feedbackCharLimit">Feedback Character Limit</label>
+      <input type="number" id="feedbackCharLimit" name="feedbackCharLimit" class="form-control" value="300" min="50" max="1000">
+      <small class="form-text">Controls the maximum characters allowed in all feedback text boxes.</small>
+    </div>
+
+    <div class="form-group">
+      <button type="submit" class="btn btn-primary">Save Settings</button>
+    </div>
+  </form>
+</div>
         </div>
       </div>
     </div>
