@@ -643,7 +643,9 @@ if (!allAnswered) {
         <td><span class="badge badge-${e.status}">${e.status}</span></td>
         <td>
           <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
-          ${e.status === 'completed' ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>` : ''}
+          ${e.status === 'completed' && Math.round((e.totalPoints / e.totalPointsPossible) * 100) < 100
+  ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>`
+  : ''}
         </td>
       `;
       tableBody.appendChild(row);
