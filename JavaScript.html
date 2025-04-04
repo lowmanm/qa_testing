@@ -67,6 +67,23 @@
   });
 }
 
+function attachAuditTabHandlers() {
+  const tabPending = document.getElementById('tabPendingAudits');
+  const tabError = document.getElementById('tabErrorAudits');
+
+  tabPending.addEventListener('click', () => {
+    tabPending.classList.add('active');
+    tabError.classList.remove('active');
+    loadPendingTasks(); // show pending audits
+  });
+
+  tabError.addEventListener('click', () => {
+    tabError.classList.add('active');
+    tabPending.classList.remove('active');
+    loadErrorTasks(); // show misconfigured audits
+  });
+}
+
   function attachDisputeHandlers() {
     const form = document.getElementById('resolveDisputeForm');
     if (!form) return;
@@ -277,10 +294,12 @@ function showAddQuestionForm() {
   }
 
   function showAuditQueue() {
-    hideAllViews();
-    document.getElementById('auditQueueView').classList.remove('hidden');
-    highlightNavItem('navAuditQueue');
-    loadPendingTasks();
+  hideAllViews();
+  document.getElementById('auditQueueView').classList.remove('hidden');
+  highlightNavItem('navAuditQueue');
+
+  attachAuditTabHandlers();
+  loadPendingTasks();       // default tab on load
 }
 
   function loadPendingTasks() {
@@ -325,6 +344,41 @@ function showAddQuestionForm() {
       showEvaluationForm(auditId);
     }
   });
+}
+
+function loadErrorTasks() {
+  const tableBody = document.getElementById('pendingTasksBody');
+  tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading errors...</td></tr>';
+
+  google.script.run.withSuccessHandler(function(audits) {
+    const misconfigured = audits.filter(a => a.auditStatus === 'misconfigured');
+
+    if (misconfigured.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No misconfigured audits</td></tr>';
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    misconfigured.forEach(function(audit) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${audit.agentEmail}</td>
+        <td>${formatTaskType(audit.taskType)}</td>
+        <td>${audit.referenceNumber || 'N/A'}</td>
+        <td>${formatDate(audit.taskTimestamp)}</td>
+        <td>
+          <span class="badge badge-danger" title="No questions configured for this task type">Misconfigured</span>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-secondary" disabled>Unavailable</button>
+        </td>
+      `;
+      fragment.appendChild(row);
+    });
+
+    tableBody.innerHTML = '';
+    tableBody.appendChild(fragment);
+  }).getAllAudits(); // using all audits here
 }
 
   function updateAuditStatusAndLock(auditId, status) {
