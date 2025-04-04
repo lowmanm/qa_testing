@@ -421,16 +421,16 @@ function showAddQuestionForm() {
 
   // Validation: all questions must be answered
   let allAnswered = true;
-  document.querySelectorAll('.question-card').forEach(function (questionCard) {
-    const questionId = questionCard.getAttribute('data-question-id');
-    const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
-    if (!selectedOption) allAnswered = false;
-  });
+document.querySelectorAll('.question-card').forEach(function (questionCard) {
+  const questionId = questionCard.getAttribute('data-question-id');
+  const selectedOption = questionCard.querySelector(`input[name="question_${questionId}"]:checked`);
+  if (!selectedOption) allAnswered = false;
+});
 
-  if (!allAnswered) {
-    alert("Please answer all questions before submitting the evaluation.");
-    return;
-  }
+if (!allAnswered) {
+  alert("Please answer all questions before submitting the evaluation.");
+  return;
+}
 
   // Compile responses
   let score = 0;
