@@ -1,5 +1,3 @@
-// Refactored Code.gs
-
 // ====================
 // App Entry Points
 // ====================
@@ -38,13 +36,13 @@ function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const sheetsToCreate = {
-    users: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp'],
+    users: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl'],
     auditQueue: [
       'auditId', 'taskId', 'referenceNumber', 'auditStatus', 'agentEmail',
       'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp', 'locked'
     ],
     evalSummary: [
-      'id', 'auditId', 'referenceNumber', 'taskType', 'outcome',
+      'id', 'evalId', 'referenceNumber', 'taskType', 'outcome',
       'qaEmail', 'startTimestamp', 'stopTimestamp', 'totalPoints',
       'totalPointsPossible', 'status', 'feedback', 'evalScore'
     ],
@@ -59,8 +57,7 @@ function setupSpreadsheet() {
     disputesQueue: [
       'id', 'evalId', 'userEmail', 'disputeTimestamp', 'reason',
       'questionIds', 'status', 'resolutionNotes', 'resolvedBy', 'resolutionTimestamp'
-    ],
-    settings: ['key', 'value']
+    ]
   };
 
   for (const [sheetName, headers] of Object.entries(sheetsToCreate)) {
@@ -743,49 +740,7 @@ function getSheetDataAsObjects(sheet) {
   });
 }
 
-function getSetting(key, defaultValue = '') {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('settings');
-  const data = getSheetDataAsObjects(sheet);
-  const found = data.find(row => row.key === key);
-  return found ? found.value : defaultValue;
-}
-
-function setSetting(key, value) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('settings');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const keyCol = headers.indexOf('key');
-  const valueCol = headers.indexOf('value');
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][keyCol] === key) {
-      sheet.getRange(i + 1, valueCol + 1).setValue(value);
-      CacheService.getScriptCache().remove('system_settings');
-      return;
-    }
-  }
-
-  sheet.appendRow([key, value]);
-  CacheService.getScriptCache().remove('system_settings');
-}
-
 // Convert snake_case to Title Case for display
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
-
-function getSystemSettings() {
-  return {
-    emailSubject: getSetting('emailSubject', 'NVS Audit File'),
-    csvFilename: getSetting('csvFilename', 'nvs_qa_audit.csv'),
-    feedbackCharLimit: parseInt(getSetting('feedbackCharLimit', '300'), 10)
-  };
-}
-
-function saveSystemSettings(settings) {
-  setSetting('emailSubject', settings.emailSubject);
-  setSetting('csvFilename', settings.csvFilename);
-  setSetting('feedbackCharLimit', settings.feedbackCharLimit);
-  return { success: true };
-}
-
