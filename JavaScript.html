@@ -301,7 +301,12 @@ function showAddQuestionForm() {
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
         <td>${formatDate(audit.taskTimestamp)}</td>
-        <td><span class="badge badge-${audit.auditStatus}">${audit.auditStatus}</span></td>
+        <td>
+  <span class="badge ${audit.auditStatus === 'misconfigured' ? 'badge-danger' : 'badge-' + audit.auditStatus}" 
+        title="${audit.auditStatus === 'misconfigured' ? 'No questions configured for this task type' : audit.auditStatus}">
+    ${audit.auditStatus}
+  </span>
+</td>
         <td>
           <button class="evaluate-button btn btn-sm btn-primary" data-audit-id="${audit.auditId}">Evaluate</button>
         </td>
