@@ -620,44 +620,49 @@ if (!allAnswered) {
   const tableBody = document.getElementById('evaluationsBody');
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
-  google.script.run.withSuccessHandler(function(evaluations) {
-    if (!evaluations.length) {
-      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No evaluations found</td></tr>';
-      return;
-    }
+  google.script.run.withSuccessHandler(function({ evaluations, disputes }) {
+  if (!evaluations.length) {
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No evaluations found</td></tr>';
+    return;
+  }
 
-    tableBody.innerHTML = '';
+  tableBody.innerHTML = '';
 
-    evaluations.forEach(e => {
-      const percentage = Math.round((e.totalPoints / e.totalPointsPossible) * 100);
-      let scoreClass = 'score-high';
-      if (percentage < 70) scoreClass = 'score-low';
-      else if (percentage < 90) scoreClass = 'score-medium';
+  evaluations.forEach(e => {
+    const dispute = disputes.find(d => d.evalId === e.id);
+    const isDisputed = !!dispute;
 
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${formatTaskType(e.taskType)}</td>
-        <td>${e.qaEmail}</td>
-        <td>${formatDate(e.stopTimestamp)}</td>
-        <td class="evaluation-score ${scoreClass}">${e.totalPoints}/${e.totalPointsPossible} (${percentage}%)</td>
-        <td><span class="badge badge-${e.status}">${e.status}</span></td>
-        <td>
-          <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
-          ${e.status === 'completed' ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>` : ''}
-        </td>
-      `;
-      tableBody.appendChild(row);
-    });
+    const percentage = Math.round((e.totalPoints / e.totalPointsPossible) * 100);
+    let scoreClass = 'score-high';
+    if (percentage < 70) scoreClass = 'score-low';
+    else if (percentage < 90) scoreClass = 'score-medium';
 
-    // Delegate event listeners
-    document.querySelectorAll('.view-evaluation-button').forEach(btn =>
-      btn.addEventListener('click', () => viewEvaluation(btn.dataset.evaluationId))
-    );
-    document.querySelectorAll('.dispute-button').forEach(btn =>
-      btn.addEventListener('click', () => showDisputeForm(btn.dataset.evaluationId))
-    );
-  }).getAllEvaluations();
-}
+    const effectiveStatus = isDisputed ? 'in_dispute' : e.status;
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${formatTaskType(e.taskType)}</td>
+      <td>${e.qaEmail}</td>
+      <td>${formatDate(e.stopTimestamp)}</td>
+      <td class="evaluation-score ${scoreClass}">${e.totalPoints}/${e.totalPointsPossible} (${percentage}%)</td>
+      <td><span class="badge badge-${effectiveStatus}">${effectiveStatus}</span></td>
+      <td>
+        <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
+        ${e.status === 'completed' && !isDisputed ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>` : ''}
+      </td>
+    `;
+    tableBody.appendChild(row);
+  });
+
+  // Event listeners
+  document.querySelectorAll('.view-evaluation-button').forEach(btn =>
+    btn.addEventListener('click', () => viewEvaluation(btn.dataset.evaluationId))
+  );
+  document.querySelectorAll('.dispute-button').forEach(btn =>
+    btn.addEventListener('click', () => showDisputeForm(btn.dataset.evaluationId))
+  );
+
+}).getAllEvaluationsAndDisputes();
 
   function viewEvaluation(evaluationId) {
   hideAllViews();
