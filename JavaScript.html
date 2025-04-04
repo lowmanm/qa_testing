@@ -31,23 +31,43 @@
   });
 
   function initializeApp() {
-  // Load user info and role
-  google.script.run.withSuccessHandler(user => {
-    document.getElementById('userName').textContent = user.name;
-    document.getElementById('userRole').textContent = formatRole(user.role);
+  // Load current user
+  google.script.run
+    .withSuccessHandler(user => {
+      if (!user || !user.role) {
+        showToast('Unable to load user details.', 'error');
+        console.error('User object is empty or invalid:', user);
+        return;
+      }
 
-    const isAdmin = user.role === 'admin' || user.role === 'qa_manager';
-    document.getElementById('navAdmin').style.display = isAdmin ? 'block' : 'none';
+      document.getElementById('userName').textContent = user.name || 'Unknown';
+      document.getElementById('userRole').textContent = formatRole(user.role);
 
-    if (user.role === 'qa_analyst' || user.role === 'qa_manager') {
-      showAuditQueue();
-    } else {
-      showDashboard();
-    }
-  }).getCurrentUser();
+      const isAdmin = user.role === 'admin' || user.role === 'qa_manager';
+      const navAdmin = document.getElementById('navAdmin');
+      if (navAdmin) navAdmin.style.display = isAdmin ? 'block' : 'none';
 
-  // Load system settings and apply character limits
-  google.script.run.withSuccessHandler(applySystemSettings).getSystemSettings();
+      // Show default view based on role
+      if (user.role === 'qa_analyst' || user.role === 'qa_manager') {
+        showAuditQueue();
+      } else {
+        showDashboard();
+      }
+    })
+    .withFailureHandler(err => {
+      showToast('Error loading user info: ' + err.message, 'error');
+      console.error('getCurrentUser() failed:', err);
+    })
+    .getCurrentUser();
+
+  // Load system settings and apply feedback character limits
+  google.script.run
+    .withSuccessHandler(applySystemSettings)
+    .withFailureHandler(err => {
+      showToast('Error loading system settings: ' + err.message, 'warning');
+      console.error('getSystemSettings() failed:', err);
+    })
+    .getSystemSettings();
 }
 
 function applySystemSettings(settings) {
