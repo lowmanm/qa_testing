@@ -405,7 +405,7 @@ function showAddQuestionForm() {
 
 function markAuditAsMisconfigured(auditId) {
   if (!auditId) return;
-  google.script.run.markAuditMisconfigured(auditId);
+  google.script.run.markAuditAsMisconfigured(auditId);
 }
 
     questions.forEach(q => {
