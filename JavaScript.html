@@ -433,7 +433,7 @@ function showAddQuestionForm() {
   e.preventDefault();
 
   const form = document.getElementById('evaluationForm');
-  if (!form) return alert("Evaluation form not found.");
+  if (!form) return showToast("Evaluation form not found.", 'error');
 
   const auditId = form.getAttribute('data-audit-id');
   const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
@@ -453,7 +453,7 @@ document.querySelectorAll('#questions .question-card').forEach(function (questio
 });
 
 if (!allAnswered) {
-  alert("Please answer all questions before submitting the evaluation.");
+  showToast("Please answer all questions before submitting the evaluation.", 'warning');
   return;
 }
 
@@ -508,7 +508,7 @@ if (!allAnswered) {
     .withSuccessHandler(function () {
       updateAuditStatusAndLock(auditId, 'evaluated')
         .then(() => {
-          alert('Evaluation saved and audit unlocked successfully!');
+          showToast("Evaluation saved and audit unlocked successfully!", 'success');
           resetEvaluationForm();
           document.getElementById('evaluationLoadingIndicator')?.remove();
           form.classList.remove('hidden');
@@ -516,13 +516,13 @@ if (!allAnswered) {
         })
         .catch(error => {
           console.error('Error updating audit status:', error);
-          alert('Failed to unlock the record. Try again.');
+          showToast("Failed to unlock the record. Try again.", 'error');
           document.getElementById('evaluationLoadingIndicator')?.remove();
           form.classList.remove('hidden');
         });
     })
     .withFailureHandler(function (error) {
-      alert('Error saving evaluation: ' + error.message);
+      showToast("Error saving evaluation: " + error.message, 'error');
       document.getElementById('evaluationLoadingIndicator')?.remove();
       form.classList.remove('hidden');
     })
@@ -783,14 +783,14 @@ if (!allAnswered) {
   e.preventDefault();
 
   const form = document.getElementById('disputeForm');
-  if (!form) return alert("Dispute form not found.");
+  if (!form) return showToast("Dispute form not found.", 'error');
 
   const evaluationId = form.getAttribute('data-evaluation-id');
   const reasonField = document.getElementById('disputeReason');
   const reason = reasonField ? reasonField.value : '';
 
   if (!reason) {
-    alert('Please provide a reason for the dispute.');
+    showToast("Please provide a reason for the dispute.", 'warning');
     return;
   }
 
@@ -800,7 +800,7 @@ if (!allAnswered) {
   });
 
   if (disputedQuestionIds.length === 0) {
-    alert('Please select at least one question to dispute.');
+    showToast("Please select at least one question to dispute.", 'warning');
     return;
   }
 
@@ -815,7 +815,7 @@ if (!allAnswered) {
 
   google.script.run
     .withSuccessHandler(() => {
-      alert('Dispute submitted successfully!');
+      showToast("Dispute submitted successfully!", 'success');
       showEvaluations();
     })
     .withFailureHandler(error => {
@@ -835,7 +835,7 @@ if (!allAnswered) {
     const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
 
     if (!dispute || !evaluation) {
-      alert("Dispute or evaluation not found.");
+      showToast("Dispute or evaluation not found.", 'error');
       return;
     }
 
@@ -990,12 +990,12 @@ function handleUserFormSubmit(e) {
   };
 
   const onSuccess = () => {
-    alert(`User ${userId ? 'updated' : 'created'} successfully!`);
+    showToast(`User ${userId ? 'updated' : 'created'} successfully!`, 'success');;
     hideUserForm();
     loadUsers();
   };
 
-  const onFailure = err => alert('Error saving user: ' + err.message);
+  const onFailure = err => showToast("Error saving user: " + err.message, 'error');
 
   if (userId) {
     google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).updateUser(userData);
@@ -1007,10 +1007,10 @@ function handleUserFormSubmit(e) {
 function deleteUser(userId) {
   google.script.run
     .withSuccessHandler(() => {
-      alert('User deleted.');
+      showToast("User deleted.", 'success');
       loadUsers();
     })
-    .withFailureHandler(err => alert('Error deleting user: ' + err.message))
+    .withFailureHandler(err => showToast("Error deleting user: " + err.message, 'error');
     .deleteUser(userId);
 }
 
@@ -1089,12 +1089,12 @@ function handleQuestionFormSubmit(e) {
   };
 
   const onSuccess = () => {
-    alert(`Question ${id ? 'updated' : 'created'} successfully.`);
+    showToast(`Question ${id ? 'updated' : 'created'} successfully.`, 'success');
     hideQuestionForm();
     loadQuestions();
   };
 
-  const onFailure = err => alert('Error saving question: ' + err.message);
+  const onFailure = err => showToast("Error saving question: " + err.message, 'error');
 
   if (id) {
     google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).updateQuestion(data);
@@ -1106,10 +1106,10 @@ function handleQuestionFormSubmit(e) {
 function deleteQuestion(qid) {
   google.script.run
     .withSuccessHandler(() => {
-      alert('Question deleted.');
+      showToast("Question deleted.", 'success');
       loadQuestions();
     })
-    .withFailureHandler(err => alert('Error deleting question: ' + err.message))
+    .withFailureHandler(err => showToast("Error deleting question: " + err.message, 'error');
     .deleteQuestion(qid);
 }
 
