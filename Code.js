@@ -60,6 +60,7 @@ function setupSpreadsheet() {
       'id', 'evalId', 'userEmail', 'disputeTimestamp', 'reason',
       'questionIds', 'status', 'resolutionNotes', 'resolvedBy', 'resolutionTimestamp'
     ]
+    settings: ['key', 'value']
   };
 
   for (const [sheetName, headers] of Object.entries(sheetsToCreate)) {
@@ -742,7 +743,48 @@ function getSheetDataAsObjects(sheet) {
   });
 }
 
+function getSetting(key, defaultValue = '') {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('settings');
+  const data = getSheetDataAsObjects(sheet);
+  const found = data.find(row => row.key === key);
+  return found ? found.value : defaultValue;
+}
+
+function setSetting(key, value) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('settings');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const keyCol = headers.indexOf('key');
+  const valueCol = headers.indexOf('value');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][keyCol] === key) {
+      sheet.getRange(i + 1, valueCol + 1).setValue(value);
+      return;
+    }
+  }
+
+  // If not found, append it
+  sheet.appendRow([key, value]);
+}
+
 // Convert snake_case to Title Case for display
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
+
+function getSystemSettings() {
+  return {
+    emailSubject: getSetting('emailSubject', 'NVS Audit File'),
+    csvFilename: getSetting('csvFilename', 'nvs_qa_audit.csv'),
+    feedbackCharLimit: parseInt(getSetting('feedbackCharLimit', '300'), 10)
+  };
+}
+
+function saveSystemSettings(settings) {
+  setSetting('emailSubject', settings.emailSubject);
+  setSetting('csvFilename', settings.csvFilename);
+  setSetting('feedbackCharLimit', settings.feedbackCharLimit);
+  return { success: true };
+}
+
