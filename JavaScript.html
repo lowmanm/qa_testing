@@ -1221,16 +1221,23 @@ function handleResolveDisputeSubmit(e) {
   const decisions = [];
   let overturnCount = 0;
 
-  document.querySelectorAll('#resolveDisputeQuestions .question-card').forEach(card => {
+  const cards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
+  let hasMissing = false;
+
+  cards.forEach(card => {
     const qid = card.querySelector('input[type="radio"]')?.name?.split('_')[1];
     const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
     const note = form.querySelector(`#note_${qid}`)?.value || '';
 
-    if (!selected) return;
+    if (!selected) {
+      hasMissing = true;
+      return;
+    }
 
     const resolution = selected.value;
     if (resolution === 'upheld' && !note.trim()) {
-      alert('Please provide justification for upheld questions.');
+      alert('Please provide justification for all upheld questions.');
+      hasMissing = true;
       return;
     }
 
@@ -1239,9 +1246,16 @@ function handleResolveDisputeSubmit(e) {
     decisions.push({ questionId: qid, resolution, note });
   });
 
+  if (hasMissing) return;
+
+  // Determine status based on overturned questions among disputed ones
+  const totalDisputed = decisions.length;
   let newStatus = 'upheld';
-  if (overturnCount === decisions.length) newStatus = 'overturned';
-  else if (overturnCount > 0) newStatus = 'partial overturn';
+  if (overturnCount === totalDisputed && totalDisputed > 0) {
+    newStatus = 'overturned';
+  } else if (overturnCount > 0) {
+    newStatus = 'partial overturn';
+  }
 
   google.script.run
     .withSuccessHandler(() => {
