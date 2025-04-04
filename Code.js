@@ -760,12 +760,13 @@ function setSetting(key, value) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][keyCol] === key) {
       sheet.getRange(i + 1, valueCol + 1).setValue(value);
+      CacheService.getScriptCache().remove('system_settings');
       return;
     }
   }
 
-  // If not found, append it
   sheet.appendRow([key, value]);
+  CacheService.getScriptCache().remove('system_settings');
 }
 
 // Convert snake_case to Title Case for display
