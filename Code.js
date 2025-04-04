@@ -424,14 +424,17 @@ function getAllEvaluations() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const evalSheet = ss.getSheetByName('evalSummary');
     const questSheet = ss.getSheetByName('evalQuest');
+    const disputeSheet = ss.getSheetByName('disputesQueue');
 
     const summaries = getSheetDataAsObjects(evalSheet);
     const questions = getSheetDataAsObjects(questSheet);
+    const disputes = getSheetDataAsObjects(disputeSheet);
 
-    const map = {};
+    // Map questions by evalId
+    const questionMap = {};
     questions.forEach(q => {
-      if (!map[q.evalId]) map[q.evalId] = [];
-      map[q.evalId].push({
+      if (!questionMap[q.evalId]) questionMap[q.evalId] = [];
+      questionMap[q.evalId].push({
         id: q.id,
         questionId: q.questionId,
         questionText: q.questionText,
@@ -442,7 +445,15 @@ function getAllEvaluations() {
       });
     });
 
-    summaries.forEach(s => s.questions = map[s.id] || []);
+    // Set of disputed evalIds
+    const disputedEvalIds = new Set(disputes.map(d => d.evalId));
+
+    // Add questions and disputed flag to evaluations
+    summaries.forEach(s => {
+      s.questions = questionMap[s.id] || [];
+      s.isDisputed = disputedEvalIds.has(s.id);
+    });
+
     return summaries;
   });
 }
