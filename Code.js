@@ -262,6 +262,18 @@ function getQuestionsForTaskType(taskType) {
   });
 }
 
+function markAuditMisconfigured(auditId) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName("Audits");
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === auditId) {
+      sheet.getRange(i + 1, 6).setValue("misconfigured"); // assuming status is column 6
+      break;
+    }
+  }
+}
+
 function createQuestion(questionData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
 
