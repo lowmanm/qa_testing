@@ -1009,7 +1009,7 @@ function deleteUser(userId) {
       showToast("User deleted.", 'success');
       loadUsers();
     })
-    .withFailureHandler(err => showToast("Error deleting user: " + err.message, 'error');
+    .withFailureHandler(err => showToast("Error deleting user: " + err.message, 'error'))
     .deleteUser(userId);
 }
 
@@ -1108,7 +1108,7 @@ function deleteQuestion(qid) {
       showToast("Question deleted.", 'success');
       loadQuestions();
     })
-    .withFailureHandler(err => showToast("Error deleting question: " + err.message, 'error');
+    .withFailureHandler(err => showToast("Error deleting question: " + err.message, 'error'))
     .deleteQuestion(qid);
 }
 
