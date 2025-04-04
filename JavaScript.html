@@ -1,11 +1,4 @@
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-  initializeApp();
-  attachNavHandlers();
-  attachFormHandlers();
-  attachAdminHandlers();
-  attachDisputeHandlers();
-});
 
   function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
@@ -22,13 +15,41 @@
     setTimeout(() => toast.remove(), 3000);
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-    attachNavHandlers();
-    attachFormHandlers();
-    attachAdminHandlers();
-    attachDisputeHandlers();
+  document.addEventListener('DOMContentLoaded', function () {
+  initializeApp();
+  attachNavHandlers();
+  attachFormHandlers();
+  attachAdminHandlers();
+  attachDisputeHandlers();
+
+  // Fix missing Disputes loader
+  if (typeof loadDisputes === 'function') {
+    document.getElementById('navDisputes')?.addEventListener('click', showDisputes);
+  }
+
+  // Fix back button on viewEvaluationView
+  document.getElementById('closeViewEvaluation')?.addEventListener('click', showEvaluations);
+
+  // Admin tab buttons
+  document.getElementById('adminUsers')?.addEventListener('click', () => {
+    showAdminTab('adminUsersView');
+    loadUsers();
+    hideUserForm();
   });
+
+  document.getElementById('adminQuestions')?.addEventListener('click', () => {
+    showAdminTab('adminQuestionsView');
+    loadQuestions();
+  });
+
+  document.getElementById('adminSettings')?.addEventListener('click', () => {
+    showAdminTab('adminSettingsView');
+  });
+
+  // Cancel buttons
+  document.getElementById('cancelUserForm')?.addEventListener('click', hideUserForm);
+  document.getElementById('cancelQuestionForm')?.addEventListener('click', hideQuestionForm);
+});
 
   function initializeApp() {
     google.script.run.withSuccessHandler(user => {
