@@ -121,12 +121,6 @@ function attachAuditTabHandlers() {
     loadDashboardStats();
   }
 
-  function handleDashboardNav(targetFn) {
-    document.getElementById('dashboardStatsCard')?.classList.add('hidden');
-    document.getElementById('importAuditCard')?.classList.add('hidden');
-    targetFn();
-  }
-
    function loadDashboardStats() {
     // Step 1: Get pending audits
     google.script.run.withSuccessHandler(function(audits) {
@@ -260,15 +254,6 @@ function showAddQuestionForm() {
   function highlightNavItem(navId) {
     document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
     document.getElementById(navId)?.classList.add('active');
-  }
-
-  function showDashboard() {
-    hideAllViews();
-    document.getElementById('dashboardView')?.classList.remove('hidden');
-    highlightNavItem('navDashboard');
-    loadDashboardStats();
-    document.getElementById('dashboardStatsCard')?.classList.remove('hidden');
-    document.getElementById('importAuditCard')?.classList.remove('hidden');
   }
 
   function handleDashboardNav(targetFn) {
@@ -1216,11 +1201,6 @@ function deleteQuestion(qid) {
     .deleteQuestion(qid);
 }
 
-  function formatRole(role) {
-  if (!role) return 'Unknown';
-  return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-}
-
 function formatTaskType(type) {
   if (!type) return 'Unknown';
   return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
@@ -1245,23 +1225,6 @@ function formatTaskType(type) {
       .withFailureHandler(reject)
       .createUser(userData);
   });
-}
-
-  function resetEvaluationForm() {
-  const form = document.getElementById('evaluationForm');
-  form.reset();
-
-  const questionsContainer = document.getElementById('questions');
-  if (questionsContainer) questionsContainer.innerHTML = '';
-
-  const feedbackField = document.getElementById('feedback');
-  if (feedbackField) feedbackField.value = '';
-
-  form.removeAttribute('data-audit-id');
-  form.removeAttribute('data-reference-number');
-  form.removeAttribute('data-task-type');
-  form.removeAttribute('data-outcome');
-  form.removeAttribute('data-max-score');
 }
 
   function hideAllViews() {
