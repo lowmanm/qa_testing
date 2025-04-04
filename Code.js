@@ -79,6 +79,37 @@ function setupSpreadsheet() {
 }
 
 // ====================
+// UI Setup Functions
+// ====================
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('QA System')
+    .addItem('Open QA App', 'openQaApp')
+    .addItem('Setup Spreadsheet', 'setupSpreadsheet')
+    .addItem('Import Data from Email', 'importDataFromEmail')
+    .addToUi();
+}
+
+function openQaApp() {
+  const html = HtmlService.createHtmlOutputFromFile('Index')
+    .setWidth(1200)
+    .setHeight(800);
+  SpreadsheetApp.getUi().showModalDialog(html, 'QA Evaluation System');
+}
+
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('QA Evaluation System')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// ====================
 // Caching Utilities
 // ====================
 
@@ -138,9 +169,9 @@ function getAllUsers() {
 }
 
 function getCurrentUser() {
-  const email = Session.getActiveUser().getEmail();
-  const users = getAllUsers();
-  const user = users.find(function(user) {
+  var email = Session.getActiveUser().getEmail();
+  var users = getAllUsers();
+  var user = users.find(function(user) {
     return user.email === email;
   });
 
@@ -233,7 +264,7 @@ function getQuestionsForTaskType(taskType) {
 
 function markAuditAsMisconfigured(auditId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
-  if (!sheet) throw new Error('Sheet "auditQueue" not found');
+  if (!sheet) throw new Error('Sheet "auditsQueue" not found');
 
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
@@ -334,7 +365,7 @@ function getPendingAudits() {
     const evaluations = getAllEvaluations();
 
     const evaluatedIds = new Set(evaluations.map(e => e.evalId));
-    return audits.filter(a => 
+    return audits.filter(a =>
       a.auditStatus.toLowerCase() === 'pending' &&
       !evaluatedIds.has(a.auditId)
     );
@@ -393,17 +424,14 @@ function getAllEvaluations() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const evalSheet = ss.getSheetByName('evalSummary');
     const questSheet = ss.getSheetByName('evalQuest');
-    const disputeSheet = ss.getSheetByName('disputesQueue');
 
     const summaries = getSheetDataAsObjects(evalSheet);
     const questions = getSheetDataAsObjects(questSheet);
-    const disputes = getSheetDataAsObjects(disputeSheet);
 
-    // Map questions by evalId
-    const questionMap = {};
+    const map = {};
     questions.forEach(q => {
-      if (!questionMap[q.evalId]) questionMap[q.evalId] = [];
-      questionMap[q.evalId].push({
+      if (!map[q.evalId]) map[q.evalId] = [];
+      map[q.evalId].push({
         id: q.id,
         questionId: q.questionId,
         questionText: q.questionText,
@@ -414,15 +442,7 @@ function getAllEvaluations() {
       });
     });
 
-    // Set of disputed evalIds
-    const disputedEvalIds = new Set(disputes.map(d => d.evalId));
-
-    // Add questions and disputed flag to evaluations
-    summaries.forEach(s => {
-      s.questions = questionMap[s.id] || [];
-      s.isDisputed = disputedEvalIds.has(s.id);
-    });
-
+    summaries.forEach(s => s.questions = map[s.id] || []);
     return summaries;
   });
 }
@@ -683,8 +703,45 @@ function getDisputeStats() {
 // Utility & Shared Helper Functions
 // ==============================
 
+// Generic caching wrapper
+function getCachedOrFetch(cacheKey, fetchFn) {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(cacheKey);
+
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      Logger.log(`Error parsing cache for ${cacheKey}: ${e.message}`);
+    }
+  }
+
+  const fresh = fetchFn();
+  try {
+    cache.put(cacheKey, JSON.stringify(fresh), 300); // 5 minutes
+  } catch (e) {
+    Logger.log(`Error caching ${cacheKey}: ${e.message}`);
+  }
+
+  return fresh;
+}
+
+// Convert sheet data to array of objects (with headers)
+function getSheetDataAsObjects(sheet) {
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0];
+  return data.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => {
+      if (h) obj[h] = row[i];
+    });
+    return obj;
+  });
+}
+
 // Convert snake_case to Title Case for display
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
