@@ -390,6 +390,11 @@ function loadErrorTasks() {
   });
 }
 
+function markAuditAsMisconfigured(auditId) {
+  if (!auditId) return;
+  google.script.run.markAuditAsMisconfigured(auditId);
+}
+
   function showEvaluationForm(auditId) {
   hideAllViews();
   document.getElementById('evaluationFormView').classList.remove('hidden');
@@ -452,16 +457,11 @@ function loadErrorTasks() {
     questionsContainer.innerHTML = '';
 
     if (questions.length === 0) {
-  showToast("No evaluation questions are set up for this task type.", 'error');
-  markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
-  showAuditQueue(); // return user to queue
-  return;
-}
-
-function markAuditAsMisconfigured(auditId) {
-  if (!auditId) return;
-  google.script.run.markAuditAsMisconfigured(auditId);
-}
+      showToast("No evaluation questions are set up for this task type.", 'error');
+      markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
+      showAuditQueue(); // return user to queue
+      return;
+    }
 
     questions.forEach(q => {
       maxPossibleScore += parseInt(q.pointsPossible || 0);
