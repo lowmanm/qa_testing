@@ -683,45 +683,6 @@ function getDisputeStats() {
 // Utility & Shared Helper Functions
 // ==============================
 
-// Generic caching wrapper
-function getCachedOrFetch(cacheKey, fetchFn) {
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get(cacheKey);
-
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (e) {
-      Logger.log(`Error parsing cache for ${cacheKey}: ${e.message}`);
-    }
-  }
-
-  const fresh = fetchFn();
-  try {
-    cache.put(cacheKey, JSON.stringify(fresh), 300); // 5 minutes
-  } catch (e) {
-    Logger.log(`Error caching ${cacheKey}: ${e.message}`);
-  }
-
-  return fresh;
-}
-
-// Convert sheet data to array of objects (with headers)
-function getSheetDataAsObjects(sheet) {
-  if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-
-  const headers = data[0];
-  return data.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => {
-      if (h) obj[h] = row[i];
-    });
-    return obj;
-  });
-}
-
 // Convert snake_case to Title Case for display
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
