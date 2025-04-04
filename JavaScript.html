@@ -1326,27 +1326,32 @@ function handleResolveDisputeSubmit(e) {
   let hasMissing = false;
 
   cards.forEach(card => {
-    const qid = card.querySelector('input[type="radio"]')?.name?.split('_')[1];
-    const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
-    const note = form.querySelector(`#note_${qid}`)?.value || '';
+  const radioInput = card.querySelector('input[type="radio"]');
+  if (!radioInput || !radioInput.name.includes('_')) return;
 
-    if (!selected) {
-      showToast('Please make a selection for all disputed questions.', 'warning');
-      hasMissing = true;
-      return;
-    }
+  const qid = radioInput.name.split('_')[1];
+  if (!qid) return; // extra guard
 
-    const resolution = selected.value;
-    if (resolution === 'upheld' && !note.trim()) {
-      showToast('Justification is required for upheld questions.', 'warning');
-      hasMissing = true;
-      return;
-    }
+  const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
+  const note = form.querySelector(`#note_${qid}`)?.value || '';
 
-    if (resolution === 'overturned') overturnCount++;
+  if (!selected) {
+    showToast('Please make a selection for all disputed questions.', 'warning');
+    hasMissing = true;
+    return;
+  }
 
-    decisions.push({ questionId: qid, resolution, note });
-  });
+  const resolution = selected.value;
+  if (resolution === 'upheld' && !note.trim()) {
+    showToast('Justification is required for upheld questions.', 'warning');
+    hasMissing = true;
+    return;
+  }
+
+  if (resolution === 'overturned') overturnCount++;
+
+  decisions.push({ questionId: qid, resolution, note });
+});
 
   if (hasMissing) return;
 
