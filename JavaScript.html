@@ -958,7 +958,12 @@ if (!allAnswered) {
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
-      if (!dispute.questionIds.includes(q.questionId)) return;
+  if (!q.questionId || !q.questionText) return; // skip invalid
+  if (!dispute.questionIds.includes(q.questionId)) return;
+  if (!q.questionId || !q.questionText) {
+  console.warn("Skipping question with missing data:", q);
+  return;
+}
 
       const highlightClass = q.response === 'no' ? 'highlight-no' : '';
       const card = document.createElement('div');
