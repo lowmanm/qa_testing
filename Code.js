@@ -138,9 +138,9 @@ function getAllUsers() {
 }
 
 function getCurrentUser() {
-  var email = Session.getActiveUser().getEmail();
-  var users = getAllUsers();
-  var user = users.find(function(user) {
+  const email = Session.getActiveUser().getEmail();
+  const users = getAllUsers();
+  const user = users.find(function(user) {
     return user.email === email;
   });
 
@@ -233,7 +233,7 @@ function getQuestionsForTaskType(taskType) {
 
 function markAuditAsMisconfigured(auditId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
-  if (!sheet) throw new Error('Sheet "auditsQueue" not found');
+  if (!sheet) throw new Error('Sheet "auditQueue" not found');
 
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
