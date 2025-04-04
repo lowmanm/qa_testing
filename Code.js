@@ -44,7 +44,7 @@ function setupSpreadsheet() {
       'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp', 'locked'
     ],
     evalSummary: [
-      'id', 'evalId', 'referenceNumber', 'taskType', 'outcome',
+      'id', 'auditId', 'referenceNumber', 'taskType', 'outcome',
       'qaEmail', 'startTimestamp', 'stopTimestamp', 'totalPoints',
       'totalPointsPossible', 'status', 'feedback', 'evalScore'
     ],
