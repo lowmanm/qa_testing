@@ -38,7 +38,7 @@ function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const sheetsToCreate = {
-    users: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl'],
+    users: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp'],
     auditQueue: [
       'auditId', 'taskId', 'referenceNumber', 'auditStatus', 'agentEmail',
       'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp', 'locked'
@@ -59,7 +59,7 @@ function setupSpreadsheet() {
     disputesQueue: [
       'id', 'evalId', 'userEmail', 'disputeTimestamp', 'reason',
       'questionIds', 'status', 'resolutionNotes', 'resolvedBy', 'resolutionTimestamp'
-    ]
+    ],
     settings: ['key', 'value']
   };
 
