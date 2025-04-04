@@ -263,7 +263,7 @@ function getQuestionsForTaskType(taskType) {
 }
 
 function markAuditMisconfigured(auditId) {
-  const sheet = SpreadsheetApp.getActive().getSheetByName("Audits");
+  const sheet = SpreadsheetApp.getActive().getSheetByName("auditQueue");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
