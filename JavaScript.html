@@ -1,14 +1,10 @@
 <script>
-  // == Initialization ==
-  document.addEventListener('DOMContentLoaded', function () {
-  // Initialize app and load user context
+  document.addEventListener('DOMContentLoaded', () => {
   initializeApp();
-  // Attach all nav button handlers
   attachNavHandlers();
-  // Attach form event listeners (evaluation + disputes)
   attachFormHandlers();
-  // Attach all admin tab handlers (users, questions, settings)
   attachAdminHandlers();
+  attachDisputeHandlers();
 });
 
   function initializeApp() {
@@ -34,11 +30,25 @@
   }
 
   function attachNavHandlers() {
-  document.getElementById('navDashboard')?.addEventListener('click', showDashboard);
-  document.getElementById('navAuditQueue')?.addEventListener('click', showAuditQueue);
-  document.getElementById('navEvaluations')?.addEventListener('click', showEvaluations);
-  document.getElementById('navDisputes')?.addEventListener('click', showDisputes);
-  document.getElementById('navAdmin')?.addEventListener('click', showAdmin);
+  const nav = [
+    ['navDashboard', showDashboard],
+    ['navAuditQueue', showAuditQueue],
+    ['navEvaluations', showEvaluations],
+    ['navDisputes', showDisputes],
+    ['navAdmin', showAdmin]
+  ];
+
+  nav.forEach(([id, handler]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', handler);
+  });
+}
+
+  function attachDisputeHandlers() {
+    const form = document.getElementById('resolveDisputeForm');
+    if (!form) return;
+
+  form.addEventListener('submit', handleResolveDisputeSubmit);
 }
 
   function showDashboard() {
@@ -97,84 +107,83 @@
 
   // == Form + Button Event Handlers ==
   function attachFormHandlers() {
-    document.getElementById('evaluationForm')?.addEventListener('submit', handleEvaluationSubmit);
-    document.getElementById('disputeForm')?.addEventListener('submit', handleDisputeSubmit);
-    document.getElementById('cancelEvaluation')?.addEventListener('click', showAuditQueue);
-    document.getElementById('cancelDispute')?.addEventListener('click', showEvaluations);
-   /* document.getElementById('resolveDisputeForm')?.addEventListener('submit', handleResolveDisputeSubmit);*/
-  }
+  const cancelEval = document.getElementById('cancelEvaluation');
+  const evalForm = document.getElementById('evaluationForm');
+  if (cancelEval) cancelEval.addEventListener('click', showAuditQueue);
+  if (evalForm) evalForm.addEventListener('submit', handleEvaluationSubmit);
 
- function attachAdminHandlers() {
-  // Users tab
-  const addUserBtn = document.getElementById('addUserBtn');
-  if (addUserBtn) {
-    addUserBtn.addEventListener('click', showAddUserForm);
-  }
+  const cancelDispute = document.getElementById('cancelDispute');
+  const disputeForm = document.getElementById('disputeForm');
+  if (cancelDispute) cancelDispute.addEventListener('click', showEvaluations);
+  if (disputeForm) disputeForm.addEventListener('submit', handleDisputeSubmit);
 
-  const cancelUserFormBtn = document.getElementById('cancelUserForm');
-  if (cancelUserFormBtn) {
-    cancelUserFormBtn.addEventListener('click', hideUserForm);
-  }
+  const importBtn = document.getElementById('importButton');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      const statusDiv = document.getElementById('importStatus');
+      if (!statusDiv) return;
 
-  const userFormElement = document.getElementById('userFormElement');
-  if (userFormElement) {
-    userFormElement.addEventListener('submit', handleUserFormSubmit);
-  }
+      statusDiv.innerHTML = '<div class="alert alert-info">Importing data from email... This may take a moment.</div>';
 
-  // Questions tab
-  const addQuestionBtn = document.getElementById('addQuestionBtn');
-  if (addQuestionBtn) {
-    addQuestionBtn.addEventListener('click', showAddQuestionForm);
-  }
-
-  const cancelQuestionFormBtn = document.getElementById('cancelQuestionForm');
-  if (cancelQuestionFormBtn) {
-    cancelQuestionFormBtn.addEventListener('click', hideQuestionForm);
-  }
-
-  const questionFormElement = document.getElementById('questionFormElement');
-  if (questionFormElement) {
-    questionFormElement.addEventListener('submit', handleQuestionFormSubmit);
-  }
-
-  const taskTypeFilter = document.getElementById('taskTypeFilter');
-  if (taskTypeFilter) {
-    taskTypeFilter.addEventListener('change', loadQuestions);
-  }
-
-  // Settings form
-  const settingsForm = document.getElementById('settingsForm');
-  if (settingsForm) {
-    settingsForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      alert('Settings saved successfully!');
+      google.script.run
+        .withSuccessHandler(result => {
+          statusDiv.innerHTML = result.success
+            ? `<div class="alert alert-success">${result.message}</div>`
+            : `<div class="alert alert-danger">${result.message}</div>`;
+          if (result.success) loadDashboardStats();
+        })
+        .withFailureHandler(error => {
+          statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        })
+        .importDataFromEmail();
     });
   }
+}
 
-  // Admin tab navigation
-  const adminUsersTab = document.getElementById('adminUsers');
-  if (adminUsersTab) {
-    adminUsersTab.addEventListener('click', function () {
+ function attachAdminHandlers() {
+  const userBtn = document.getElementById('adminUsers');
+  const qBtn = document.getElementById('adminQuestions');
+  const setBtn = document.getElementById('adminSettings');
+
+  if (userBtn) {
+    userBtn.addEventListener('click', () => {
       showAdminTab('adminUsersView');
       loadUsers();
       hideUserForm();
     });
   }
 
-  const adminQuestionsTab = document.getElementById('adminQuestions');
-  if (adminQuestionsTab) {
-    adminQuestionsTab.addEventListener('click', function () {
+  if (qBtn) {
+    qBtn.addEventListener('click', () => {
       showAdminTab('adminQuestionsView');
       loadQuestions();
     });
   }
 
-  const adminSettingsTab = document.getElementById('adminSettings');
-  if (adminSettingsTab) {
-    adminSettingsTab.addEventListener('click', function () {
+  if (setBtn) {
+    setBtn.addEventListener('click', () => {
       showAdminTab('adminSettingsView');
     });
   }
+
+  const addUserBtn = document.getElementById('addUserBtn');
+  if (addUserBtn) addUserBtn.addEventListener('click', showAddUserForm);
+
+  const cancelUser = document.getElementById('cancelUserForm');
+  if (cancelUser) cancelUser.addEventListener('click', hideUserForm);
+
+  const userForm = document.getElementById('userFormElement');
+  if (userForm) userForm.addEventListener('submit', handleUserFormSubmit);
+
+  const addQ = document.getElementById('addQuestionBtn');
+  const cancelQ = document.getElementById('cancelQuestionForm');
+  const qForm = document.getElementById('questionFormElement');
+  const filter = document.getElementById('taskTypeFilter');
+
+  if (addQ) addQ.addEventListener('click', showAddQuestionForm);
+  if (cancelQ) cancelQ.addEventListener('click', hideQuestionForm);
+  if (qForm) qForm.addEventListener('submit', handleQuestionFormSubmit);
+  if (filter) filter.addEventListener('change', loadQuestions);
 }
 
   // Show the Add User form with cleared values
@@ -186,23 +195,6 @@ function showAddUserForm() {
 function showAddQuestionForm() {
   showQuestionForm(); // This calls the already defined generic showQuestionForm()
 }
-
-
-  // == View Management ==
-  function hideAllViews() {
-    const viewIds = [
-      'dashboardView',
-      'auditQueueView',
-      'evaluationFormView',
-      'evaluationsView',
-      'disputesView',
-      'disputeFormView',
-      'adminView',
-      'viewEvaluationView',
-      'resolveDisputeView'
-    ];
-    viewIds.forEach(id => document.getElementById(id)?.classList.add('hidden'));
-  }
 
   function highlightNavItem(navId) {
     document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
@@ -222,13 +214,6 @@ function showAddQuestionForm() {
     document.getElementById('dashboardStatsCard')?.classList.add('hidden');
     document.getElementById('importAuditCard')?.classList.add('hidden');
     targetFn();
-  }
-
-  function showAuditQueue() {
-    hideAllViews();
-    document.getElementById('auditQueueView')?.classList.remove('hidden');
-    highlightNavItem('navAuditQueue');
-    loadPendingTasks();
   }
 
   function showEvaluations() {
@@ -832,7 +817,35 @@ function showAddQuestionForm() {
     // Update status to "reviewing"
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
-    // Show evaluation metadata
+    // Inject HTML structure for the resolve view
+    document.getElementById('resolveDisputeView').innerHTML = `
+      <div class="card">
+        <h2>Resolve Dispute</h2>
+        <div id="resolveEvaluationDetails" class="mb-4">Loading...</div>
+
+        <form id="resolveDisputeForm">
+          <div id="resolveDisputeQuestions" class="questions-container mb-4">Loading questions...</div>
+
+          <div class="form-group mt-3">
+            <label for="resolutionNotes">General Notes (optional)</label>
+            <textarea id="resolutionNotes" name="resolutionNotes" rows="3" class="form-control"></textarea>
+          </div>
+
+          <div class="button-group">
+            <button type="submit" class="btn btn-primary">Submit Resolution</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const form = document.getElementById('resolveDisputeForm');
+    form.setAttribute('data-eval-id', evaluation.id);
+    form.setAttribute('data-dispute-id', dispute.id);
+
+    // Attach the submit handler directly here
+    form.addEventListener('submit', handleResolveDisputeSubmit);
+
+    // Render evaluation metadata
     const detailsHTML = `
       <div class="grid-2">
         <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
@@ -843,7 +856,7 @@ function showAddQuestionForm() {
     `;
     document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
 
-    // Load disputed questions only
+    // Render disputed questions
     const container = document.getElementById('resolveDisputeQuestions');
     container.innerHTML = '';
 
@@ -852,97 +865,33 @@ function showAddQuestionForm() {
 
       const highlightClass = q.response === 'no' ? 'highlight-no' : '';
       const card = document.createElement('div');
-card.className = `question-card ${highlightClass}`;
-card.innerHTML = `
-  <div class="question-header">
-    <h3 class="question-text">${q.questionText}</h3>
-    <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
-  </div>
-  <div class="question-body">
-    <div class="radio-group">
-      <label>
-        <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
-        <span>Uphold</span>
-      </label>
-      <label>
-        <input type="radio" name="resolution_${q.questionId}" value="overturned">
-        <span>Overturn</span>
-      </label>
-    </div>
-    <div class="form-group mt-2">
-      <label for="note_${q.questionId}">Justification (required if Upheld)</label>
-      <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
-    </div>
-  </div>
-`;
-container.appendChild(card);
-
+      card.className = `question-card ${highlightClass}`;
+      card.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
+              <span>Uphold</span>
+            </label>
+            <label>
+              <input type="radio" name="resolution_${q.questionId}" value="overturned">
+              <span>Overturn</span>
+            </label>
+          </div>
+          <div class="form-group mt-2">
+            <label for="note_${q.questionId}">Justification (required if Upheld)</label>
+            <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
     });
-
-    // Store IDs
-    const form = document.getElementById('resolveDisputeForm');
-    form.setAttribute('data-eval-id', evaluation.id);
-    form.setAttribute('data-dispute-id', dispute.id);
   }).getAllEvaluationsAndDisputes();
 }
-
- document.getElementById('resolveDisputeForm').addEventListener('submit', function (e) {
-  e.preventDefault();
-
-  const form = e.target;
-  const evalId = form.getAttribute('data-eval-id');
-  const disputeId = form.getAttribute('data-dispute-id');
-  const notesField = document.getElementById('resolutionNotes');
-  const resolutionNotes = notesField ? notesField.value : '';
-
-  const decisions = [];
-  let overturnCount = 0;
-
-  document.querySelectorAll('#resolveDisputeQuestions .question-card').forEach(card => {
-    const qid = card.querySelector('input[type="radio"]')?.name.split('_')[1];
-    if (!qid) return;
-
-    const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
-    if (!selected) return;
-
-    const resolution = selected.value;
-    const noteField = form.querySelector(`#note_${qid}`);
-    const note = noteField ? noteField.value.trim() : '';
-
-    if (resolution === 'upheld' && !note) {
-      alert("Justification is required for upheld questions.");
-      return;
-    }
-
-    if (resolution === 'overturned') overturnCount++;
-
-    decisions.push({ questionId: qid, resolution, note });
-  });
-
-  const newStatus = overturnCount === 0
-    ? 'upheld'
-    : overturnCount === decisions.length
-    ? 'overturned'
-    : 'partial overturn';
-
-  google.script.run
-    .withSuccessHandler(() => {
-      alert("Dispute resolved successfully.");
-      showDisputes();
-    })
-    .withFailureHandler(error => {
-      console.error('Resolution error:', error);
-      alert("Failed to resolve dispute: " + error.message);
-    })
-    .resolveDispute({
-      disputeId,
-      evalId,
-      decisions,
-      resolutionNotes,
-      status: newStatus
-    });
-});
-
 
   function loadUsers() {
   const tableBody = document.getElementById('usersBody');
@@ -1259,5 +1208,56 @@ document.addEventListener('DOMContentLoaded', function () {
     cancelQuestionBtn.addEventListener('click', hideQuestionForm);
   }
 });
+
+function handleResolveDisputeSubmit(e) {
+  e.preventDefault();
+
+  const form = e.target;
+  const evalId = form.getAttribute('data-eval-id');
+  const disputeId = form.getAttribute('data-dispute-id');
+  const resolutionNotes = document.getElementById('resolutionNotes')?.value || '';
+
+  const decisions = [];
+  let overturnCount = 0;
+
+  document.querySelectorAll('#resolveDisputeQuestions .question-card').forEach(card => {
+    const qid = card.querySelector('input[type="radio"]')?.name?.split('_')[1];
+    const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
+    const note = form.querySelector(`#note_${qid}`)?.value || '';
+
+    if (!selected) return;
+
+    const resolution = selected.value;
+    if (resolution === 'upheld' && !note.trim()) {
+      alert('Please provide justification for upheld questions.');
+      return;
+    }
+
+    if (resolution === 'overturned') overturnCount++;
+
+    decisions.push({ questionId: qid, resolution, note });
+  });
+
+  let newStatus = 'upheld';
+  if (overturnCount === decisions.length) newStatus = 'overturned';
+  else if (overturnCount > 0) newStatus = 'partial overturn';
+
+  google.script.run
+    .withSuccessHandler(() => {
+      alert('Dispute resolved successfully.');
+      showDisputes();
+    })
+    .withFailureHandler(error => {
+      console.error('Error resolving dispute:', error);
+      alert('Failed to resolve dispute: ' + error.message);
+    })
+    .resolveDispute({
+      disputeId,
+      evalId,
+      decisions,
+      resolutionNotes,
+      status: newStatus
+    });
+}
 
 </script>
