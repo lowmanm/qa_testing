@@ -745,3 +745,4 @@ function getSheetDataAsObjects(sheet) {
 // Convert snake_case to Title Case for display
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
