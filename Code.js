@@ -79,37 +79,6 @@ function setupSpreadsheet() {
 }
 
 // ====================
-// UI Setup Functions
-// ====================
-
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('QA System')
-    .addItem('Open QA App', 'openQaApp')
-    .addItem('Setup Spreadsheet', 'setupSpreadsheet')
-    .addItem('Import Data from Email', 'importDataFromEmail')
-    .addToUi();
-}
-
-function openQaApp() {
-  const html = HtmlService.createHtmlOutputFromFile('Index')
-    .setWidth(1200)
-    .setHeight(800);
-  SpreadsheetApp.getUi().showModalDialog(html, 'QA Evaluation System');
-}
-
-function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
-    .evaluate()
-    .setTitle('QA Evaluation System')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-}
-
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
-
-// ====================
 // Caching Utilities
 // ====================
 
