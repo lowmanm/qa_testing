@@ -29,26 +29,6 @@
 
   // Fix back button on viewEvaluationView
   document.getElementById('closeViewEvaluation')?.addEventListener('click', showEvaluations);
-
-  // Admin tab buttons
-  document.getElementById('adminUsers')?.addEventListener('click', () => {
-    showAdminTab('adminUsersView');
-    loadUsers();
-    hideUserForm();
-  });
-
-  document.getElementById('adminQuestions')?.addEventListener('click', () => {
-    showAdminTab('adminQuestionsView');
-    loadQuestions();
-  });
-
-  document.getElementById('adminSettings')?.addEventListener('click', () => {
-    showAdminTab('adminSettingsView');
-  });
-
-  // Cancel buttons
-  document.getElementById('cancelUserForm')?.addEventListener('click', hideUserForm);
-  document.getElementById('cancelQuestionForm')?.addEventListener('click', hideQuestionForm);
 });
 
   function initializeApp() {
