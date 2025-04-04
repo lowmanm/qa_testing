@@ -392,9 +392,16 @@ function showAddQuestionForm() {
     questionsContainer.innerHTML = '';
 
     if (questions.length === 0) {
-      questionsContainer.innerHTML = '<div class="alert alert-warning">No questions found for this task type.</div>';
-      return;
-    }
+  showToast("No evaluation questions are set up for this task type.", 'error');
+  markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
+  showAuditQueue(); // return user to queue
+  return;
+}
+
+function markAuditAsMisconfigured(auditId) {
+  if (!auditId) return;
+  google.script.run.markAuditMisconfigured(auditId);
+}
 
     questions.forEach(q => {
       maxPossibleScore += parseInt(q.pointsPossible || 0);
