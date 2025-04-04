@@ -537,21 +537,24 @@ function markAuditAsMisconfigured(auditId) {
       questionCard.setAttribute('data-points-possible', q.pointsPossible);
 
       questionCard.innerHTML = `
-        <div class="question-header">
-          <h3 class="question-text">${q.questionText}</h3>
-          <span class="question-points">Points: ${q.pointsPossible}</span>
-        </div>
-        <div class="question-body">
-          <div class="radio-group">
-            <label><input type="radio" name="question_${q.id}" value="yes"> <span>Yes</span></label>
-            <label><input type="radio" name="question_${q.id}" value="no"> <span>No</span></label>
-          </div>
-          <div class="feedback-field">
-            <label for="feedback_${q.id}">Specific Feedback:</label>
-            <textarea id="feedback_${q.id}" name="feedback_${q.id}" rows="2" class="form-control"></textarea>
-          </div>
-        </div>
-      `;
+  <div class="question-header">
+    <h3 class="question-text">${q.questionText}</h3>
+    <span class="question-points">Points: ${q.pointsPossible}</span>
+  </div>
+  <div class="question-body">
+    <div class="radio-group">
+      <label><input type="radio" name="question_${q.id}" value="yes"> <span>Yes</span></label>
+      <label><input type="radio" name="question_${q.id}" value="no"> <span>No</span></label>
+    </div>
+    <div class="feedback-field">
+      <label for="feedback_${q.id}">Specific Feedback:</label>
+      <textarea id="feedback_${q.id}" name="feedback_${q.id}" rows="2"
+        class="form-control feedback-textarea"
+        data-feedback-id="${q.id}"></textarea>
+      <div id="feedbackCounter_${q.id}" class="form-text text-right" style="font-size: 12px; color: #6b7280;"></div>
+    </div>
+  </div>
+`;
       questionsContainer.appendChild(questionCard);
     });
 
