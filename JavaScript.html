@@ -7,6 +7,30 @@
   attachDisputeHandlers();
 });
 
+<script>
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+
+    if (type === 'success') toast.style.backgroundColor = '#28a745';
+    else if (type === 'error') toast.style.backgroundColor = '#dc3545';
+    else if (type === 'warning') toast.style.backgroundColor = '#ffc107';
+
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+    attachNavHandlers();
+    attachFormHandlers();
+    attachAdminHandlers();
+    attachDisputeHandlers();
+  });
+
   function initializeApp() {
     google.script.run.withSuccessHandler(user => {
       document.getElementById('userName').textContent = user.name;
@@ -1273,22 +1297,6 @@ function handleResolveDisputeSubmit(e) {
       resolutionNotes,
       status: newStatus
     });
-}
-
-function showToast(message, type = 'info') {
-  const container = document.getElementById('toastContainer');
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  if (type === 'success') toast.style.backgroundColor = '#28a745';
-  else if (type === 'error') toast.style.backgroundColor = '#dc3545';
-  else if (type === 'warning') toast.style.backgroundColor = '#ffc107';
-  toast.textContent = message;
-
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.remove();
-  }, 3000);
 }
 
 </script>
