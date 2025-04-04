@@ -404,6 +404,7 @@ function loadErrorTasks() {
   questionsContainer.innerHTML = '';
   taskDetails.innerHTML = 'Loading task details...';
   feedbackField.value = '';
+  form.classList.add('disabled'); // prevent premature interaction
   ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr => form.removeAttribute(attr));
 
   // Fetch and render new audit
@@ -491,6 +492,7 @@ function markAuditAsMisconfigured(auditId) {
     });
 
     form.setAttribute('data-max-score', maxPossibleScore);
+    form.classList.remove('disabled');
   }).getQuestionsForTaskType(taskType);
 }
 
@@ -499,6 +501,11 @@ function markAuditAsMisconfigured(auditId) {
 
   const form = document.getElementById('evaluationForm');
   if (!form) return showToast("Evaluation form not found.", 'error');
+  
+  if (form.classList.contains('disabled')) {
+  showToast("Please wait for the questions to finish loading.", 'warning');
+  return;
+}
 
   const auditId = form.getAttribute('data-audit-id');
   const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
