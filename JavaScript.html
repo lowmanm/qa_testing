@@ -218,6 +218,33 @@ function attachAuditTabHandlers() {
   }
 }
 
+function applyFeedbackCharacterLimits(limit) {
+  const textareas = document.querySelectorAll('textarea.feedback-textarea');
+
+  textareas.forEach(textarea => {
+    const questionId = textarea.getAttribute('data-feedback-id');
+    const counter = document.getElementById(`feedbackCounter_${textarea.id}`);
+
+    if (!counter) return;
+
+    // Initial update
+    counter.textContent = `${textarea.value.length} / ${limit} characters`;
+
+    // Add live input handler
+    textarea.addEventListener('input', () => {
+      const length = textarea.value.length;
+      counter.textContent = `${length} / ${limit} characters`;
+
+      // Optional: Add color warning if nearing the limit
+      if (length > limit * 0.9) {
+        counter.style.color = '#b91c1c'; // red
+      } else {
+        counter.style.color = '#6b7280'; // neutral gray
+      }
+    });
+  });
+}
+
  function attachAdminHandlers() {
   const userBtn = document.getElementById('adminUsers');
   const qBtn = document.getElementById('adminQuestions');
@@ -511,21 +538,16 @@ function loadErrorTasks() {
 
   questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
 
-  google.script.run.withSuccessHandler(function(questions) {
+  google.script.run.withSuccessHandler(function (questions) {
     let maxPossibleScore = 0;
     questionsContainer.innerHTML = '';
 
     if (questions.length === 0) {
-  showToast("No evaluation questions are set up for this task type.", 'error');
-  markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
-  showAuditQueue(); // return user to queue
-  return;
-}
-
-function markAuditAsMisconfigured(auditId) {
-  if (!auditId) return;
-  google.script.run.markAuditAsMisconfigured(auditId);
-}
+      showToast("No evaluation questions are set up for this task type.", 'error');
+      markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
+      showAuditQueue();
+      return;
+    }
 
     questions.forEach(q => {
       maxPossibleScore += parseInt(q.pointsPossible || 0);
@@ -537,29 +559,41 @@ function markAuditAsMisconfigured(auditId) {
       questionCard.setAttribute('data-points-possible', q.pointsPossible);
 
       questionCard.innerHTML = `
-  <div class="question-header">
-    <h3 class="question-text">${q.questionText}</h3>
-    <span class="question-points">Points: ${q.pointsPossible}</span>
-  </div>
-  <div class="question-body">
-    <div class="radio-group">
-      <label><input type="radio" name="question_${q.id}" value="yes"> <span>Yes</span></label>
-      <label><input type="radio" name="question_${q.id}" value="no"> <span>No</span></label>
-    </div>
-    <div class="feedback-field">
-      <label for="feedback_${q.id}">Specific Feedback:</label>
-      <textarea id="feedback_${q.id}" name="feedback_${q.id}" rows="2"
-        class="form-control feedback-textarea"
-        data-feedback-id="${q.id}"></textarea>
-      <div id="feedbackCounter_${q.id}" class="form-text text-right" style="font-size: 12px; color: #6b7280;"></div>
-    </div>
-  </div>
-`;
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Points: ${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label><input type="radio" name="question_${q.id}" value="yes"> <span>Yes</span></label>
+            <label><input type="radio" name="question_${q.id}" value="no"> <span>No</span></label>
+          </div>
+          <div class="feedback-field">
+            <label for="feedback_${q.id}">Specific Feedback:</label>
+            <textarea
+              id="feedback_${q.id}"
+              name="feedback_${q.id}"
+              rows="2"
+              class="form-control feedback-textarea"
+              data-feedback-id="${q.id}"
+            ></textarea>
+            <small class="form-text" id="feedbackCounter_${q.id}">Loading character limit...</small>
+          </div>
+        </div>
+      `;
+
       questionsContainer.appendChild(questionCard);
     });
 
     form.setAttribute('data-max-score', maxPossibleScore);
     form.classList.remove('disabled');
+
+    // Fetch character limit setting and apply it
+    google.script.run.withSuccessHandler(settings => {
+      const limit = parseInt(settings?.feedbackCharLimit) || 300;
+      applyFeedbackCharacterLimits(limit);
+    }).getSettings();
+
   }).getQuestionsForTaskType(taskType);
 }
 
@@ -896,28 +930,51 @@ if (!allAnswered) {
     return;
   }
 
-  evaluation.questions.forEach(q => {
-    const highlightClass = q.response === 'no' ? 'highlight-no' : '';
-    const feedbackHtml = q.feedback ? `<p class="field-label">Feedback:</p><p class="field-value">${q.feedback}</p>` : '';
+  // Fetch settings to get character limit
+  google.script.run.withSuccessHandler(settings => {
+    const limit = parseInt(settings?.feedbackCharLimit) || 300;
 
-    const card = document.createElement('div');
-    card.className = `question-card ${highlightClass}`;
-    card.innerHTML = `
-      <div class="question-header">
-        <h3 class="question-text">${q.questionText}</h3>
-        <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
-      </div>
-      <div class="question-body">
-        <p class="field-label">Response:</p>
-        <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
-        ${feedbackHtml}
-        <div class="dispute-checkbox">
-          <label><input type="checkbox" name="dispute_question_${q.questionId}" value="${q.questionId}"> Dispute this question</label>
+    evaluation.questions.forEach(q => {
+      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+      const feedbackHtml = q.feedback ? `<p class="field-label">Feedback:</p><p class="field-value">${q.feedback}</p>` : '';
+
+      const card = document.createElement('div');
+      card.className = `question-card ${highlightClass}`;
+      card.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
         </div>
-      </div>
-    `;
-    container.appendChild(card);
-  });
+        <div class="question-body">
+          <p class="field-label">Response:</p>
+          <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
+          ${feedbackHtml}
+          <div class="dispute-checkbox">
+            <label>
+              <input type="checkbox" name="dispute_question_${q.questionId}" value="${q.questionId}">
+              Dispute this question
+            </label>
+          </div>
+          <div class="feedback-field">
+            <label for="feedback_dispute_${q.questionId}">Optional Notes:</label>
+            <textarea
+              id="feedback_dispute_${q.questionId}"
+              name="feedback_dispute_${q.questionId}"
+              rows="2"
+              class="form-control feedback-textarea"
+              maxlength="${limit}"
+              data-feedback-id="${q.questionId}"
+            ></textarea>
+            <small class="form-text" id="feedbackCounter_feedback_dispute_${q.questionId}">0 / ${limit} characters</small>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    applyFeedbackCharacterLimits(limit);
+  }).getSettings();
+}
 }
 
   function handleDisputeSubmit(e) {
@@ -1007,8 +1064,6 @@ if (!allAnswered) {
     const form = document.getElementById('resolveDisputeForm');
     form.setAttribute('data-eval-id', evaluation.id);
     form.setAttribute('data-dispute-id', dispute.id);
-
-    // Attach the submit handler directly here
     form.addEventListener('submit', handleResolveDisputeSubmit);
 
     // Render evaluation metadata
@@ -1022,46 +1077,55 @@ if (!allAnswered) {
     `;
     document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
 
-    // Render disputed questions
-    const container = document.getElementById('resolveDisputeQuestions');
-    container.innerHTML = '';
+    // Fetch limit, then render disputed questions
+    google.script.run.withSuccessHandler(settings => {
+      const limit = parseInt(settings?.feedbackCharLimit) || 300;
+      const container = document.getElementById('resolveDisputeQuestions');
+      container.innerHTML = '';
 
-    evaluation.questions.forEach(q => {
-  if (!q.questionId || !q.questionText) return; // skip invalid
-  if (!dispute.questionIds.includes(q.questionId)) return;
-  if (!q.questionId || !q.questionText) {
-  console.warn("Skipping question with missing data:", q);
-  return;
-}
+      evaluation.questions.forEach(q => {
+        if (!dispute.questionIds.includes(q.questionId)) return;
 
-      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
-      const card = document.createElement('div');
-      card.className = `question-card ${highlightClass}`;
-      card.innerHTML = `
-        <div class="question-header">
-          <h3 class="question-text">${q.questionText}</h3>
-          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
-        </div>
-        <div class="question-body">
-          <div class="radio-group">
-            <label>
-              <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
-              <span>Uphold</span>
-            </label>
-            <label>
-              <input type="radio" name="resolution_${q.questionId}" value="overturned">
-              <span>Overturn</span>
-            </label>
+        const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+        const card = document.createElement('div');
+        card.className = `question-card ${highlightClass}`;
+        card.innerHTML = `
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
           </div>
-          <div class="form-group mt-2">
-            <label for="note_${q.questionId}">Justification (required if Upheld)</label>
-            <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
+          <div class="question-body">
+            <div class="radio-group">
+              <label>
+                <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
+                <span>Uphold</span>
+              </label>
+              <label>
+                <input type="radio" name="resolution_${q.questionId}" value="overturned">
+                <span>Overturn</span>
+              </label>
+            </div>
+            <div class="form-group mt-2">
+              <label for="note_${q.questionId}">Justification (required if Upheld)</label>
+              <textarea
+                class="form-control feedback-textarea"
+                id="note_${q.questionId}"
+                name="note_${q.questionId}"
+                rows="2"
+                maxlength="${limit}"
+                data-feedback-id="${q.questionId}"
+              ></textarea>
+              <small class="form-text" id="feedbackCounter_note_${q.questionId}">0 / ${limit} characters</small>
+            </div>
           </div>
-        </div>
-      `;
-      container.appendChild(card);
-    });
+        `;
+        container.appendChild(card);
+      });
+
+      applyFeedbackCharacterLimits(limit);
+    }).getSettings();
   }).getAllEvaluationsAndDisputes();
+}
 }
 
   function loadUsers() {
