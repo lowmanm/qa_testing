@@ -224,6 +224,32 @@ function attachAuditTabHandlers() {
   if (cancelQ) cancelQ.addEventListener('click', hideQuestionForm);
   if (qForm) qForm.addEventListener('submit', handleQuestionFormSubmit);
   if (filter) filter.addEventListener('change', loadQuestions);
+
+  // ===============================
+  // System Settings Load + Save
+  // ===============================
+  const settingsForm = document.getElementById('settingsForm');
+  if (settingsForm) {
+    google.script.run.withSuccessHandler(data => {
+      document.getElementById('emailSubject').value = data.emailSubject || '';
+      document.getElementById('csvFilename').value = data.csvFilename || '';
+      document.getElementById('feedbackCharLimit').value = data.feedbackCharLimit || 300;
+    }).getSystemSettings();
+
+    settingsForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const settings = {
+        emailSubject: document.getElementById('emailSubject').value,
+        csvFilename: document.getElementById('csvFilename').value,
+        feedbackCharLimit: parseInt(document.getElementById('feedbackCharLimit').value, 10)
+      };
+
+      google.script.run
+        .withSuccessHandler(() => showToast('Settings saved successfully!', 'success'))
+        .withFailureHandler(err => showToast('Error saving settings: ' + err.message, 'error'))
+        .saveSystemSettings(settings);
+    });
+  }
 }
 
   // Show the Add User form with cleared values
