@@ -72,30 +72,34 @@
 </div>
 
 
-      <div id="auditQueueView" class="view hidden">
-        <div class="card">
-          <h2>Pending Audits</h2>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Agent</th>
-                  <th>Task Type</th>
-                  <th>Reference</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="pendingTasksBody">
-                <tr>
-                  <td colspan="6" class="text-center">Loading...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      <div id="auditQueueView" class="hidden">
+  <h2 class="mb-3">Audit Queue</h2>
+
+  <div class="audit-tabs mb-3">
+    <button id="tabPendingAudits" class="tab active">Pending Audits</button>
+    <button id="tabErrorAudits" class="tab">Errors</button>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Task Type</th>
+            <th>Reference</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="pendingTasksBody">
+          <!-- Populated dynamically by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
       <div id="evaluationFormView" class="view hidden">
         <div class="card">
