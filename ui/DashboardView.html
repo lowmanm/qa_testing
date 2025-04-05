@@ -1,9 +1,10 @@
-<!-- DashboardView.html -->
+<!-- ui/DashboardView.html -->
 <div id="dashboardView" class="view hidden">
-  <!-- Dashboard Stats -->
+  <!-- Dashboard Summary Card -->
   <div class="card" id="dashboardStatsCard">
     <h2>Dashboard</h2>
     <div class="stats-container">
+
       <!-- Pending Audits -->
       <div class="stat-card" id="pendingAuditsCard" onclick="handleDashboardNav(showAuditQueue)">
         <h3>Pending Audits</h3>
@@ -23,99 +24,25 @@
         </div>
       </div>
 
-      <!-- Disputes -->
+      <!-- Total Disputes -->
       <div class="stat-card" id="disputedEvalsCard" onclick="handleDashboardNav(showDisputes)">
         <h3>Total Disputes</h3>
         <div class="stat-value" id="disputedEvalsCount">0</div>
-        <div class="dispute-details">
+        <div class="stat-subtext">
           <div>Partial Overturns: <span id="partialOverturns">0</span></div>
           <div>Total Overturned: <span id="totalOverturned">0</span></div>
           <div>Disputes Upheld: <span id="disputesUpheld">0</span></div>
         </div>
       </div>
+
     </div>
   </div>
 
   <!-- Import Audit Data -->
   <div class="card" id="importAuditCard">
     <h2>Import Audit Data</h2>
-    <p>Imports the latest audit file received via email with subject "NVS Audit File".</p>
+    <p>Import audits from the latest email with subject "NVS Audit File" containing an attachment named <code>nvs_qa_audit.csv</code>.</p>
     <button id="importButton" class="btn btn-primary">Import Data from Email</button>
     <div id="importStatus" class="mt-3"></div>
   </div>
 </div>
-
-<!-- Script for Dashboard View -->
-<script>
-  function showDashboard() {
-    hideAllViews();
-    document.getElementById('dashboardView')?.classList.remove('hidden');
-    highlightNavItem('navDashboard');
-    loadDashboardStats();
-    document.getElementById('dashboardStatsCard')?.classList.remove('hidden');
-    document.getElementById('importAuditCard')?.classList.remove('hidden');
-  }
-
-  function handleDashboardNav(targetFn) {
-    document.getElementById('dashboardStatsCard')?.classList.add('hidden');
-    document.getElementById('importAuditCard')?.classList.add('hidden');
-    targetFn();
-  }
-
-  function loadDashboardStats() {
-    // Step 1: Pending Audits
-    google.script.run.withSuccessHandler(audits => {
-      const total = audits.length;
-      document.getElementById('pendingAuditsCount').textContent = total;
-
-      // Step 2: Completed Evaluations
-      google.script.run.withSuccessHandler(evaluations => {
-        const completed = evaluations.filter(e => e.status === 'completed').length;
-        document.getElementById('completedEvalsCount').textContent = completed;
-
-        const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
-        const bar = document.getElementById('evalProgressBar');
-        const text = document.getElementById('evalProgressText');
-
-        let colorClass = 'progress-green';
-        if (percent < 70) colorClass = 'progress-red';
-        else if (percent < 90) colorClass = 'progress-yellow';
-
-        bar.style.width = percent + '%';
-        bar.className = `progress-bar-fill ${colorClass}`;
-        text.textContent = percent + '%';
-
-      }).getAllEvaluations();
-    }).getPendingAudits();
-
-    // Step 3: Dispute Stats
-    google.script.run.withSuccessHandler(stats => {
-      document.getElementById('disputedEvalsCount').textContent = stats.total;
-      document.getElementById('partialOverturns').textContent = stats.partialOverturns;
-      document.getElementById('totalOverturned').textContent = stats.totalOverturned;
-      document.getElementById('disputesUpheld').textContent = stats.disputesUpheld;
-    }).getDisputeStats();
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('importButton');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        const statusDiv = document.getElementById('importStatus');
-        statusDiv.innerHTML = '<div class="alert alert-info">Importing data from email...</div>';
-
-        google.script.run
-          .withSuccessHandler(result => {
-            statusDiv.innerHTML = result.success
-              ? `<div class="alert alert-success">${result.message}</div>`
-              : `<div class="alert alert-danger">${result.message}</div>`;
-            if (result.success) loadDashboardStats();
-          })
-          .withFailureHandler(error => {
-            statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-          })
-          .importDataFromEmail();
-      });
-    }
-  });
-</script>
