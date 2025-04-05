@@ -1,0 +1,130 @@
+<!-- EvaluationFormView.html -->
+
+<div id="evaluationFormView" class="view hidden">
+  <div class="card">
+    <h2>Evaluation Form</h2>
+
+    <!-- Task Metadata -->
+    <div id="taskDetails" class="task-details mb-4">Loading task details...</div>
+
+    <!-- Dynamic Question List -->
+    <form id="evaluationForm">
+      <div id="questions" class="questions-container mb-4">
+        Loading questions...
+      </div>
+
+      <!-- Overall Feedback -->
+      <div class="form-group mb-4">
+        <label for="feedback">Overall Feedback</label>
+        <textarea id="feedback" name="feedback" rows="3" class="form-control"></textarea>
+        <div id="feedbackCounter" class="form-text text-right" style="font-size: 12px; color: #6b7280;"></div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="button-group">
+        <button type="button" id="cancelEvaluation" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Evaluation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function showEvaluationForm(auditId) {
+    hideAllViews();
+    document.getElementById('evaluationFormView')?.classList.remove('hidden');
+
+    const form = document.getElementById('evaluationForm');
+    const taskDetails = document.getElementById('taskDetails');
+    const questionsContainer = document.getElementById('questions');
+    const feedbackField = document.getElementById('feedback');
+
+    form.reset();
+    form.classList.add('disabled');
+    questionsContainer.innerHTML = '';
+    feedbackField.value = '';
+    taskDetails.textContent = 'Loading task details...';
+
+    ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score']
+      .forEach(attr => form.removeAttribute(attr));
+
+    google.script.run.withSuccessHandler(audit => {
+      // Fill task metadata
+      taskDetails.innerHTML = `
+        <div class="grid-2">
+          <div><p class="field-label">Agent</p><p class="field-value">${audit.agentEmail}</p></div>
+          <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(audit.taskType)}</p></div>
+          <div><p class="field-label">Reference</p><p class="field-value">${audit.referenceNumber || 'N/A'}</p></div>
+          <div><p class="field-label">Date</p><p class="field-value">${formatDate(audit.taskTimestamp)}</p></div>
+          <div><p class="field-label">Request Type</p><p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p></div>
+          <div><p class="field-label">Outcome</p><p class="field-value">${audit.outcome || 'N/A'}</p></div>
+        </div>
+      `;
+
+      // Tag form with metadata
+      form.setAttribute('data-audit-id', audit.auditId);
+      form.setAttribute('data-reference-number', audit.referenceNumber || '');
+      form.setAttribute('data-task-type', audit.taskType || '');
+      form.setAttribute('data-outcome', audit.outcome || '');
+
+      loadQuestionsForEvaluation(audit.taskType);
+    }).prepareEvaluation(auditId);
+  }
+
+  function loadQuestionsForEvaluation(taskType) {
+    const container = document.getElementById('questions');
+    const form = document.getElementById('evaluationForm');
+
+    container.innerHTML = '<div class="loading">Loading questions...</div>';
+
+    google.script.run.withSuccessHandler(questions => {
+      if (!questions.length) {
+        showToast("No evaluation questions are configured for this task type.", 'error');
+        markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
+        showAuditQueue();
+        return;
+      }
+
+      container.innerHTML = '';
+      let maxPossibleScore = 0;
+
+      questions.forEach(q => {
+        maxPossibleScore += parseInt(q.pointsPossible || 0);
+
+        const card = document.createElement('div');
+        card.className = 'question-card';
+        card.setAttribute('data-question-id', q.id);
+        card.setAttribute('data-question-text', q.questionText);
+        card.setAttribute('data-points-possible', q.pointsPossible);
+
+        card.innerHTML = `
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">Points: ${q.pointsPossible}</span>
+          </div>
+          <div class="question-body">
+            <div class="radio-group">
+              <label><input type="radio" name="question_${q.id}" value="yes"> Yes</label>
+              <label><input type="radio" name="question_${q.id}" value="no"> No</label>
+            </div>
+            <div class="feedback-field">
+              <label for="feedback_${q.id}">Specific Feedback</label>
+              <textarea id="feedback_${q.id}" name="feedback_${q.id}" rows="2" class="form-control feedback-textarea" data-feedback-id="${q.id}"></textarea>
+              <small class="form-text" id="feedbackCounter_feedback_${q.id}">0 / 300 characters</small>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      form.setAttribute('data-max-score', maxPossibleScore);
+      form.classList.remove('disabled');
+
+      google.script.run.withSuccessHandler(settings => {
+        const limit = parseInt(settings?.feedbackCharLimit) || 300;
+        applyFeedbackCharacterLimits(limit);
+      }).getSystemSettings();
+    }).getQuestionsForTaskType(taskType);
+  }
+</script>
