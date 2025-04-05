@@ -1,0 +1,137 @@
+<!-- AuditQueueView.html -->
+
+<div id="auditQueueView" class="view hidden">
+  <h2 class="mb-3">Audit Queue</h2>
+
+  <!-- Tabs for Pending and Error Audits -->
+  <div class="audit-tabs mb-3">
+    <button id="tabPendingAudits" class="tab active">Pending Audits</button>
+    <button id="tabErrorAudits" class="tab">Errors</button>
+  </div>
+
+  <!-- Audit Table -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Task Type</th>
+            <th>Reference</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="pendingTasksBody">
+          <!-- Populated dynamically by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Script for Audit Queue View -->
+<script>
+  function showAuditQueue() {
+    hideAllViews();
+    document.getElementById('auditQueueView')?.classList.remove('hidden');
+    highlightNavItem('navAuditQueue');
+
+    attachAuditTabHandlers();
+    loadPendingTasks(); // default tab on load
+  }
+
+  function attachAuditTabHandlers() {
+    const tabPending = document.getElementById('tabPendingAudits');
+    const tabError = document.getElementById('tabErrorAudits');
+
+    if (!tabPending || !tabError) return;
+
+    tabPending.addEventListener('click', () => {
+      tabPending.classList.add('active');
+      tabError.classList.remove('active');
+      loadPendingTasks();
+    });
+
+    tabError.addEventListener('click', () => {
+      tabError.classList.add('active');
+      tabPending.classList.remove('active');
+      loadErrorTasks();
+    });
+  }
+
+  function loadPendingTasks() {
+    const tableBody = document.getElementById('pendingTasksBody');
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+
+    google.script.run.withSuccessHandler(audits => {
+      if (!audits.length) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending audits found</td></tr>';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      audits.forEach(audit => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${audit.agentEmail}</td>
+          <td>${formatTaskType(audit.taskType)}</td>
+          <td>${audit.referenceNumber || 'N/A'}</td>
+          <td>${formatDate(audit.taskTimestamp)}</td>
+          <td>
+            <span class="badge ${audit.auditStatus === 'misconfigured' ? 'badge-danger' : 'badge-' + audit.auditStatus}"
+                  title="${audit.auditStatus}">
+              ${audit.auditStatus}
+            </span>
+          </td>
+          <td>
+            <button class="evaluate-button btn btn-sm btn-primary" data-audit-id="${audit.auditId}">Evaluate</button>
+          </td>
+        `;
+        fragment.appendChild(row);
+      });
+
+      tableBody.innerHTML = '';
+      tableBody.appendChild(fragment);
+    }).getPendingAudits();
+
+    tableBody.addEventListener('click', e => {
+      const btn = e.target.closest('.evaluate-button');
+      if (!btn) return;
+
+      const auditId = btn.getAttribute('data-audit-id');
+      showEvaluationForm(auditId);
+    });
+  }
+
+  function loadErrorTasks() {
+    const tableBody = document.getElementById('pendingTasksBody');
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading errors...</td></tr>';
+
+    google.script.run.withSuccessHandler(audits => {
+      const misconfigured = audits.filter(a => a.auditStatus === 'misconfigured');
+      if (!misconfigured.length) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No misconfigured audits</td></tr>';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      misconfigured.forEach(audit => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${audit.agentEmail}</td>
+          <td>${formatTaskType(audit.taskType)}</td>
+          <td>${audit.referenceNumber || 'N/A'}</td>
+          <td>${formatDate(audit.taskTimestamp)}</td>
+          <td><span class="badge badge-danger">Misconfigured</span></td>
+          <td><button class="btn btn-sm btn-secondary" disabled>Unavailable</button></td>
+        `;
+        fragment.appendChild(row);
+      });
+
+      tableBody.innerHTML = '';
+      tableBody.appendChild(fragment);
+    }).getAllAudits();
+  }
+</script>
