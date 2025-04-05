@@ -1,0 +1,76 @@
+<!-- EvaluationsView.html -->
+
+<div id="evaluationsView" class="view hidden">
+  <div class="card">
+    <h2>Completed Evaluations</h2>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Task Type</th>
+            <th>QA Agent</th>
+            <th>Date</th>
+            <th>Score</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="evaluationsBody">
+          <tr>
+            <td colspan="6" class="text-center">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function loadEvaluations() {
+    const tableBody = document.getElementById('evaluationsBody');
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+
+    google.script.run.withSuccessHandler(function(evaluations) {
+      if (!evaluations.length) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No evaluations found</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = '';
+
+      evaluations.forEach(e => {
+        const percentage = Math.round((e.totalPoints / e.totalPointsPossible) * 100);
+        let scoreClass = 'score-high';
+        if (percentage < 70) scoreClass = 'score-low';
+        else if (percentage < 90) scoreClass = 'score-medium';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${formatTaskType(e.taskType)}</td>
+          <td>${e.qaEmail}</td>
+          <td>${formatDate(e.stopTimestamp)}</td>
+          <td class="evaluation-score ${scoreClass}">${e.totalPoints}/${e.totalPointsPossible} (${percentage}%)</td>
+          <td><span class="badge badge-${e.status}">${e.status}</span></td>
+          <td>
+            <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
+            ${e.status === 'completed' && percentage < 100
+              ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>`
+              : ''
+            }
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
+
+      // Bind view and dispute buttons
+      document.querySelectorAll('.view-evaluation-button').forEach(btn =>
+        btn.addEventListener('click', () => viewEvaluation(btn.dataset.evaluationId))
+      );
+
+      document.querySelectorAll('.dispute-button').forEach(btn =>
+        btn.addEventListener('click', () => showDisputeForm(btn.dataset.evaluationId))
+      );
+    }).getAllEvaluations();
+  }
+</script>
