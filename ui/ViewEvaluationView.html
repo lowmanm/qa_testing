@@ -1,0 +1,69 @@
+<!-- ViewEvaluationView.html -->
+
+<div id="viewEvaluationView" class="view hidden">
+  <div class="card">
+    <h2>Evaluation Summary</h2>
+
+    <div id="viewEvaluationDetails" class="evaluation-details mb-4">
+      Loading...
+    </div>
+
+    <div id="viewEvaluationQuestions" class="questions-container mb-4">
+      Loading questions...
+    </div>
+
+    <div class="button-group">
+      <button type="button" id="closeViewEvaluation" class="btn btn-secondary">Back to Evaluations</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function viewEvaluation(evaluationId) {
+    hideAllViews();
+    document.getElementById('viewEvaluationView').classList.remove('hidden');
+
+    google.script.run.withSuccessHandler(function(evaluations) {
+      const evaluation = evaluations.find(e => e.id === evaluationId);
+      if (!evaluation) return alert("Evaluation not found.");
+
+      // Evaluation details
+      document.getElementById('viewEvaluationDetails').innerHTML = `
+        <div class="grid-2">
+          <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+          <div><p class="field-label">Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
+          <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
+          <div><p class="field-label">QA Agent</p><p class="field-value">${evaluation.qaEmail}</p></div>
+          <div class="grid-span-2">
+            <p class="field-label">Feedback</p>
+            <p class="field-value">${evaluation.feedback || 'No feedback provided.'}</p>
+          </div>
+        </div>
+      `;
+
+      // Questions
+      const container = document.getElementById('viewEvaluationQuestions');
+      container.innerHTML = '';
+
+      evaluation.questions.forEach(q => {
+        const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+        container.innerHTML += `
+          <div class="question-card ${highlightClass}">
+            <div class="question-header">
+              <h3 class="question-text">${q.questionText}</h3>
+              <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
+            </div>
+            <div class="question-body">
+              <p class="field-label">Response:</p>
+              <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
+              ${q.feedback ? `<p class="field-label">Feedback:</p><p class="field-value">${q.feedback}</p>` : ''}
+            </div>
+          </div>
+        `;
+      });
+    }).getAllEvaluations();
+  }
+
+  // Back button handler
+  document.getElementById('closeViewEvaluation')?.addEventListener('click', showEvaluations);
+</script>
