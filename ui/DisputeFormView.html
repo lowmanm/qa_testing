@@ -1,0 +1,151 @@
+<!-- DisputeFormView.html -->
+
+<div id="disputeFormView" class="view hidden">
+  <div class="card">
+    <h2>Dispute Evaluation</h2>
+    <p>Please provide the details for your dispute below. Ensure all required fields are filled out.</p>
+
+    <div id="evaluationDetails" class="evaluation-details mb-4">
+      Loading evaluation details...
+    </div>
+
+    <form id="disputeForm">
+      <div id="disputeQuestions" class="questions-container mb-4">
+        Loading questions...
+      </div>
+
+      <div class="form-group mb-4">
+        <label for="disputeReason">Reason for Dispute <span class="required">*</span></label>
+        <textarea id="disputeReason" name="disputeReason" rows="3" class="form-control" required></textarea>
+        <div id="disputeCounter" class="form-text text-right" style="font-size: 12px; color: #6b7280;"></div>
+        <div class="invalid-feedback">Please provide a reason for the dispute.</div>
+      </div>
+
+      <div class="button-group">
+        <button type="button" id="cancelDispute" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Dispute</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function showDisputeForm(evaluationId) {
+    hideAllViews();
+    document.getElementById('disputeFormView').classList.remove('hidden');
+
+    document.getElementById('disputeForm').reset();
+    document.getElementById('disputeForm').setAttribute('data-evaluation-id', evaluationId);
+
+    // Load evaluation details
+    google.script.run.withSuccessHandler(evaluations => {
+      const evaluation = evaluations.find(e => e.id === evaluationId);
+      if (!evaluation) return showToast('Evaluation not found.', 'error');
+
+      // Populate evaluation metadata
+      const scorePercentage = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
+      document.getElementById('evaluationDetails').innerHTML = `
+        <div class="grid-2">
+          <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+          <div><p class="field-label">Evaluation Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
+          <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
+          <div><p class="field-label">Score</p><p class="field-value">${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</p></div>
+          <div class="grid-span-2"><p class="field-label">Feedback</p><p class="field-value">${evaluation.feedback || 'No feedback provided.'}</p></div>
+        </div>
+      `;
+
+      loadQuestionsForDispute(evaluation);
+    }).getAllEvaluations();
+
+    document.getElementById('cancelDispute').addEventListener('click', showEvaluations);
+    document.getElementById('disputeForm').addEventListener('submit', handleDisputeSubmit);
+  }
+
+  function loadQuestionsForDispute(evaluation) {
+    const container = document.getElementById('disputeQuestions');
+    container.innerHTML = '';
+
+    if (!evaluation.questions.length) {
+      container.innerHTML = '<div class="alert alert-warning">No questions found for this evaluation.</div>';
+      return;
+    }
+
+    google.script.run.withSuccessHandler(settings => {
+      const limit = parseInt(settings?.feedbackCharLimit) || 300;
+
+      evaluation.questions.forEach(q => {
+        const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+        const feedbackHtml = q.feedback ? `<p class="field-label">Feedback:</p><p class="field-value">${q.feedback}</p>` : '';
+
+        const card = document.createElement('div');
+        card.className = `question-card ${highlightClass}`;
+        card.innerHTML = `
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">Score: ${q.pointsEarned}/${q.pointsPossible}</span>
+          </div>
+          <div class="question-body">
+            <p class="field-label">Response:</p>
+            <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
+            ${feedbackHtml}
+            <div class="dispute-checkbox">
+              <label>
+                <input type="checkbox" name="dispute_question_${q.questionId}" value="${q.questionId}">
+                Dispute this question
+              </label>
+            </div>
+            <div class="feedback-field">
+              <label for="feedback_dispute_${q.questionId}">Optional Notes:</label>
+              <textarea
+                id="feedback_dispute_${q.questionId}"
+                name="feedback_dispute_${q.questionId}"
+                rows="2"
+                class="form-control feedback-textarea"
+                maxlength="${limit}"
+                data-feedback-id="${q.questionId}"
+              ></textarea>
+              <small class="form-text" id="feedbackCounter_feedback_dispute_${q.questionId}">0 / ${limit} characters</small>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      applyFeedbackCharacterLimits(limit);
+    }).getSettings();
+  }
+
+  function handleDisputeSubmit(e) {
+    e.preventDefault();
+
+    const form = document.getElementById('disputeForm');
+    const evaluationId = form.getAttribute('data-evaluation-id');
+    const reason = document.getElementById('disputeReason').value.trim();
+
+    if (!reason) return showToast("Please provide a reason for the dispute.", 'warning');
+
+    const disputedQuestionIds = Array.from(form.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(cb => cb.value);
+
+    if (disputedQuestionIds.length === 0) {
+      showToast("Please select at least one question to dispute.", 'warning');
+      return;
+    }
+
+    form.innerHTML = '<div class="loading">Submitting dispute...</div>';
+
+    google.script.run.withSuccessHandler(() => {
+      showToast("Dispute submitted successfully!", 'success');
+      showEvaluations();
+    }).withFailureHandler(error => {
+      form.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+      setTimeout(showEvaluations, 3000);
+    }).saveDispute({
+      evalId: evaluationId,
+      reason,
+      questionIds: disputedQuestionIds,
+      status: 'pending'
+    });
+  }
+</script>
