@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?!= include('Styles'); ?>
+    <title>QA Evaluation System</title>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header>
+        <h1>QA Evaluation System</h1>
+        <div class="user-info">
+          <span id="userName">Loading...</span>
+          <span class="badge" id="userRole">loading...</span>
+        </div>
+      </header>
+
+      <!-- Navigation -->
+      <nav class="tabs">
+        <button id="navDashboard" class="tab-item">Dashboard</button>
+        <button id="navAuditQueue" class="tab-item">Audit Queue</button>
+        <button id="navEvaluations" class="tab-item">Evaluations</button>
+        <button id="navDisputes" class="tab-item">Disputes</button>
+        <button id="navAdmin" class="tab-item">Admin</button>
+      </nav>
+
+      <!-- Views -->
+      <?!= include('DashboardView'); ?>
+      <?!= include('AuditQueueView'); ?>
+      <?!= include('EvaluationFormView'); ?>
+      <?!= include('EvaluationsView'); ?>
+      <?!= include('ViewEvaluationView'); ?>
+      <?!= include('DisputeFormView'); ?>
+      <?!= include('DisputesView'); ?>
+      <?!= include('ResolveDisputeView'); ?>
+      <?!= include('AdminView'); ?>
+
+      <!-- Toast container -->
+      <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <?!= include('JavaScript'); ?>
+  </body>
+</html>
