@@ -89,6 +89,50 @@
     loadQuestions();
     loadSettings();
   }
+  
+  function showEvaluationForm() {
+    hideAllViews();
+    document.getElementById('evaluationFormView')?.classList.remove('hidden');
+  }
+  
+  // ------------------------------------
+  // Format Helpers
+  // ------------------------------------
+  function formatRole(role) {
+    return role ? role.split('_').map(capitalize).join(' ') : 'Unknown';
+  }
+
+  function formatTaskType(type) {
+    return type ? type.split('_').map(capitalize).join(' ') : 'Unknown';
+  }
+
+  function capitalize(word) {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return 'Unknown';
+    const date = new Date(dateStr);
+    if (isNaN(date)) return dateStr;
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  
+  // ------------------------------------
+  // Toast Notifications
+  // ------------------------------------
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+
+    if (type === 'success') toast.style.backgroundColor = '#38a169';
+    else if (type === 'error') toast.style.backgroundColor = '#e53e3e';
+    else if (type === 'warning') toast.style.backgroundColor = '#ecc94b';
+
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
 
   // ------------------------------------
   // Data Loaders
