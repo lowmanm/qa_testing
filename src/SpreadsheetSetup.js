@@ -43,9 +43,15 @@ function setupSpreadsheet() {
       if (legacySheet) legacySheet.setName(sheetName);
     }
 
-    // Ensure correct headers
-    const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    // Read existing headers safely
+    let existingHeaders = [];
+    if (sheet.getLastRow() > 0 && sheet.getLastColumn() > 0) {
+      existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    }
+
+    // Reset headers if they don't match
     if (existingHeaders.join(',') !== headers.join(',')) {
+      sheet.clear(); // Optional: clear existing data
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     }
   }
