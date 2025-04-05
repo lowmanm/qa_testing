@@ -1,0 +1,177 @@
+<!-- AdminView.html -->
+
+<div id="adminView" class="view hidden">
+  <div class="card">
+    <h2>Admin Panel</h2>
+
+    <!-- Admin Tabs -->
+    <div class="admin-tabs">
+      <button id="adminUsers" class="admin-tab-item active">Users</button>
+      <button id="adminQuestions" class="admin-tab-item">Questions</button>
+      <button id="adminSettings" class="admin-tab-item">Settings</button>
+    </div>
+
+    <!-- === Users Tab === -->
+    <div id="adminUsersView" class="admin-tab-content">
+      <div class="admin-actions mb-3">
+        <button id="addUserBtn" class="btn btn-primary">Add User</button>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Manager</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody">
+            <tr><td colspan="5" class="text-center">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add/Edit User Form -->
+      <div id="userForm" class="form-modal hidden">
+        <div class="form-modal-content">
+          <h3 id="userFormTitle">Add User</h3>
+          <form id="userFormElement">
+            <input type="hidden" id="userId" name="userId">
+
+            <div class="form-group">
+              <label for="userFormName">Name</label>
+              <input type="text" id="userFormName" name="userName" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="userEmail">Email</label>
+              <input type="email" id="userEmail" name="userEmail" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="userFormRole">Role</label>
+              <select id="userFormRole" name="userRole" class="form-control" required>
+                <option value="agent">Agent</option>
+                <option value="manager">Manager</option>
+                <option value="qa_analyst">QA Analyst</option>
+                <option value="qa_manager">QA Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="userManager">Manager Email</label>
+              <input type="email" id="userManager" name="userManager" class="form-control">
+            </div>
+
+            <div class="button-group">
+              <button type="button" id="cancelUserForm" class="btn btn-secondary">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- === Questions Tab === -->
+    <div id="adminQuestionsView" class="admin-tab-content hidden">
+      <div class="admin-actions mb-3">
+        <button id="addQuestionBtn" class="btn btn-primary">Add Question</button>
+        <div class="filter-group">
+          <label for="taskTypeFilter">Filter by Task Type:</label>
+          <select id="taskTypeFilter" class="form-control">
+            <option value="">All Types</option>
+            <option value="phone_call">Phone Call</option>
+            <option value="email">Email</option>
+            <option value="chat">Chat</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>Task Type</th>
+              <th>Points</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="questionsBody">
+            <tr><td colspan="4" class="text-center">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add/Edit Question Form -->
+      <div id="questionForm" class="form-modal hidden">
+        <div class="form-modal-content">
+          <h3 id="questionFormTitle">Add Question</h3>
+          <form id="questionFormElement">
+            <input type="hidden" id="questionId" name="questionId">
+
+            <div class="form-group">
+              <label for="questionText">Question Text</label>
+              <textarea id="questionText" name="questionText" class="form-control" required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="questionTaskType">Task Type</label>
+              <select id="questionTaskType" name="questionTaskType" class="form-control" required>
+                <option value="phone_call">Phone Call</option>
+                <option value="email">Email</option>
+                <option value="chat">Chat</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="questionPoints">Points Possible</label>
+              <input type="number" id="questionPoints" name="questionPoints" class="form-control" min="1" max="100" required>
+            </div>
+
+            <div class="form-group">
+              <label for="questionSetId">Question Set ID (optional)</label>
+              <input type="text" id="questionSetId" name="questionSetId" class="form-control">
+              <small class="form-text">Questions in the same set will be grouped during evaluation.</small>
+            </div>
+
+            <div class="button-group">
+              <button type="button" id="cancelQuestionForm" class="btn btn-secondary">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- === Settings Tab === -->
+    <div id="adminSettingsView" class="admin-tab-content hidden">
+      <h3>System Settings</h3>
+      <form id="settingsForm">
+        <div class="form-group">
+          <label for="emailSubject">Email Subject for Imports</label>
+          <input type="text" id="emailSubject" name="emailSubject" class="form-control" value="NVS Audit File">
+        </div>
+
+        <div class="form-group">
+          <label for="csvFilename">CSV Filename for Imports</label>
+          <input type="text" id="csvFilename" name="csvFilename" class="form-control" value="nvs_qa_audit.csv">
+        </div>
+
+        <div class="form-group">
+          <label for="feedbackCharLimit">Feedback Character Limit</label>
+          <input type="number" id="feedbackCharLimit" name="feedbackCharLimit" class="form-control" value="300" min="50" max="1000">
+          <small class="form-text">Controls the max characters allowed in feedback text areas.</small>
+        </div>
+
+        <div class="form-group">
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
