@@ -1,9 +1,12 @@
 <!-- JavaScript.html -->
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-    attachNavHandlers();
-  });
+  initializeApp();
+  attachNavHandlers();
+
+  // Attach task type filter listener
+  document.getElementById('taskTypeFilter')?.addEventListener('change', loadQuestions);
+});
 
   // ------------------------------------
   // App Initialization
@@ -138,18 +141,19 @@
   // Data Loaders
   // ------------------------------------
   function loadDashboardStats() {
-    google.script.run.withSuccessHandler(stats => {
-      document.getElementById('pendingAuditsCount').textContent = stats.pending || 0;
-      document.getElementById('completedEvalsCount').textContent = stats.completed || 0;
-            const percent = stats.evalRate ? Math.round(stats.evalRate * 100) : 0;
-      document.getElementById('evalProgressText').textContent = `${percent}%`;
-      document.getElementById('evalProgressBar').style.width = `${percent}%`;
+    google.script.run.withSuccessHandler(data => {
+      document.getElementById('pendingAuditsCount').textContent = data.pendingCount || 0;
+      document.getElementById('completedEvalsCount').textContent = data.completedCount || 0;
 
-      document.getElementById('disputedEvalsCount').textContent = stats.disputes.total || 0;
-      document.getElementById('partialOverturns').textContent = stats.disputes.partialOverturns || 0;
-      document.getElementById('totalOverturned').textContent = stats.disputes.totalOverturned || 0;
-      document.getElementById('disputesUpheld').textContent = stats.disputes.disputesUpheld || 0;
-    }).getDashboardStats();
+      const pct = data.evalPercent || 0;
+      document.getElementById('evalProgressText').textContent = `${pct}%`;
+      document.getElementById('evalProgressBar').style.width = `${pct}%`;
+
+      document.getElementById('disputedEvalsCount').textContent = data.disputeStats.total;
+      document.getElementById('partialOverturns').textContent = data.disputeStats.partialOverturns;
+      document.getElementById('totalOverturned').textContent = data.disputeStats.totalOverturned;
+      document.getElementById('disputesUpheld').textContent = data.disputeStats.disputesUpheld;
+    }).getDashboardMetrics();
   }
 
   function loadAuditQueue() {
@@ -519,66 +523,120 @@
       showDisputes();
     }).saveDispute(payload);
   });
+  
+    // ------------------------------------
+  // Load Questions (Admin)
+  // ------------------------------------
+  function loadQuestions() {
+  const tableBody = document.getElementById('questionsBody');
+  tableBody.innerHTML = `<tr><td colspan="4" class="text-center">Loading...</td></tr>`;
+
+  google.script.run.withSuccessHandler(questions => {
+    if (!questions.length) {
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500">No questions found</td></tr>`;
+      return;
+    }
+
+    const filter = document.getElementById('taskTypeFilter')?.value || '';
+    const filtered = filter ? questions.filter(q => q.taskType === filter) : questions;
+
+    if (!filtered.length) {
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500">No matching questions</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = '';
+    filtered.forEach(q => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${q.questionText}</td>
+        <td>${formatTaskType(q.taskType)}</td>
+        <td>${q.pointsPossible}</td>
+        <td>
+          <button class="btn btn-sm btn-outline" onclick="editQuestion('${q.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteQuestion('${q.id}')">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }).getAllQuestions();
+}
 
   // ------------------------------------
-  // Load Audit Queue
+  // Load Settings (Admin)
   // ------------------------------------
-  function loadAuditQueue() {
-    const tbody = document.getElementById('pendingTasksBody');
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center">Loading...</td></tr>`;
+  function loadSettings() {
+    google.script.run.withSuccessHandler(settings => {
+      document.getElementById('emailSubject').value = settings.emailSubject || 'NVS Audit File';
+      document.getElementById('csvFilename').value = settings.csvFilename || 'nvs_qa_audit.csv';
+      document.getElementById('feedbackCharLimit').value = settings.feedbackCharLimit || 300;
+    }).getSettings();
+  }
+  
+    // ------------------------------------
+  // Add Question Button
+  // ------------------------------------
+  document.getElementById('addQuestionBtn')?.addEventListener('click', () => {
+    document.getElementById('questionFormTitle').textContent = 'Add Question';
+    document.getElementById('questionFormElement').reset();
+    document.getElementById('questionId').value = '';
+    document.getElementById('questionForm').classList.remove('hidden');
+  });
 
-    google.script.run.withSuccessHandler(audits => {
-      if (!audits.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-gray-500">No pending audits</td></tr>`;
-        return;
-      }
+  document.getElementById('cancelQuestionForm')?.addEventListener('click', () => {
+    document.getElementById('questionForm').classList.add('hidden');
+  });
 
-      tbody.innerHTML = '';
-      audits.forEach(a => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${a.agentEmail}</td>
-          <td>${formatTaskType(a.taskType)}</td>
-          <td>${a.referenceNumber}</td>
-          <td>${formatDate(a.taskTimestamp)}</td>
-          <td>${a.auditStatus}</td>
-          <td><button class="btn btn-sm btn-primary" onclick="startEvaluation('${a.auditId}')">Evaluate</button></td>
-        `;
-        tbody.appendChild(row);
-      });
-    }).getPendingAudits();
+  document.getElementById('questionFormElement')?.addEventListener('submit', e => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+
+    const questionData = {
+      id: form.get('questionId'),
+      questionText: form.get('questionText'),
+      taskType: form.get('questionTaskType'),
+      pointsPossible: parseInt(form.get('questionPoints'), 10),
+      setId: form.get('questionSetId') || ''
+    };
+
+    const fn = questionData.id ? 'updateQuestion' : 'createQuestion';
+
+    google.script.run.withSuccessHandler(() => {
+      showToast('Question saved', 'success');
+      document.getElementById('questionForm').classList.add('hidden');
+      loadQuestions();
+    })[fn](questionData);
+  });
+
+  // ------------------------------------
+  // Edit Question
+  // ------------------------------------
+  function editQuestion(questionId) {
+    google.script.run.withSuccessHandler(questions => {
+      const q = questions.find(q => q.id === questionId);
+      if (!q) return;
+
+      document.getElementById('questionFormTitle').textContent = 'Edit Question';
+      document.getElementById('questionId').value = q.id;
+      document.getElementById('questionText').value = q.questionText;
+      document.getElementById('questionTaskType').value = q.taskType;
+      document.getElementById('questionPoints').value = q.pointsPossible;
+      document.getElementById('questionSetId').value = q.setId || '';
+
+      document.getElementById('questionForm').classList.remove('hidden');
+    }).getAllQuestions();
   }
 
   // ------------------------------------
-  // Load Dashboard
+  // Delete Question
   // ------------------------------------
-  function loadDashboardStats() {
-    google.script.run.withSuccessHandler(data => {
-      document.getElementById('pendingAuditsCount').textContent = data.pendingCount || 0;
-      document.getElementById('completedEvalsCount').textContent = data.completedCount || 0;
+  function deleteQuestion(questionId) {
+    if (!confirm('Are you sure you want to delete this question?')) return;
 
-      const pct = data.evalPercent || 0;
-      document.getElementById('evalProgressText').textContent = `${pct}%`;
-      document.getElementById('evalProgressBar').style.width = `${pct}%`;
-
-      document.getElementById('disputedEvalsCount').textContent = data.disputeStats.total;
-      document.getElementById('partialOverturns').textContent = data.disputeStats.partialOverturns;
-      document.getElementById('totalOverturned').textContent = data.disputeStats.totalOverturned;
-      document.getElementById('disputesUpheld').textContent = data.disputeStats.disputesUpheld;
-    }).getDashboardMetrics();
+    google.script.run.withSuccessHandler(() => {
+      showToast('Question deleted', 'success');
+      loadQuestions();
+    }).deleteQuestion(questionId);
   }
 
-  function showDashboard() {
-    hideAllViews();
-    document.getElementById('dashboardView')?.classList.remove('hidden');
-    highlightNavItem('navDashboard');
-    loadDashboardStats();
-  }
-
-  function showAuditQueue() {
-    hideAllViews();
-    document.getElementById('auditQueueView')?.classList.remove('hidden');
-    highlightNavItem('navAuditQueue');
-    loadAuditQueue();
-  }
 </script>
