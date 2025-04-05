@@ -1,0 +1,71 @@
+<!-- DisputesView.html -->
+
+<div id="disputesView" class="view hidden">
+  <div class="card">
+    <h2>Dispute Requests</h2>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Evaluation</th>
+            <th>Requested By</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="disputesBody">
+          <tr>
+            <td colspan="5" class="text-center">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showDisputes() {
+    hideAllViews();
+    document.getElementById('disputesView').classList.remove('hidden');
+    loadDisputes();
+  }
+
+  function loadDisputes() {
+    const tableBody = document.getElementById('disputesBody');
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+
+    google.script.run.withSuccessHandler(disputes => {
+      if (!disputes.length) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No disputes found</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = '';
+
+      disputes.forEach(dispute => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>Evaluation #${dispute.evalId}</td>
+          <td>${dispute.userEmail}</td>
+          <td>${formatDate(dispute.disputeTimestamp)}</td>
+          <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
+          <td>
+            <button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">
+              View
+            </button>
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
+
+      document.querySelectorAll('.resolve-dispute-button').forEach(button => {
+        button.addEventListener('click', function () {
+          const disputeId = this.getAttribute('data-dispute-id');
+          resolveDispute(disputeId);
+        });
+      });
+    }).getAllDisputes();
+  }
+</script>
