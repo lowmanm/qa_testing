@@ -52,20 +52,16 @@
       if (el) el.addEventListener('click', handler);
     });
   }
-  
+
   function showEvaluations() {
-  hideAllViews();
-  document.getElementById('evaluationsView')?.classList.remove('hidden');
-  highlightNavItem('navEvaluations');
+    hideAllViews();
+    document.getElementById('evaluationsView')?.classList.remove('hidden');
+    highlightNavItem('navEvaluations');
 
-  // If you have a data loader function:
-  if (typeof loadEvaluations === 'function') {
-    loadEvaluations();
+    if (typeof loadEvaluations === 'function') {
+      loadEvaluations();
+    }
   }
-}
-
-<script>
-  // ...
 
   function loadEvaluations() {
     const tableBody = document.getElementById('evaluationsBody');
@@ -96,9 +92,6 @@
       });
     }).getAllEvaluations();
   }
-
-  // ...
-</script>
 
   // ------------------------------------
   // Toast Notifications
