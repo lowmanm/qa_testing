@@ -1,0 +1,95 @@
+<!-- JavaScript.html -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+    attachNavHandlers();
+  });
+
+  // ------------------------------------
+  // App Initialization
+  // ------------------------------------
+  function initializeApp() {
+    google.script.run.withSuccessHandler(user => {
+      document.getElementById('userName').textContent = user.name;
+      document.getElementById('userRole').textContent = formatRole(user.role);
+
+      const isAdmin = ['admin', 'qa_manager'].includes(user.role);
+      document.getElementById('navAdmin').style.display = isAdmin ? 'block' : 'none';
+
+      if (['qa_analyst', 'qa_manager'].includes(user.role)) {
+        showAuditQueue();
+      } else {
+        showDashboard();
+      }
+    }).getCurrentUser();
+  }
+
+  // ------------------------------------
+  // View Switching
+  // ------------------------------------
+  function hideAllViews() {
+    const views = document.querySelectorAll('.view');
+    views.forEach(view => view.classList.add('hidden'));
+  }
+
+  function highlightNavItem(navId) {
+    document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
+    const btn = document.getElementById(navId);
+    if (btn) btn.classList.add('active');
+  }
+
+  function attachNavHandlers() {
+    const map = {
+      navDashboard: showDashboard,
+      navAuditQueue: showAuditQueue,
+      navEvaluations: showEvaluations,
+      navDisputes: showDisputes,
+      navAdmin: showAdmin
+    };
+
+    Object.entries(map).forEach(([id, handler]) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', handler);
+    });
+  }
+
+  // ------------------------------------
+  // Toast Notifications
+  // ------------------------------------
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+
+    if (type === 'success') toast.style.backgroundColor = '#38a169';
+    else if (type === 'error') toast.style.backgroundColor = '#e53e3e';
+    else if (type === 'warning') toast.style.backgroundColor = '#ecc94b';
+
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  // ------------------------------------
+  // Format Helpers
+  // ------------------------------------
+  function formatRole(role) {
+    return role ? role.split('_').map(capitalize).join(' ') : 'Unknown';
+  }
+
+  function formatTaskType(type) {
+    return type ? type.split('_').map(capitalize).join(' ') : 'Unknown';
+  }
+
+  function capitalize(word) {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return 'Unknown';
+    const date = new Date(dateStr);
+    if (isNaN(date)) return dateStr;
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+</script>
