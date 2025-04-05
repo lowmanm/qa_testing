@@ -52,6 +52,17 @@
       if (el) el.addEventListener('click', handler);
     });
   }
+  
+  function showEvaluations() {
+  hideAllViews();
+  document.getElementById('evaluationsView')?.classList.remove('hidden');
+  highlightNavItem('navEvaluations');
+
+  // If you have a data loader function:
+  if (typeof loadEvaluations === 'function') {
+    loadEvaluations();
+  }
+}
 
   // ------------------------------------
   // Toast Notifications
