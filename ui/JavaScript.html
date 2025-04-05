@@ -64,6 +64,42 @@
   }
 }
 
+<script>
+  // ...
+
+  function loadEvaluations() {
+    const tableBody = document.getElementById('evaluationsBody');
+    tableBody.innerHTML = `<tr><td colspan="6" class="text-center">Loading...</td></tr>`;
+
+    google.script.run.withSuccessHandler(evaluations => {
+      if (!evaluations.length) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-gray-500">No evaluations found</td></tr>`;
+        return;
+      }
+
+      tableBody.innerHTML = ''; // Clear previous content
+
+      evaluations.forEach(eval => {
+        const percentage = Math.round((eval.totalPoints / eval.totalPointsPossible) * 100);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${formatTaskType(eval.taskType)}</td>
+          <td>${eval.qaEmail}</td>
+          <td>${formatDate(eval.stopTimestamp)}</td>
+          <td>${eval.totalPoints}/${eval.totalPointsPossible} (${percentage}%)</td>
+          <td><span class="badge badge-${eval.status}">${eval.status}</span></td>
+          <td>
+            <button class="btn btn-sm btn-primary" disabled>View</button>
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }).getAllEvaluations();
+  }
+
+  // ...
+</script>
+
   // ------------------------------------
   // Toast Notifications
   // ------------------------------------
