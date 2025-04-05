@@ -1,0 +1,112 @@
+<!-- ResolveDisputeView.html -->
+
+<div id="resolveDisputeView" class="view hidden">
+  <div class="card">
+    <h2>Resolve Dispute</h2>
+    <div id="resolveEvaluationDetails" class="evaluation-details mb-4">
+      Loading evaluation...
+    </div>
+
+    <form id="resolveDisputeForm">
+      <div id="resolveDisputeQuestions" class="questions-container mb-4">
+        Loading disputed questions...
+      </div>
+
+      <div class="form-group mt-3">
+        <label for="resolutionNotes">Overall Notes (optional)</label>
+        <textarea id="resolutionNotes" name="resolutionNotes" rows="3" class="form-control"></textarea>
+        <div id="resolutionCounter" class="form-text text-right" style="font-size: 12px; color: #6b7280;"></div>
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn btn-secondary" onclick="showDisputes()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Resolution</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function resolveDispute(disputeId) {
+    hideAllViews();
+    document.getElementById('resolveDisputeView').classList.remove('hidden');
+
+    google.script.run.withSuccessHandler(function(data) {
+      const dispute = data.disputes.find(d => d.id === disputeId);
+      const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
+
+      if (!dispute || !evaluation) {
+        showToast("Dispute or evaluation not found.", 'error');
+        return;
+      }
+
+      // Update status to "reviewing"
+      google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
+
+      // Inject evaluation details
+      const detailsHTML = `
+        <div class="grid-2">
+          <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
+          <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+          <div><p class="field-label">QA Agent</p><p class="field-value">${evaluation.qaEmail}</p></div>
+          <div><p class="field-label">Dispute Reason</p><p class="field-value">${dispute.reason}</p></div>
+        </div>
+      `;
+      document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
+
+      // Prepare form
+      const form = document.getElementById('resolveDisputeForm');
+      form.setAttribute('data-eval-id', evaluation.id);
+      form.setAttribute('data-dispute-id', dispute.id);
+      form.addEventListener('submit', handleResolveDisputeSubmit);
+
+      // Load disputed questions
+      google.script.run.withSuccessHandler(settings => {
+        const limit = parseInt(settings?.feedbackCharLimit) || 300;
+        const container = document.getElementById('resolveDisputeQuestions');
+        container.innerHTML = '';
+
+        evaluation.questions.forEach(q => {
+          if (!dispute.questionIds.includes(q.questionId)) return;
+
+          const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+          const card = document.createElement('div');
+          card.className = `question-card ${highlightClass}`;
+          card.innerHTML = `
+            <div class="question-header">
+              <h3 class="question-text">${q.questionText}</h3>
+              <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+            </div>
+            <div class="question-body">
+              <div class="radio-group">
+                <label>
+                  <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
+                  <span>Uphold</span>
+                </label>
+                <label>
+                  <input type="radio" name="resolution_${q.questionId}" value="overturned">
+                  <span>Overturn</span>
+                </label>
+              </div>
+              <div class="form-group mt-2">
+                <label for="note_${q.questionId}">Justification (required if Upheld)</label>
+                <textarea
+                  class="form-control feedback-textarea"
+                  id="note_${q.questionId}"
+                  name="note_${q.questionId}"
+                  rows="2"
+                  maxlength="${limit}"
+                  data-feedback-id="${q.questionId}"
+                ></textarea>
+                <small class="form-text" id="feedbackCounter_note_${q.questionId}">0 / ${limit} characters</small>
+              </div>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+        applyFeedbackCharacterLimits(limit);
+      }).getSettings();
+    }).getAllEvaluationsAndDisputes();
+  }
+</script>
