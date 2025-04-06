@@ -89,8 +89,48 @@
 
   function handleEvaluationFormSubmit(e) {
     e.preventDefault();
-    // Existing logic for evaluation form submission
-  }
+    
+    const form = e.target;
+    const auditId = form.dataset.auditId;
+    const questionsEls = form.querySelectorAll('.question');
+    const feedback = form.querySelector('#feedback').value;
+    
+    const questions = Array.from(questionsEls).map(el => {
+        const questionText = el.querySelector('label strong').textContent.split(': ')[1];
+        const select = el.querySelector('select');
+        const response = select.value;
+        const pointsPossible = 1;
+        const pointsEarned = response === 'yes' ? 1 : 0;
+        const feedbackText = el.querySelector('textarea').value;
+        
+        return {
+            questionId: select.name.split('-')[1],
+            questionText,
+            response,
+            pointsEarned,
+            pointsPossible,
+            feedback: feedbackText
+        };
+    });
+    
+    const totalPoints = questions.reduce((sum, q) => sum + q.pointsEarned, 0);
+    const totalPointsPossible = questions.length;
+    
+    const payload = {
+        auditId,
+        taskType: '',
+        referenceNumber: '',
+        questions,
+        feedback,
+        totalPoints,
+        totalPointsPossible
+    };
+    
+    google.script.run.withSuccessHandler(() => {
+        showToast('Evaluation saved successfully', 'success');
+        showEvaluations();
+    }).saveEvaluation(payload);
+}
 
   function handleSettingsFormSubmit(e) {
     e.preventDefault();
