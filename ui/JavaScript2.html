@@ -1,0 +1,155 @@
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+    attachNavHandlers();
+    attachGlobalEventListeners();
+  });
+
+  const selectors = {
+    taskTypeFilter: 'taskTypeFilter',
+    navButtons: 'nav button',
+    views: '.view',
+    toastContainer: 'toastContainer',
+    evaluationForm: 'evaluationForm',
+    feedback: 'feedback',
+    feedbackCounter: 'feedbackCounter',
+    userForm: 'userForm',
+    addUserBtn: 'addUserBtn',
+    cancelUserForm: 'cancelUserForm',
+    userFormElement: 'userFormElement',
+    adminTabItems: '.admin-tab-item',
+    adminTabContent: '.admin-tab-content',
+    settingsForm: 'settingsForm',
+    resolveDisputeForm: 'resolveDisputeForm',
+    disputeForm: 'disputeForm',
+    addQuestionBtn: 'addQuestionBtn',
+    cancelQuestionForm: 'cancelQuestionForm',
+    questionFormElement: 'questionFormElement'
+  };
+
+  function initializeApp() {
+    google.script.run.withSuccessHandler(user => {
+      document.getElementById('userName').textContent = user.name;
+      document.getElementById('userRole').textContent = formatRole(user.role);
+
+      const isAdmin = ['admin', 'qa_manager'].includes(user.role);
+      document.getElementById('navAdmin').style.display = isAdmin ? 'block' : 'none';
+
+      if (['qa_analyst', 'qa_manager'].includes(user.role)) {
+        showAuditQueue();
+      } else {
+        showDashboard();
+      }
+    }).getCurrentUser();
+  }
+
+  function attachNavHandlers() {
+    const navMap = {
+      navDashboard: showDashboard,
+      navAuditQueue: showAuditQueue,
+      navEvaluations: showEvaluations,
+      navDisputes: showDisputes,
+      navAdmin: showAdmin
+    };
+
+    Object.entries(navMap).forEach(([id, handler]) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', handler);
+    });
+  }
+
+  function attachGlobalEventListeners() {
+    // Attach task type filter listener
+    document.getElementById(selectors.taskTypeFilter)?.addEventListener('change', loadQuestions);
+
+    // Attach form submission handlers
+    document.getElementById(selectors.evaluationForm)?.addEventListener('submit', handleEvaluationFormSubmit);
+    document.getElementById(selectors.settingsForm)?.addEventListener('submit', handleSettingsFormSubmit);
+    document.getElementById(selectors.resolveDisputeForm)?.addEventListener('submit', handleResolveDisputeFormSubmit);
+    document.getElementById(selectors.disputeForm)?.addEventListener('submit', handleDisputeFormSubmit);
+
+    // Attach input handlers
+    document.getElementById(selectors.feedback)?.addEventListener('input', handleFeedbackInput);
+
+    // Attach user form handlers
+    document.getElementById(selectors.addUserBtn)?.addEventListener('click', showAddUserForm);
+    document.getElementById(selectors.cancelUserForm)?.addEventListener('click', hideUserForm);
+    document.getElementById(selectors.userFormElement)?.addEventListener('submit', handleUserFormSubmit);
+
+    // Attach admin tab switching
+    document.querySelectorAll(selectors.adminTabItems)?.forEach(btn => {
+      btn.addEventListener('click', handleAdminTabClick);
+    });
+
+    // Attach question form handlers
+    document.getElementById(selectors.addQuestionBtn)?.addEventListener('click', showAddQuestionForm);
+    document.getElementById(selectors.cancelQuestionForm)?.addEventListener('click', hideQuestionForm);
+    document.getElementById(selectors.questionFormElement)?.addEventListener('submit', handleQuestionFormSubmit);
+  }
+
+  function handleEvaluationFormSubmit(e) {
+    e.preventDefault();
+    // Existing logic for evaluation form submission
+  }
+
+  function handleSettingsFormSubmit(e) {
+    e.preventDefault();
+    // Existing logic for settings form submission
+  }
+
+  function handleResolveDisputeFormSubmit(e) {
+    e.preventDefault();
+    // Existing logic for resolve dispute form submission
+  }
+
+  function handleDisputeFormSubmit(e) {
+    e.preventDefault();
+    // Existing logic for dispute form submission
+  }
+
+  function handleFeedbackInput(e) {
+    const max = 300;
+    const len = e.target.value.length;
+    const counter = document.getElementById(selectors.feedbackCounter);
+    counter.textContent = `${len}/${max}`;
+    counter.style.color = len > max ? 'red' : '#6b7280';
+  }
+
+  function showAddUserForm() {
+    document.getElementById('userFormTitle').textContent = 'Add User';
+    document.getElementById('userFormElement').reset();
+    document.getElementById('userId').value = '';
+    document.getElementById(selectors.userForm).classList.remove('hidden');
+  }
+
+  function hideUserForm() {
+    document.getElementById(selectors.userForm).classList.add('hidden');
+  }
+
+  function handleUserFormSubmit(e) {
+    e.preventDefault();
+    // Existing logic for user form submission
+  }
+
+  function handleAdminTabClick() {
+    // Existing logic for admin tab click event
+  }
+
+  function showAddQuestionForm() {
+    document.getElementById('questionFormTitle').textContent = 'Add Question';
+    document.getElementById('questionFormElement').reset();
+    document.getElementById('questionId').value = '';
+    document.getElementById('questionForm').classList.remove('hidden');
+  }
+
+  function hideQuestionForm() {
+    document.getElementById('questionForm').classList.add('hidden');
+  }
+
+  function handleQuestionFormSubmit(e) {
+    e.preventDefault();
+    // Existing logic for question form submission
+  }
+
+  // Other existing functions such as showDashboard, showAuditQueue, etc.
+</script>
