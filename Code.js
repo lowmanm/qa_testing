@@ -27,6 +27,9 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+/**
+ * Helper function to include HTML files.
+ */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
@@ -39,6 +42,9 @@ function onOpen() {
     .addToUi();
 }
 
+/**
+ * Opens the QA App as a modal dialog.
+ */
 function openQaApp() {
   var html = HtmlService.createHtmlOutputFromFile('Index')
     .setWidth(1200)
@@ -50,6 +56,9 @@ function openQaApp() {
 // Spreadsheet Setup
 // ====================
 
+/**
+ * Sets up the spreadsheet by creating necessary sheets and headers.
+ */
 function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -98,6 +107,9 @@ function setupSpreadsheet() {
 // Caching Utilities
 // ====================
 
+/**
+ * Generic caching wrapper to fetch data or retrieve from cache.
+ */
 function getCachedOrFetch(key, fetchFn) {
   const cache = CacheService.getScriptCache();
   const cached = cache.get(key);
@@ -124,6 +136,9 @@ function getCachedOrFetch(key, fetchFn) {
 // Sheet Data Helpers
 // ====================
 
+/**
+ * Converts sheet data to an array of objects with headers.
+ */
 function getSheetDataAsObjects(sheet) {
   if (!sheet) return [];
 
@@ -143,6 +158,9 @@ function getSheetDataAsObjects(sheet) {
 // Users Module
 // ====================
 
+/**
+ * Retrieves all users from the users sheet.
+ */
 function getAllUsers() {
   return getCachedOrFetch('all_users', () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
@@ -150,6 +168,9 @@ function getAllUsers() {
   });
 }
 
+/**
+ * Retrieves the current user based on their email.
+ */
 function getCurrentUser() {
   try {
     var email = Session.getActiveUser().getEmail();
@@ -178,6 +199,9 @@ function getCurrentUser() {
   }
 }
 
+/**
+ * Creates a new user and adds to the users sheet.
+ */
 function createUser(userData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
 
@@ -197,6 +221,9 @@ function createUser(userData) {
   return userData;
 }
 
+/**
+ * Updates an existing user in the users sheet.
+ */
 function updateUser(userData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
   const data = sheet.getDataRange().getValues();
@@ -216,6 +243,9 @@ function updateUser(userData) {
   return userData;
 }
 
+/**
+ * Deletes a user from the users sheet.
+ */
 function deleteUser(userId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
   const data = sheet.getDataRange().getValues();
@@ -235,6 +265,9 @@ function deleteUser(userId) {
 // Questions Module
 // ====================
 
+/**
+ * Retrieves all questions from the questions sheet.
+ */
 function getAllQuestions() {
   return getCachedOrFetch('all_questions', () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
@@ -242,6 +275,9 @@ function getAllQuestions() {
   });
 }
 
+/**
+ * Retrieves questions for a specific task type.
+ */
 function getQuestionsForTaskType(taskType) {
   const cacheKey = 'questions_' + taskType;
   return getCachedOrFetch(cacheKey, () => {
@@ -251,6 +287,9 @@ function getQuestionsForTaskType(taskType) {
   });
 }
 
+/**
+ * Marks an audit as misconfigured.
+ */
 function markAuditAsMisconfigured(auditId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   if (!sheet) throw new Error(`Sheet "${SHEET_AUDIT_QUEUE}" not found`);
@@ -275,6 +314,9 @@ function markAuditAsMisconfigured(auditId) {
   throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
 }
 
+/**
+ * Creates a new question and adds to the questions sheet.
+ */
 function createQuestion(questionData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
 
@@ -303,6 +345,9 @@ function createQuestion(questionData) {
   return questionData;
 }
 
+/**
+ * Updates an existing question in the questions sheet.
+ */
 function updateQuestion(questionData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
   const data = sheet.getDataRange().getValues();
@@ -322,6 +367,9 @@ function updateQuestion(questionData) {
   return questionData;
 }
 
+/**
+ * Deletes a question from the questions sheet.
+ */
 function deleteQuestion(questionId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
   const data = sheet.getDataRange().getValues();
@@ -340,6 +388,9 @@ function deleteQuestion(questionId) {
 // Audit Queue Module
 // ====================
 
+/**
+ * Retrieves all audits from the audit queue sheet.
+ */
 function getAllAudits() {
   return getCachedOrFetch('all_audits', () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
@@ -347,6 +398,9 @@ function getAllAudits() {
   });
 }
 
+/**
+ * Retrieves pending audits from the audit queue sheet.
+ */
 function getPendingAudits() {
   Logger.log('Fetching pending audits...');
   return getCachedOrFetch('pending_audits', () => {
@@ -361,6 +415,9 @@ function getPendingAudits() {
   });
 }
 
+/**
+ * Updates the status of an audit in the audit queue sheet.
+ */
 function updateAuditStatus(auditId, newStatus) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
@@ -375,6 +432,10 @@ function updateAuditStatus(auditId, newStatus) {
   CacheService.getScriptCache().remove('all_audits');
 }
 
+
+/**
+ * Updates the status of an audit and locks it.
+ */
 function updateAuditStatusAndLock(auditId, status) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
@@ -393,6 +454,9 @@ function updateAuditStatusAndLock(auditId, status) {
   return { success: true };
 }
 
+/**
+ * Prepares an evaluation by updating the audit status to 'In Process'.
+ */
 function prepareEvaluation(auditId) {
   const result = updateAuditStatusAndLock(auditId, 'In Process');
   if (!result.success) throw new Error('Failed to update audit status');
@@ -408,6 +472,9 @@ function prepareEvaluation(auditId) {
 // Evaluations Module
 // ====================
 
+/**
+ * Retrieves all evaluations from the evaluation summary sheet.
+ */
 function getAllEvaluations() {
   return getCachedOrFetch('all_evaluations', () => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -436,6 +503,9 @@ function getAllEvaluations() {
   });
 }
 
+/**
+ * Saves a new evaluation and updates relevant sheets.
+ */
 function saveEvaluation(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const evalSheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
