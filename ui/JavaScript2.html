@@ -144,8 +144,29 @@
 
   function handleDisputeFormSubmit(e) {
     e.preventDefault();
-    // Existing logic for dispute form submission
-  }
+    const reason = document.getElementById('disputeReason')?.value?.trim();
+    const evalId = e.target.dataset.evalId;
+    const questionIds = Array.from(e.target.querySelectorAll('.question-dispute-checkbox'))
+      .filter(c => c.checked)
+      .map(c => c.dataset.questionId);
+
+    if (!reason) {
+      showToast('Reason is required', 'warning');
+      return;
+    }
+
+    if (!questionIds.length) {
+      showToast('Please select at least one question to dispute.', 'warning');
+      return;
+    }
+
+    const payload = { evalId, reason, questionIds };
+
+    google.script.run.withSuccessHandler(() => {
+      showToast('Dispute submitted successfully', 'success');
+      showDisputes();
+    }).saveDispute(payload);
+  });
 
   function handleFeedbackInput(e) {
     const max = 300;
