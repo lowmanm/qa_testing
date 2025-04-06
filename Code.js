@@ -97,7 +97,7 @@ function setupSpreadsheet() {
     }
 
     const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    if (existingHeaders.join(',') !== headers.join(',')) {
+    if (JSON.stringify(existingHeaders) !== JSON.stringify(headers)) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     }
   }
@@ -142,10 +142,7 @@ function getCachedOrFetch(key, fetchFn) {
 function getSheetDataAsObjects(sheet) {
   if (!sheet) return [];
 
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-
-  const headers = values.shift(); // Extract the headers and remove the first row
+  const [headers, ...values] = sheet.getDataRange().getValues();
   return values.map(row => {
     return headers.reduce((obj, header, i) => {
       if (header) obj[header] = row[i];
@@ -637,6 +634,9 @@ function updateDisputeStatus(disputeId, newStatus) {
   return { success: true };
 }
 
+/**
+ * Resolves a dispute and updates relevant sheets.
+ */
 function resolveDispute(resolution) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
@@ -658,6 +658,7 @@ function resolveDispute(resolution) {
   const pointsPossibleIndex = headers.indexOf('pointsPossible');
 
   // Update affected questions
+  const updatedRows = [];
   for (let i = 1; i < questData.length; i++) {
     const row = questData[i];
     if (row[idIndex] !== evalId) continue;
@@ -671,7 +672,11 @@ function resolveDispute(resolution) {
     }
 
     row[feedbackIndex] = decision.note || '';
-    questSheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
+    updatedRows.push(row);
+  }
+
+  if (updatedRows.length) {
+    questSheet.getRange(2, 1, updatedRows.length, headers.length).setValues(updatedRows);
   }
 
   // Recalculate score totals
