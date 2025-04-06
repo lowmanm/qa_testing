@@ -134,13 +134,45 @@
 
   function handleSettingsFormSubmit(e) {
     e.preventDefault();
-    // Existing logic for settings form submission
-  }
+    const form = new FormData(e.target);
+    const settings = {
+      emailSubject: form.get('emailSubject'),
+      csvFilename: form.get('csvFilename'),
+      feedbackCharLimit: parseInt(form.get('feedbackCharLimit'), 10)
+    };
+
+    google.script.run.withSuccessHandler(() => {
+      showToast('Settings saved successfully', 'success');
+    }).saveSettings(settings);
+  });
 
   function handleResolveDisputeFormSubmit(e) {
     e.preventDefault();
-    // Existing logic for resolve dispute form submission
-  }
+    const form = e.target;
+    const disputeId = form.dataset.disputeId;
+    const evalId = form.dataset.evalId;
+    const resolutionNotes = form.querySelector('#resolutionNotes').value;
+
+    const decisions = Array.from(form.querySelectorAll('.dispute-question')).map(el => {
+      const questionId = el.dataset.questionId;
+      const resolution = el.querySelector('select').value;
+      const note = el.querySelector('textarea').value;
+      return { questionId, resolution, note };
+    });
+
+    const payload = {
+      disputeId,
+      evalId,
+      decisions,
+      resolutionNotes,
+      status: 'resolved'
+    };
+
+    google.script.run.withSuccessHandler(() => {
+      showToast('Dispute resolved', 'success');
+      showDisputes();
+    }).resolveDispute(payload);
+  });
 
   function handleDisputeFormSubmit(e) {
     e.preventDefault();
