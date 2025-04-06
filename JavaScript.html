@@ -20,15 +20,7 @@
     container.appendChild(toast);
 
     setTimeout(() => toast.remove(), 3000);
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-    attachNavHandlers();
-    attachFormHandlers();
-    attachAdminHandlers();
-    attachDisputeHandlers();
-  });
+  };
 
   function initializeApp() {
     google.script.run.withSuccessHandler(user => {
