@@ -1,4 +1,22 @@
 // ====================
+// Constants
+// ====================
+
+const SHEET_USERS = 'users';
+const SHEET_AUDIT_QUEUE = 'auditQueue';
+const SHEET_EVAL_SUMMARY = 'evalSummary';
+const SHEET_EVAL_QUEST = 'evalQuest';
+const SHEET_QUESTIONS = 'questions';
+const SHEET_DISPUTES_QUEUE = 'disputesQueue';
+
+const MENU_QA_SYSTEM = 'QA System';
+const ITEM_OPEN_QA_APP = 'Open QA App';
+const ITEM_SETUP_SPREADSHEET = 'Setup Spreadsheet';
+const ITEM_IMPORT_DATA_FROM_EMAIL = 'Import Data from Email';
+
+const CACHE_DURATION = 300; // seconds (5 minutes)
+
+// ====================
 // App Entry Points
 // ====================
 
@@ -14,10 +32,10 @@ function include(filename) {
 }
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('QA System')
-    .addItem('Open QA App', 'openQaApp')
-    .addItem('Setup Spreadsheet', 'setupSpreadsheet')
-    .addItem('Import Data from Email', 'importDataFromEmail')
+  SpreadsheetApp.getUi().createMenu(MENU_QA_SYSTEM)
+    .addItem(ITEM_OPEN_QA_APP, 'openQaApp')
+    .addItem(ITEM_SETUP_SPREADSHEET, 'setupSpreadsheet')
+    .addItem(ITEM_IMPORT_DATA_FROM_EMAIL, 'importDataFromEmail')
     .addToUi();
 }
 
@@ -36,25 +54,25 @@ function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const sheetsToCreate = {
-    users: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl'],
-    auditQueue: [
+    [SHEET_USERS]: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl'],
+    [SHEET_AUDIT_QUEUE]: [
       'auditId', 'taskId', 'referenceNumber', 'auditStatus', 'agentEmail',
       'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp', 'locked'
     ],
-    evalSummary: [
+    [SHEET_EVAL_SUMMARY]: [
       'id', 'evalId', 'referenceNumber', 'taskType', 'outcome',
       'qaEmail', 'startTimestamp', 'stopTimestamp', 'totalPoints',
       'totalPointsPossible', 'status', 'feedback', 'evalScore'
     ],
-    evalQuest: [
+    [SHEET_EVAL_QUEST]: [
       'id', 'evalId', 'questionId', 'questionText', 'response',
       'pointsEarned', 'pointsPossible', 'feedback'
     ],
-    questions: [
+    [SHEET_QUESTIONS]: [
       'id', 'setId', 'taskType', 'questionText', 'pointsPossible',
       'createdBy', 'createdTimestamp'
     ],
-    disputesQueue: [
+    [SHEET_DISPUTES_QUEUE]: [
       'id', 'evalId', 'userEmail', 'disputeTimestamp', 'reason',
       'questionIds', 'status', 'resolutionNotes', 'resolvedBy', 'resolutionTimestamp'
     ]
@@ -79,8 +97,6 @@ function setupSpreadsheet() {
 // ====================
 // Caching Utilities
 // ====================
-
-const CACHE_DURATION = 300; // seconds (5 minutes)
 
 function getCachedOrFetch(key, fetchFn) {
   const cache = CacheService.getScriptCache();
@@ -114,13 +130,12 @@ function getSheetDataAsObjects(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
 
-  const headers = values[0];
-  return values.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((key, i) => {
-      if (key) obj[key] = row[i];
-    });
-    return obj;
+  const headers = values.shift(); // Extract the headers and remove the first row
+  return values.map(row => {
+    return headers.reduce((obj, header, i) => {
+      if (header) obj[header] = row[i];
+      return obj;
+    }, {});
   });
 }
 
@@ -130,34 +145,41 @@ function getSheetDataAsObjects(sheet) {
 
 function getAllUsers() {
   return getCachedOrFetch('all_users', () => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
     return getSheetDataAsObjects(sheet);
   });
 }
 
 function getCurrentUser() {
-  var email = Session.getActiveUser().getEmail();
-  var users = getAllUsers();
-  var user = users.find(function(user) {
-    return user.email === email;
-  });
+  try {
+    var email = Session.getActiveUser().getEmail();
+    var users = getAllUsers();
+    var user = users.find(function(user) {
+      return user.email === email;
+    });
 
-  // Default to the first user for testing/demo purposes if no matching user
-  if (!user && users.length > 0) {
-    user = users[0];
+    if (!user && users.length > 0) {
+      user = users[0];
+    }
+
+    if (!user) {
+      throw new Error('No matching user found and no users available for default.');
+    }
+
+    return user;
+  } catch (e) {
+    Logger.log(`Error in getCurrentUser: ${e.message}`);
+    return {
+      id: 'unknown',
+      name: 'Unknown User',
+      email: email || 'unknown',
+      role: 'qa_analyst'
+    };
   }
-
-  return user || {
-    id: 'unknown',
-    name: 'Unknown User',
-    email: email,
-    role: 'qa_analyst'
-  };
 }
 
-
 function createUser(userData) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
 
   if (!userData.id) {
     userData.id = 'user' + Date.now();
@@ -176,7 +198,7 @@ function createUser(userData) {
 }
 
 function updateUser(userData) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idCol = headers.indexOf('id');
@@ -195,7 +217,7 @@ function updateUser(userData) {
 }
 
 function deleteUser(userId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('users');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idCol = headers.indexOf('id');
@@ -215,7 +237,7 @@ function deleteUser(userId) {
 
 function getAllQuestions() {
   return getCachedOrFetch('all_questions', () => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
     return getSheetDataAsObjects(sheet);
   });
 }
@@ -223,15 +245,15 @@ function getAllQuestions() {
 function getQuestionsForTaskType(taskType) {
   const cacheKey = 'questions_' + taskType;
   return getCachedOrFetch(cacheKey, () => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
     const data = getSheetDataAsObjects(sheet);
     return data.filter(q => q.taskType === taskType);
   });
 }
 
 function markAuditAsMisconfigured(auditId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
-  if (!sheet) throw new Error('Sheet "auditsQueue" not found');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
+  if (!sheet) throw new Error(`Sheet "${SHEET_AUDIT_QUEUE}" not found`);
 
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
@@ -250,11 +272,11 @@ function markAuditAsMisconfigured(auditId) {
     }
   }
 
-  throw new Error('Audit ID not found in auditsQueue.');
+  throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
 }
 
 function createQuestion(questionData) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
 
   if (!questionData.id) {
     questionData.id = 'q' + Date.now() + '-' + questionData.taskType;
@@ -282,7 +304,7 @@ function createQuestion(questionData) {
 }
 
 function updateQuestion(questionData) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idCol = headers.indexOf('id');
@@ -301,7 +323,7 @@ function updateQuestion(questionData) {
 }
 
 function deleteQuestion(questionId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('questions');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idCol = headers.indexOf('id');
@@ -320,7 +342,7 @@ function deleteQuestion(questionId) {
 
 function getAllAudits() {
   return getCachedOrFetch('all_audits', () => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
     return getSheetDataAsObjects(sheet);
   });
 }
@@ -340,7 +362,7 @@ function getPendingAudits() {
 }
 
 function updateAuditStatus(auditId, newStatus) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idIdx = headers.indexOf('auditId');
@@ -354,7 +376,7 @@ function updateAuditStatus(auditId, newStatus) {
 }
 
 function updateAuditStatusAndLock(auditId, status) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idIdx = headers.indexOf('auditId');
@@ -389,8 +411,8 @@ function prepareEvaluation(auditId) {
 function getAllEvaluations() {
   return getCachedOrFetch('all_evaluations', () => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const evalSheet = ss.getSheetByName('evalSummary');
-    const questSheet = ss.getSheetByName('evalQuest');
+    const evalSheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
+    const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
 
     const summaries = getSheetDataAsObjects(evalSheet);
     const questions = getSheetDataAsObjects(questSheet);
@@ -416,8 +438,8 @@ function getAllEvaluations() {
 
 function saveEvaluation(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const evalSheet = ss.getSheetByName('evalSummary');
-  const questSheet = ss.getSheetByName('evalQuest');
+  const evalSheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
+  const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
 
   const evalId = 'eval' + Date.now();
   const stopTime = new Date().toISOString();
@@ -467,7 +489,7 @@ function saveEvaluation(data) {
 }
 
 function updateEvaluationStatus(evalId, status) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('evalSummary');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idIdx = headers.indexOf('evalId');
@@ -486,7 +508,7 @@ function updateEvaluationStatus(evalId, status) {
 
 function getAllDisputes() {
   return getCachedOrFetch('all_disputes', () => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
     const data = getSheetDataAsObjects(sheet);
 
     // Convert questionIds from string to array
@@ -501,7 +523,7 @@ function getAllDisputes() {
 }
 
 function saveDispute(dispute) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
   const id = 'dispute' + Date.now();
   const timestamp = new Date().toISOString();
   const userEmail = dispute.userEmail || Session.getActiveUser().getEmail();
@@ -532,7 +554,7 @@ function saveDispute(dispute) {
 }
 
 function updateDisputeStatus(disputeId, newStatus) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idIdx = headers.indexOf('id');
@@ -547,9 +569,9 @@ function updateDisputeStatus(disputeId, newStatus) {
 
 function resolveDispute(resolution) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const questSheet = ss.getSheetByName('evalQuest');
-  const summarySheet = ss.getSheetByName('evalSummary');
-  const disputeSheet = ss.getSheetByName('disputesQueue');
+  const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
+  const summarySheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
+  const disputeSheet = ss.getSheetByName(SHEET_DISPUTES_QUEUE);
 
   const { disputeId, evalId, decisions, resolutionNotes, status } = resolution;
   const resolvedBy = Session.getActiveUser().getEmail();
@@ -588,7 +610,7 @@ function resolveDispute(resolution) {
   const totalPossible = updatedQuestData.reduce((sum, row) => sum + (parseFloat(row[pointsPossibleIndex]) || 0), 0);
   const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
 
-  // Update evalSummary —
+  // Update evalSummary
   const summaryData = summarySheet.getDataRange().getValues();
   const sHeaders = summaryData[0];
   const sIdIndex = sHeaders.indexOf('id');
@@ -631,10 +653,6 @@ function resolveDispute(resolution) {
   return true;
 }
 
-
-
-
-
 function getAllEvaluationsAndDisputes() {
   return {
     evaluations: getAllEvaluations(),
@@ -670,42 +688,19 @@ function getDisputeStats() {
 // Utility & Shared Helper Functions
 // ==============================
 
-// Generic caching wrapper
-function getCachedOrFetch(cacheKey, fetchFn) {
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get(cacheKey);
-
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (e) {
-      Logger.log(`Error parsing cache for ${cacheKey}: ${e.message}`);
-    }
-  }
-
-  const fresh = fetchFn();
-  try {
-    cache.put(cacheKey, JSON.stringify(fresh), 300); // 5 minutes
-  } catch (e) {
-    Logger.log(`Error caching ${cacheKey}: ${e.message}`);
-  }
-
-  return fresh;
-}
-
 // Convert sheet data to array of objects (with headers)
 function getSheetDataAsObjects(sheet) {
   if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
 
-  const headers = data[0];
-  return data.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => {
-      if (h) obj[h] = row[i];
-    });
-    return obj;
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+
+  const headers = values.shift(); // Extract the headers and remove the first row
+  return values.map(row => {
+    return headers.reduce((obj, header, i) => {
+      if (header) obj[header] = row[i];
+      return obj;
+    }, {});
   });
 }
 
