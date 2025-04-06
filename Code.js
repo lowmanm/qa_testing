@@ -684,26 +684,6 @@ function getDisputeStats() {
   };
 }
 
-// ==============================
-// Utility & Shared Helper Functions
-// ==============================
-
-// Convert sheet data to array of objects (with headers)
-function getSheetDataAsObjects(sheet) {
-  if (!sheet) return [];
-
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-
-  const headers = values.shift(); // Extract the headers and remove the first row
-  return values.map(row => {
-    return headers.reduce((obj, header, i) => {
-      if (header) obj[header] = row[i];
-      return obj;
-    }, {});
-  });
-}
-
 // Convert snake_case to Title Case for display
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
