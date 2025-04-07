@@ -423,7 +423,9 @@ function loadErrorTasks() {
   }).prepareEvaluation(auditId);
 }
 
-  function loadQuestionsForEvaluation(taskType, attempt = 1) {
+  let toastShown = false;
+
+function loadQuestionsForEvaluation(taskType, attempt = 1) {
   const maxRetries = 5;
   const questionsContainer = document.getElementById('questions');
   const form = document.getElementById('evaluationForm');
@@ -444,16 +446,14 @@ function loadErrorTasks() {
     questionsContainer.innerHTML = '';
 
     if (questions.length === 0) {
-  showToast("No evaluation questions are set up for this task type.", 'error');
-  markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
-  showAuditQueue(); // return user to queue
-  return;
-}
-
-function markAuditAsMisconfigured(auditId) {
-  if (!auditId) return;
-  google.script.run.markAuditAsMisconfigured(auditId);
-}
+      if (!toastShown) {
+        showToast("No evaluation questions are set up for this task type.", 'error');
+        toastShown = true;
+      }
+      markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
+      showAuditQueue(); // return user to queue
+      return;
+    }
 
     questions.forEach(q => {
       maxPossibleScore += parseInt(q.pointsPossible || 0);
@@ -488,6 +488,11 @@ function markAuditAsMisconfigured(auditId) {
   }).getQuestionsForTaskType(taskType);
 }
 
+function markAuditAsMisconfigured(auditId) {
+  if (!auditId) return;
+  google.script.run.markAuditAsMisconfigured(auditId);
+}
+
   function handleEvaluationSubmit(e) {
   e.preventDefault();
 
@@ -495,9 +500,9 @@ function markAuditAsMisconfigured(auditId) {
   if (!form) return showToast("Evaluation form not found.", 'error');
 
   if (form.classList.contains('disabled')) {
-  showToast("Please wait for the questions to finish loading.", 'warning');
-  return;
-}
+    showToast("Please wait for the questions to finish loading.", 'warning');
+    return;
+  }
 
   const auditId = form.getAttribute('data-audit-id');
   const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
@@ -508,18 +513,17 @@ function markAuditAsMisconfigured(auditId) {
   const feedback = feedbackField ? feedbackField.value : '';
 
   // Validation: all questions must be answered
-  // Validation: all visible questions must be answered
-let allAnswered = true;
-document.querySelectorAll('#questions .question-card').forEach(function (questionCard) {
-  const questionId = questionCard.getAttribute('data-question-id');
-  const selectedOption = questionCard.querySelector(`input[name="question_${questionId}"]:checked`);
-  if (!selectedOption) allAnswered = false;
-});
+  let allAnswered = true;
+  document.querySelectorAll('#questions .question-card').forEach(function (questionCard) {
+    const questionId = questionCard.getAttribute('data-question-id');
+    const selectedOption = questionCard.querySelector(`input[name="question_${questionId}"]:checked`);
+    if (!selectedOption) allAnswered = false;
+  });
 
-if (!allAnswered) {
-  showToast("Please answer all questions before submitting the evaluation.", 'warning');
-  return;
-}
+  if (!allAnswered) {
+    showToast("Please answer all questions before submitting the evaluation.", 'warning');
+    return;
+  }
 
   // Compile responses
   let score = 0;
@@ -535,15 +539,18 @@ if (!allAnswered) {
     const questionFeedback = questionFeedbackField ? questionFeedbackField.value : '';
     const pointsEarned = response === 'yes' ? pointsPossible : 0;
 
-    score += pointsEarned;
-    questions.push({
-      questionId,
-      questionText,
-      response,
-      pointsEarned,
-      pointsPossible,
-      feedback: questionFeedback
-    });
+    // Ensure valid question data
+    if (questionId && questionText) {
+      score += pointsEarned;
+      questions.push({
+        questionId,
+        questionText,
+        response,
+        pointsEarned,
+        pointsPossible,
+        feedback: questionFeedback
+      });
+    }
   });
 
   const evaluationData = {
@@ -613,20 +620,22 @@ if (!allAnswered) {
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
   google.script.run.withSuccessHandler(function(evaluations) {
-    if (!evaluations.length) {
-      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No evaluations found</td></tr>';
-      return;
-    }
+  google.script.run.withSuccessHandler(function(disputesQueue) {
+    const disputedEvalIds = new Set(disputesQueue.map(d => d.evalId));
+    const pendingReviewingEvalIds = new Set(disputesQueue.filter(d => d.status === 'pending' || d.status === 'reviewing').map(d => d.evalId));
 
     tableBody.innerHTML = '';
-
     evaluations.forEach(e => {
       const percentage = Math.round((e.totalPoints / e.totalPointsPossible) * 100);
       let scoreClass = 'score-high';
       if (percentage < 70) scoreClass = 'score-low';
       else if (percentage < 90) scoreClass = 'score-medium';
 
+      let rowClass = '';
+      if (e.status === 'pending' || e.status === 'reviewing') rowClass = 'highlight-pending-reviewing';
+
       const row = document.createElement('tr');
+      row.className = rowClass;
       row.innerHTML = `
         <td>${formatTaskType(e.taskType)}</td>
         <td>${e.qaEmail}</td>
@@ -635,9 +644,9 @@ if (!allAnswered) {
         <td><span class="badge badge-${e.status}">${e.status}</span></td>
         <td>
           <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
-          ${e.status === 'completed' && Math.round((e.totalPoints / e.totalPointsPossible) * 100) < 100
-  ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>`
-  : ''}
+          ${e.status === 'completed' && !disputedEvalIds.has(e.id) && percentage < 100
+            ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>`
+            : ''}
         </td>
       `;
       tableBody.appendChild(row);
@@ -645,12 +654,17 @@ if (!allAnswered) {
 
     // Delegate event listeners
     document.querySelectorAll('.view-evaluation-button').forEach(btn =>
-      btn.addEventListener('click', () => viewEvaluation(btn.dataset.evaluationId))
+      btn.addEventListener('click', () => {
+        const evaluationId = btn.getAttribute('data-evaluation-id');
+        viewEvaluation(evaluationId);
+      })
     );
+
     document.querySelectorAll('.dispute-button').forEach(btn =>
       btn.addEventListener('click', () => showDisputeForm(btn.dataset.evaluationId))
     );
-  }).getAllEvaluations();
+  }).getAllDisputes();
+}).getAllEvaluations();
 }
 
   function viewEvaluation(evaluationId) {
@@ -710,30 +724,109 @@ if (!allAnswered) {
       disputes.forEach(function(dispute) {
         var row = document.createElement('tr');
 
-        row.innerHTML = `
-          <td>Evaluation #${dispute.evalId}</td>
-          <td>${dispute.userEmail}</td>
-          <td>${formatDate(dispute.disputeTimestamp)}</td>
-          <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
-          <td>
-            <button class="resolve-dispute-button btn btn-sm btn-primary"
-              data-dispute-id="${dispute.id}">View</button>
-          </td>
-        `;
+      row.innerHTML = `
+        <td>Evaluation #${dispute.evalId}</td>
+        <td>${dispute.userEmail}</td>
+        <td>${formatDate(dispute.disputeTimestamp)}</td>
+        <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
+        <td>
+          <button class="view-dispute-button btn btn-sm btn-secondary" data-dispute-id="${dispute.id}">View</button>
+          <button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Resolve Dispute</button>
+        </td>
+      `;
 
-        tableBody.appendChild(row);
+      tableBody.appendChild(row);
+    });
+
+    // Add event listeners to view and resolve dispute buttons
+    document.querySelectorAll('.view-dispute-button').forEach(button => {
+      button.addEventListener('click', function () {
+        const id = this.getAttribute('data-dispute-id');
+        viewDispute(id);
       });
+    });
 
-      // Add event listeners to view dispute buttons
-      document.querySelectorAll('.resolve-dispute-button').forEach(button => {
-  button.addEventListener('click', function () {
-    const id = this.getAttribute('data-dispute-id');
-    resolveDispute(id);
-  });
-});
+    document.querySelectorAll('.resolve-dispute-button').forEach(button => {
+      button.addEventListener('click', function () {
+        const id = this.getAttribute('data-dispute-id');
+        resolveDispute(id);
+      });
+    });
+  }).getAllDisputes();
+}
 
-    }).getAllDisputes();
-  }
+function viewDispute(disputeId) {
+  hideAllViews();
+  document.getElementById('resolveDisputeView').classList.remove('hidden');
+
+  google.script.run.withSuccessHandler(function(data) {
+    const dispute = data.disputes.find(d => d.id === disputeId);
+    const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
+
+    if (!dispute || !evaluation) {
+      showToast("Dispute or evaluation not found.", 'error');
+      return;
+    }
+
+    // Inject HTML structure for the view mode
+    document.getElementById('resolveDisputeView').innerHTML = `
+      <div class="card">
+        <h2>View Dispute</h2>
+        <div id="resolveEvaluationDetails" class="mb-4">Loading...</div>
+
+        <form id="resolveDisputeForm">
+          <div id="resolveDisputeQuestions" class="questions-container mb-4">Loading questions...</div>
+
+          <div class="button-group">
+            <button type="button" id="cancelResolveDispute" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const form = document.getElementById('resolveDisputeForm');
+    form.setAttribute('data-eval-id', evaluation.id);
+    form.setAttribute('data-dispute-id', dispute.id);
+
+    // Attach the cancel handler
+    document.getElementById('cancelResolveDispute').addEventListener('click', showDisputes);
+
+    // Render evaluation metadata
+    const detailsHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+        <div><p class="field-label">QA Agent</p><p class="field-value">${evaluation.qaEmail}</p></div>
+        <div><p class="field-label">Dispute Reason</p><p class="field-value">${dispute.reason}</p></div>
+      </div>
+    `;
+    document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
+
+    // Render disputed questions
+    const container = document.getElementById('resolveDisputeQuestions');
+    container.innerHTML = '';
+
+    evaluation.questions.forEach(q => {
+      if (!q.questionId || !q.questionText) return;
+      if (!dispute.questionIds.includes(q.questionId)) return;
+
+      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+      const card = document.createElement('div');
+      card.className = `question-card ${highlightClass}`;
+      card.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <p class="field-label">Response:</p>
+          <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }).getAllEvaluationsAndDisputes();
+}
 
   function showDisputeForm(evaluationId) {
   hideAllViews();
@@ -836,9 +929,10 @@ if (!allAnswered) {
         <p class="field-label">Response:</p>
         <p class="field-value">${q.response === 'yes' ? 'Yes' : 'No'}</p>
         ${feedbackHtml}
+        ${q.response === 'no' ? `
         <div class="dispute-checkbox">
           <label><input type="checkbox" name="dispute_question_${q.questionId}" value="${q.questionId}"> Dispute this question</label>
-        </div>
+        </div>` : ''}
       </div>
     `;
     container.appendChild(card);
@@ -860,41 +954,52 @@ if (!allAnswered) {
     return;
   }
 
-  const disputedQuestionIds = [];
-  document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(checkbox => {
-    disputedQuestionIds.push(checkbox.value);
-  });
+  google.script.run.withSuccessHandler(function(disputesQueue) {
+    const isDisputed = disputesQueue.some(d => d.evalId === evaluationId);
 
-  if (disputedQuestionIds.length === 0) {
-    showToast("Please select at least one question to dispute.", 'warning');
-    return;
-  }
+    if (isDisputed) {
+      showToast("This evaluation has already been disputed.", 'warning');
+      return;
+    }
 
-  const disputeData = {
-    evalId: evaluationId,
-    reason,
-    questionIds: disputedQuestionIds,
-    status: 'pending'
-  };
+    const disputedQuestionIds = [];
+    document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(checkbox => {
+      disputedQuestionIds.push(checkbox.value);
+    });
 
-  form.innerHTML = '<div class="loading">Submitting dispute...</div>';
+    if (disputedQuestionIds.length === 0) {
+      showToast("Please select at least one question to dispute.", 'warning');
+      return;
+    }
 
-  google.script.run
-    .withSuccessHandler(() => {
-      showToast("Dispute submitted successfully!", 'success');
-      showEvaluations();
-    })
-    .withFailureHandler(error => {
-      form.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
-      setTimeout(() => showEvaluations(), 3000);
-    })
-    .saveDispute(disputeData);
+    const disputeData = {
+      evalId: evaluationId,
+      reason,
+      questionIds: disputedQuestionIds,
+      status: 'pending'
+    };
+
+    form.innerHTML = '<div class="loading">Submitting dispute...</div>';
+
+    google.script.run
+      .withSuccessHandler(() => {
+        showToast("Dispute submitted successfully!", 'success');
+        showEvaluations();
+      })
+      .withFailureHandler(error => {
+        form.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
+        setTimeout(() => showEvaluations(), 3000);
+      })
+      .saveDispute(disputeData);
+  }).getAllDisputes();
 }
 
 
   function resolveDispute(disputeId) {
   hideAllViews();
-  document.getElementById('resolveDisputeView').classList.remove('hidden');
+  const resolveDisputeView = document.getElementById('resolveDisputeView');
+  resolveDisputeView.classList.remove('hidden');
+  resolveDisputeView.innerHTML = ''; // Clear previous content
 
   google.script.run.withSuccessHandler(function(data) {
     const dispute = data.disputes.find(d => d.id === disputeId);
@@ -909,7 +1014,7 @@ if (!allAnswered) {
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
     // Inject HTML structure for the resolve view
-    document.getElementById('resolveDisputeView').innerHTML = `
+    resolveDisputeView.innerHTML = `
       <div class="card">
         <h2>Resolve Dispute</h2>
         <div id="resolveEvaluationDetails" class="mb-4">Loading...</div>
@@ -923,6 +1028,7 @@ if (!allAnswered) {
           </div>
 
           <div class="button-group">
+            <button type="button" id="cancelResolveDispute" class="btn btn-secondary">Cancel</button>
             <button type="submit" class="btn btn-primary">Submit Resolution</button>
           </div>
         </form>
@@ -935,6 +1041,20 @@ if (!allAnswered) {
 
     // Attach the submit handler directly here
     form.addEventListener('submit', handleResolveDisputeSubmit);
+
+    // Attach the cancel handler
+    document.getElementById('cancelResolveDispute').addEventListener('click', function() {
+      google.script.run
+        .withSuccessHandler(() => {
+          showToast('Dispute status updated to pending.', 'success');
+          showDisputes();
+        })
+        .withFailureHandler(error => {
+          console.error('Error updating dispute status:', error);
+          showToast('Failed to update dispute status: ' + error.message, 'error');
+        })
+        .updateDisputeStatus(dispute.id, 'pending');
+    });
 
     // Render evaluation metadata
     const detailsHTML = `
@@ -952,12 +1072,8 @@ if (!allAnswered) {
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
-  if (!q.questionId || !q.questionText) return; // skip invalid
-  if (!dispute.questionIds.includes(q.questionId)) return;
-  if (!q.questionId || !q.questionText) {
-  console.warn("Skipping question with missing data:", q);
-  return;
-}
+      if (!q.questionId || !q.questionText) return; // skip invalid
+      if (!dispute.questionIds.includes(q.questionId)) return;
 
       const highlightClass = q.response === 'no' ? 'highlight-no' : '';
       const card = document.createElement('div');
