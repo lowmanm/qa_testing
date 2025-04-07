@@ -559,10 +559,10 @@ function updateEvaluationStatus(evalId, status) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const idIdx = headers.indexOf('evalId');
+  const idIdx = headers.indexOf('id');
   const statusIdx = headers.indexOf('status');
 
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === evalId);
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === id);
   if (rowIndex === -1) return;
 
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(status);
