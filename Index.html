@@ -244,6 +244,18 @@
   </div>
 </div>
 
+<div id="viewDisputeModal" class="form-modal hidden">
+  <div class="form-modal-content">
+    <h3>Dispute Resolution Details</h3>
+    <div id="disputeResolutionDetails" class="evaluation-details mb-4">
+      Loading dispute details...
+    </div>
+    <div class="button-group">
+      <button type="button" class="btn btn-secondary" onclick="closeDisputeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 
       <div id="adminView" class="view hidden">
         <div class="card">
@@ -416,6 +428,31 @@
     <?!= include('JavaScript'); ?>
     <!-- Toast container -->
 <div id="toastContainer" class="toast-container"></div>
+
+      <!-- Email Template -->
+  <template id="emailTemplate">
+    <h3>Task Details</h3>
+    <p>Reference Number: {{referenceNumber}}</p>
+    <p>Request Type: {{requestType}}</p>
+    <p>Task Type: {{taskType}}</p>
+    <p>Outcome: {{outcome}}</p>
+    <p>Task Timestamp: {{taskTimestamp}}</p>
+
+    <h3>Evaluation Details</h3>
+    <p>Status: {{status}}</p>
+    <p>Total Points: {{totalPoints}}</p>
+    <p>Total Points Possible: {{totalPointsPossible}}</p>
+    <p>Feedback: {{feedback}}</p>
+    <p>Evaluation Score: {{evalScore}}%</p>
+
+    {{#if questions}}
+    <h3>Questions with "No" Responses</h3>
+    {{#each questions}}
+    <p>Question: {{questionText}}</p>
+    <p>Feedback: {{feedback}}</p>
+    {{/each}}
+    {{/if}}
+  </template>
 
 <style>
 .toast-container {
