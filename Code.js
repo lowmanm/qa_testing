@@ -884,7 +884,7 @@ function buildScorecardHtml(evaluation) {
   return `
     <div style="font-family:Arial, sans-serif; max-width:800px; margin:0 auto; padding:20px; color:#333;">
       <div style="border-radius:10px; padding:20px; background-color:#f8faff; border:1px solid #d0e6f9;">
-        <h2 style="color:#1a73e8; margin-top:0;">Evaluation Summary</h2>
+        <h2 style="color:#007298; margin-top:0;">Evaluation Summary</h2>
         <table style="width:100%; margin-top:10px;">
           <tr><td style="${labelStyle}">Reference Number:</td><td style="${valueStyle}">${evaluation.referenceNumber || 'N/A'}</td></tr>
           <tr><td style="${labelStyle}">Task Type:</td><td style="${valueStyle}">${evaluation.taskType || 'N/A'}</td></tr>
@@ -895,7 +895,7 @@ function buildScorecardHtml(evaluation) {
         </table>
       </div>
 
-      <h3 style="color:#1a73e8; margin-top:30px;">Evaluation Details</h3>
+      <h3 style="color:#007298; margin-top:30px;">Evaluation Details</h3>
       <table style="width:100%; border-collapse:collapse; border:1px solid #ddd; margin-top:10px;">
         <thead>
           <tr style="${tableHeadStyle}">
@@ -912,8 +912,8 @@ function buildScorecardHtml(evaluation) {
 
       ${evaluation.feedback ? `
         <div style="margin-top:25px;">
-          <h4 style="color:#1a73e8;">Overall Feedback</h4>
-          <p style="background-color:#f9f9f9; padding:12px; border-left:4px solid #1a73e8; border-radius:4px;">
+          <h4 style="color:#007298;">Overall Feedback</h4>
+          <p style="background-color:#f9f9f9; padding:12px; border-left:4px solid #007298; border-radius:4px;">
             ${evaluation.feedback}
           </p>
         </div>` : ''}
