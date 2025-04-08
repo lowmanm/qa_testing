@@ -1,4 +1,6 @@
 <script>
+let currentUserEmail = '';
+  
   document.addEventListener('DOMContentLoaded', () => {
   initializeApp();
   attachNavHandlers();
@@ -24,6 +26,7 @@
 
   function initializeApp() {
     google.script.run.withSuccessHandler(user => {
+      currentUserEmail = user.email; // ✅ Save current user
       document.getElementById('userName').textContent = user.name;
       document.getElementById('userRole').textContent = formatRole(user.role);
 
@@ -294,7 +297,7 @@ function showAddQuestionForm() {
   loadPendingTasks();       // default tab on load
 }
 
-  function loadPendingTasks() {
+function loadPendingTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
@@ -305,21 +308,32 @@ function showAddQuestionForm() {
     }
 
     const fragment = document.createDocumentFragment();
+
     audits.forEach(function(audit) {
       const row = document.createElement('tr');
+      const isLocked = audit.lockedBy && audit.lockedBy !== '';
+      const isLockedByUser = audit.lockedBy === currentUserEmail;
+
+      row.className = isLocked && !isLockedByUser ? 'row-locked' : '';
+
       row.innerHTML = `
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
         <td>${formatDate(audit.taskTimestamp)}</td>
         <td>
-  <span class="badge ${audit.auditStatus === 'misconfigured' ? 'badge-danger' : 'badge-' + audit.auditStatus}"
-        title="${audit.auditStatus === 'misconfigured' ? 'No questions configured for this task type' : audit.auditStatus}">
-    ${audit.auditStatus}
-  </span>
-</td>
+          ${isLocked
+            ? `<span class="badge badge-warning" title="Locked by ${audit.lockedBy}">
+                 ${isLockedByUser ? 'Locked by you' : 'Locked'}
+               </span>`
+            : `<span class="badge badge-pending">Pending</span>`}
+        </td>
         <td>
-          <button class="evaluate-button btn btn-sm btn-primary" data-audit-id="${audit.auditId}">Evaluate</button>
+          ${isLocked && !isLockedByUser
+            ? `<button class="btn btn-sm btn-secondary" disabled title="This audit is currently being evaluated by ${audit.lockedBy}">In Use</button>`
+            : `<button class="evaluate-button btn btn-sm btn-primary" data-audit-id="${audit.auditId}">
+                 ${isLockedByUser ? 'Resume' : 'Evaluate'}
+               </button>`}
         </td>
       `;
       fragment.appendChild(row);
@@ -329,13 +343,16 @@ function showAddQuestionForm() {
     tableBody.appendChild(fragment);
   }).getPendingAudits();
 
-  // Delegate event for all evaluate buttons
-  tableBody.addEventListener('click', function(event) {
-    if (event.target.classList.contains('evaluate-button')) {
-      const auditId = event.target.getAttribute('data-audit-id');
-      showEvaluationForm(auditId);
-    }
-  });
+  // ✅ Attach the event listener just once
+  if (!tableBody.hasListenerAttached) {
+    tableBody.addEventListener('click', function(event) {
+      if (event.target.classList.contains('evaluate-button')) {
+        const auditId = event.target.getAttribute('data-audit-id');
+        showEvaluationForm(auditId);
+      }
+    });
+    tableBody.hasListenerAttached = true;
+  }
 }
 
 function loadErrorTasks() {
