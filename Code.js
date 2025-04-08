@@ -80,8 +80,8 @@ function setupSpreadsheet() {
       'pointsEarned', 'pointsPossible', 'feedback'
     ],
     [SHEET_QUESTIONS]: [
-      'id', 'setId', 'taskType', 'questionText', 'pointsPossible',
-      'createdBy', 'createdTimestamp'
+      'id', 'sequenceId', 'setId', 'requestType', 'taskType',
+      'questionText', 'pointsPossible', 'createdBy', 'createdTimestamp', 'active'
     ],
     [SHEET_DISPUTES_QUEUE]: [
       'id', 'evalId', 'userEmail', 'disputeTimestamp', 'reason',
@@ -929,5 +929,95 @@ function getAuditField(sheet, auditId, columnName) {
 
   const row = data.find((r, i) => i > 0 && r[idIdx] === auditId);
   return row ? row[colIdx] : '';
+}
+
+function getUniqueTaskTypes() {
+  return getUniqueColumnValues(SHEET_AUDIT_QUEUE, 'taskType');
+}
+
+function getUniqueRequestTypes() {
+  return getUniqueColumnValues(SHEET_AUDIT_QUEUE, 'requestType');
+}
+
+function getUniqueColumnValues(sheetName, columnName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const colIdx = headers.indexOf(columnName);
+
+  return data
+    .slice(1)
+    .map(row => row[colIdx])
+    .filter(v => v)
+    .filter((v, i, arr) => arr.indexOf(v) === i)
+    .sort();
+}
+
+function saveQuestion(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+  const headers = sheet.getDataRange().getValues()[0];
+
+  const id = `q_${Date.now()}`;
+  const sequenceId = Number(data.sequenceId || 0);
+  const setId = `${data.requestType}_${data.taskType}`.toLowerCase().replace(/\s+/g, '_');
+  const createdBy = Session.getActiveUser().getEmail();
+  const createdTimestamp = new Date().toISOString();
+
+  const row = [
+    id,                          // id
+    sequenceId,                  // sequenceId
+    setId,                       // setId
+    data.requestType,            // requestType
+    data.taskType,               // taskType
+    data.questionText,           // questionText
+    Number(data.pointsPossible), // pointsPossible
+    createdBy,                   // createdBy
+    createdTimestamp,            // createdTimestamp
+    true                         // active
+  ];
+
+  sheet.appendRow(row);
+  return { success: true, id };
+}
+
+function getQuestionsBySet(requestType, taskType) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const questions = data.slice(1)
+    .filter(row => row[headers.indexOf('active')])
+    .filter(row =>
+      row[headers.indexOf('requestType')] === requestType &&
+      row[headers.indexOf('taskType')] === taskType
+    )
+    .sort((a, b) => a[headers.indexOf('sequenceId')] - b[headers.indexOf('sequenceId')])
+    .map(row => ({
+      id: row[headers.indexOf('id')],
+      sequenceId: row[headers.indexOf('sequenceId')],
+      setId: row[headers.indexOf('setId')],
+      requestType: row[headers.indexOf('requestType')],
+      taskType: row[headers.indexOf('taskType')],
+      questionText: row[headers.indexOf('questionText')],
+      pointsPossible: row[headers.indexOf('pointsPossible')],
+      active: row[headers.indexOf('active')]
+    }));
+
+  return questions;
+}
+
+function toggleQuestionActive(questionId, status) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIdx = headers.indexOf('id');
+  const activeIdx = headers.indexOf('active');
+
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === questionId);
+  if (rowIndex !== -1) {
+    sheet.getRange(rowIndex + 1, activeIdx + 1).setValue(status);
+    return { success: true };
+  }
+  return { success: false, error: 'Question not found' };
 }
 
