@@ -320,9 +320,10 @@ function showAdminTab(tabId) {
 
   // ✅ Load dynamic dropdowns when opening the Questions tab
   if (tabId === 'adminQuestionsView') {
+  loadQuestionFilters();     // ✅ Populate filters
   loadQuestionFormDropdowns();
-  loadQuestions(); // ✅ This triggers rendering
-  }
+  loadQuestions();           // ✅ Load questions list
+}
 }
 
   function loadQuestionFormDropdowns() {
@@ -334,6 +335,37 @@ function showAdminTab(tabId) {
     .withSuccessHandler(populateTaskTypeOptions)
     .getUniqueTaskTypes();
 }
+
+  function loadQuestionFilters() {
+  google.script.run.withSuccessHandler(types => {
+    const dropdown = document.getElementById('taskTypeFilter');
+    dropdown.innerHTML = '<option value="">All Types</option>';
+    types.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      dropdown.appendChild(opt);
+    });
+  }).getUniqueTaskTypes();
+
+  google.script.run.withSuccessHandler(types => {
+    const dropdown = document.getElementById('requestTypeFilter');
+    dropdown.innerHTML = '<option value="">All Requests</option>';
+    types.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      dropdown.appendChild(opt);
+    });
+  }).getUniqueRequestTypes();
+}
+  
+/*
+This ensures the table refreshes whenever a filter is changed.
+*/
+document.getElementById('taskTypeFilter').addEventListener('change', loadQuestions);
+document.getElementById('requestTypeFilter').addEventListener('change', loadQuestions);
+
 
   function populateRequestTypeOptions(types) {
   const dropdown = document.getElementById('requestTypeDropdown');
@@ -1379,21 +1411,28 @@ function handleQuestionFormSubmit(e) {
     .saveQuestion(data);
 }
 
-  function renderQuestionTable(questions) {
-  console.log("✅ renderQuestionTable called with", questions.length, "questions");
+function renderQuestionTable(questions) {
   const tbody = document.getElementById('questionListBody');
   if (!tbody) return;
 
-  tbody.innerHTML = ''; // Clear existing rows
+  const taskFilter = document.getElementById('taskTypeFilter').value;
+  const requestFilter = document.getElementById('requestTypeFilter').value;
 
-  if (questions.length === 0) {
+  const filtered = questions.filter(q => {
+    const matchTask = !taskFilter || q.taskType === taskFilter;
+    const matchRequest = !requestFilter || q.requestType === requestFilter;
+    return matchTask && matchRequest;
+  });
+
+  tbody.innerHTML = '';
+
+  if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No questions available</td></tr>';
     return;
   }
 
-  questions.forEach(q => {
+  filtered.forEach(q => {
     const row = document.createElement('tr');
-
     row.innerHTML = `
       <td>${q.sequenceId || ''}</td>
       <td>${q.requestType || ''}</td>
@@ -1401,16 +1440,12 @@ function handleQuestionFormSubmit(e) {
       <td>${q.questionText || ''}</td>
       <td>${q.pointsPossible || ''}</td>
       <td>
-        <input type="checkbox"
-               class="toggle-active"
-               data-id="${q.id}"
-               ${q.active ? 'checked' : ''}>
+        <input type="checkbox" class="toggle-active" data-id="${q.id}" ${q.active ? 'checked' : ''}>
       </td>
       <td>
         <button class="btn btn-sm btn-primary" data-id="${q.id}" data-action="edit">Edit</button>
       </td>
     `;
-
     tbody.appendChild(row);
   });
 }
