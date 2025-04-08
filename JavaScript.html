@@ -531,7 +531,7 @@ function showEvaluationForm(auditId) {
           <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(audit.taskType)}</p></div>
           <div><p class="field-label">Reference Number</p><p class="field-value">${audit.referenceNumber || 'N/A'}</p></div>
           <div><p class="field-label">Date</p><p class="field-value">${formatDate(audit.taskTimestamp)}</p></div>
-          <div><p class="field-label">Request Type</p><p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p></div>
+          <div><p class="field-label">Request Type</p><p class="field-value">${escapeHTML(audit.requestType || 'N/A')}</p></div>
           <div><p class="field-label">Outcome</p><p class="field-value">${audit.outcome || 'N/A'}</p></div>
         </div>
       `;
@@ -543,7 +543,7 @@ function showEvaluationForm(auditId) {
       form.setAttribute('data-outcome', audit.outcome || '');
 
       // Load relevant questions
-      loadQuestionsForEvaluation(audit.taskType);
+      loadQuestionsForEvaluation(audit);
     })
     .withFailureHandler(function(error) {
       showToast(error.message || 'This audit is currently locked by another user.', 'warning');
@@ -556,14 +556,14 @@ function showEvaluationForm(auditId) {
   
   let toastShown = false;
 
-function loadQuestionsForEvaluation(taskType, attempt = 1) {
+function loadQuestionsForEvaluation(audit, attempt = 1) {
   const maxRetries = 5;
   const questionsContainer = document.getElementById('questions');
   const form = document.getElementById('evaluationForm');
 
   if (!questionsContainer) {
     if (attempt < maxRetries) {
-      return setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
+      return setTimeout(() => loadQuestionsForEvaluation(audit, attempt + 1), 300);
     } else {
       alert('Failed to load questions. Please return to the Audit Queue and try again.');
       return;
@@ -572,17 +572,17 @@ function loadQuestionsForEvaluation(taskType, attempt = 1) {
 
   questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
 
-  google.script.run.withSuccessHandler(function(questions) {
+  google.script.run.withSuccessHandler(function (questions) {
     let maxPossibleScore = 0;
     questionsContainer.innerHTML = '';
 
     if (questions.length === 0) {
       if (!toastShown) {
-        showToast("No evaluation questions are set up for this task type.", 'error');
+        showToast("No evaluation questions are set up for this request + task type.", 'error');
         toastShown = true;
       }
       markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
-      showAuditQueue(); // return user to queue
+      showAuditQueue();
       return;
     }
 
@@ -616,7 +616,7 @@ function loadQuestionsForEvaluation(taskType, attempt = 1) {
 
     form.setAttribute('data-max-score', maxPossibleScore);
     form.classList.remove('disabled');
-  }).getQuestionsForTaskType(taskType);
+  }).getQuestionsBySet(audit.requestType, audit.taskType);
 }
 
 function markAuditAsMisconfigured(auditId) {
