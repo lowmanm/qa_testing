@@ -1311,11 +1311,13 @@ function deleteUser(userId) {
     .deleteUser(userId);
 }
 
-  function loadQuestions() {
+function loadQuestions() {
+  console.log("🔄 loadQuestions triggered");
   google.script.run
     .withSuccessHandler(renderQuestionTable)
     .getAllQuestions();
 }
+
 
 function showQuestionForm(question = null) {
   // Load fresh dropdowns every time
@@ -1337,9 +1339,11 @@ function showQuestionForm(question = null) {
 
 
 function hideQuestionForm() {
-  document.getElementById('questionForm').reset();
+  const form = document.getElementById('questionForm');
+  form.reset();
   document.getElementById('questionFormView').classList.add('hidden');
 }
+
 
 function handleQuestionFormSubmit(e) {
   e.preventDefault();
@@ -1372,6 +1376,7 @@ function handleQuestionFormSubmit(e) {
 }
 
   function renderQuestionTable(questions) {
+  console.log("✅ renderQuestionTable called with", questions.length, "questions");
   const tbody = document.getElementById('questionListBody');
   if (!tbody) return;
 
