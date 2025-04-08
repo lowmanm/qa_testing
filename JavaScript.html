@@ -144,7 +144,21 @@ function attachAuditTabHandlers() {
   function attachFormHandlers() {
   const cancelEval = document.getElementById('cancelEvaluation');
   const evalForm = document.getElementById('evaluationForm');
-  if (cancelEval) cancelEval.addEventListener('click', showAuditQueue);
+  if (cancelEval) {
+  cancelEval.addEventListener('click', () => {
+    const form = document.getElementById('evaluationForm');
+    const auditId = form.getAttribute('data-audit-id');
+
+    if (auditId) {
+      // Unlock the audit before navigating away
+      google.script.run.updateAuditStatusAndLock(auditId, 'pending');
+    }
+
+    resetEvaluationForm();  // optional: clear form
+    showAuditQueue();
+  });
+}
+
   if (evalForm) evalForm.addEventListener('submit', handleEvaluationSubmit);
 
   const cancelDispute = document.getElementById('cancelDispute');
@@ -617,9 +631,11 @@ function markAuditAsMisconfigured(auditId) {
     .saveEvaluation(evaluationData);
 }
 
-  function resetEvaluationForm() {
+function resetEvaluationForm() {
   const form = document.getElementById('evaluationForm');
-  form.reset();
+  if (!form) return;
+
+  form.reset(); // Clear all inputs
 
   const questionsContainer = document.getElementById('questions');
   if (questionsContainer) questionsContainer.innerHTML = '';
@@ -627,10 +643,19 @@ function markAuditAsMisconfigured(auditId) {
   const feedbackField = document.getElementById('feedback');
   if (feedbackField) feedbackField.value = '';
 
+  // Remove audit-specific metadata
   ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr =>
     form.removeAttribute(attr)
   );
+
+  // Hide the evaluation form view (optional, but improves UX)
+  document.getElementById('evaluationFormView')?.classList.add('hidden');
+
+  // Remove loading indicator if still present
+  document.getElementById('evaluationLoadingIndicator')?.remove();
 }
+
+
 
   function loadEvaluations() {
   const tableBody = document.getElementById('evaluationsBody');
