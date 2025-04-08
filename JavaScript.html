@@ -413,7 +413,7 @@ function loadErrorTasks() {
   });
 }
 
-  function showEvaluationForm(auditId) {
+function showEvaluationForm(auditId) {
   hideAllViews();
   document.getElementById('evaluationFormView').classList.remove('hidden');
 
@@ -431,29 +431,37 @@ function loadErrorTasks() {
   ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr => form.removeAttribute(attr));
 
   // Fetch and render new audit
-  google.script.run.withSuccessHandler(function(audit) {
-    taskDetails.innerHTML = `
-      <div class="grid-2">
-        <div><p class="field-label">Agent</p><p class="field-value">${audit.agentEmail}</p></div>
-        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(audit.taskType)}</p></div>
-        <div><p class="field-label">Reference Number</p><p class="field-value">${audit.referenceNumber || 'N/A'}</p></div>
-        <div><p class="field-label">Date</p><p class="field-value">${formatDate(audit.taskTimestamp)}</p></div>
-        <div><p class="field-label">Request Type</p><p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p></div>
-        <div><p class="field-label">Outcome</p><p class="field-value">${audit.outcome || 'N/A'}</p></div>
-      </div>
-    `;
+  google.script.run
+    .withSuccessHandler(function(audit) {
+      taskDetails.innerHTML = `
+        <div class="grid-2">
+          <div><p class="field-label">Agent</p><p class="field-value">${audit.agentEmail}</p></div>
+          <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(audit.taskType)}</p></div>
+          <div><p class="field-label">Reference Number</p><p class="field-value">${audit.referenceNumber || 'N/A'}</p></div>
+          <div><p class="field-label">Date</p><p class="field-value">${formatDate(audit.taskTimestamp)}</p></div>
+          <div><p class="field-label">Request Type</p><p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p></div>
+          <div><p class="field-label">Outcome</p><p class="field-value">${audit.outcome || 'N/A'}</p></div>
+        </div>
+      `;
 
-    // Form metadata
-    form.setAttribute('data-audit-id', auditId);
-    form.setAttribute('data-reference-number', audit.referenceNumber || '');
-    form.setAttribute('data-task-type', audit.taskType || '');
-    form.setAttribute('data-outcome', audit.outcome || '');
+      // Form metadata
+      form.setAttribute('data-audit-id', auditId);
+      form.setAttribute('data-reference-number', audit.referenceNumber || '');
+      form.setAttribute('data-task-type', audit.taskType || '');
+      form.setAttribute('data-outcome', audit.outcome || '');
 
-    // Load relevant questions
-    loadQuestionsForEvaluation(audit.taskType);
-  }).prepareEvaluation(auditId);
+      // Load relevant questions
+      loadQuestionsForEvaluation(audit.taskType);
+    })
+    .withFailureHandler(function(error) {
+      showToast(error.message || 'This audit is currently locked by another user.', 'warning');
+      resetEvaluationForm();
+      showAuditQueue();
+      loadPendingTasks();
+    })
+    .prepareEvaluation(auditId);
 }
-
+  
   let toastShown = false;
 
 function loadQuestionsForEvaluation(taskType, attempt = 1) {
