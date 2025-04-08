@@ -7,6 +7,7 @@ let currentUserEmail = '';
   attachFormHandlers();
   attachAdminHandlers();
   attachDisputeHandlers();
+  attachQuestionFormHandler();
 });
 
   function showToast(message, type = 'info') {
@@ -85,6 +86,22 @@ function attachAuditTabHandlers() {
 
   form.addEventListener('submit', handleResolveDisputeSubmit);
 }
+
+function attachQuestionFormHandler() {
+  const form = document.getElementById('questionForm');
+  if (!form) return;
+
+  // Prevent multiple bindings
+  form.removeEventListener('submit', handleQuestionFormSubmit); 
+  form.addEventListener('submit', handleQuestionFormSubmit);
+
+  // Cancel button logic
+  document.getElementById('cancelQuestion')?.addEventListener('click', () => {
+    form.reset();
+    document.getElementById('questionFormView').classList.add('hidden');
+  });
+}
+
 
   function showDashboard() {
     hideAllViews();
@@ -1342,6 +1359,7 @@ function deleteUser(userId) {
 function showQuestionForm(question = null) {
   // Load fresh dropdowns every time
   loadQuestionFormDropdowns();
+  attachQuestionFormHandler();
 
   const isEdit = !!question;
   document.getElementById('questionFormTitle').textContent = isEdit ? 'Edit Question' : 'Add Question';
