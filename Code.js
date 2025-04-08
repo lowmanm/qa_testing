@@ -963,18 +963,32 @@ function getQuestionsBySet(requestType, taskType) {
   return questions;
 }
 
-function toggleQuestionActive(questionId, status) {
+function getQuestionById(id) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIdx = headers.indexOf('id');
+
+  const row = data.find((r, i) => i > 0 && r[idIdx] === id);
+  if (!row) return null;
+
+  const obj = {};
+  headers.forEach((h, i) => obj[h] = row[i]);
+  return obj;
+}
+
+function toggleQuestionActive(id, isActive) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idIdx = headers.indexOf('id');
   const activeIdx = headers.indexOf('active');
 
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === questionId);
-  if (rowIndex !== -1) {
-    sheet.getRange(rowIndex + 1, activeIdx + 1).setValue(status);
-    return { success: true };
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === id) {
+      sheet.getRange(i + 1, activeIdx + 1).setValue(isActive);
+      break;
+    }
   }
-  return { success: false, error: 'Question not found' };
 }
 
