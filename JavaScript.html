@@ -1490,6 +1490,19 @@ function formatTaskType(type) {
   return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+function escapeHTML(str) {
+  if (!str) return '';
+  return str.replace(/[&<>"']/g, function (char) {
+    return ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    })[char];
+  });
+}
+
   function formatDate(dateStr) {
   if (!dateStr) return 'Unknown';
   const date = new Date(dateStr);
