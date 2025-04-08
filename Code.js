@@ -275,18 +275,6 @@ function getAllQuestions() {
 }
 
 /**
- * Retrieves questions for a specific task type.
- */
-function getQuestionsForTaskType(taskType) {
-  const cacheKey = 'questions_' + taskType;
-  return getCachedOrFetch(cacheKey, () => {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-    const data = getSheetDataAsObjects(sheet);
-    return data.filter(q => q.taskType === taskType);
-  });
-}
-
-/**
  * Marks an audit as misconfigured.
  */
 function markAuditAsMisconfigured(auditId) {
@@ -311,37 +299,6 @@ function markAuditAsMisconfigured(auditId) {
   }
 
   throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
-}
-
-/**
- * Creates a new question and adds to the questions sheet.
- */
-function createQuestion(questionData) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-
-  if (!questionData.id) {
-    questionData.id = 'q' + Date.now() + '-' + questionData.taskType;
-  }
-
-  questionData.createdTimestamp = new Date().toISOString();
-  questionData.createdBy = questionData.createdBy || Session.getActiveUser().getEmail() || 'system';
-
-  if (!questionData.setId) {
-    const data = sheet.getDataRange().getValues();
-    const headers = data.shift();
-    const setIdIdx = headers.indexOf('setId');
-    const taskTypeIdx = headers.indexOf('taskType');
-
-    const setIds = [...new Set(data.filter(r => r[taskTypeIdx] === questionData.taskType).map(r => r[setIdIdx]))];
-    questionData.setId = setIds.length > 0 ? setIds[0] : 'set' + (Date.now() % 1000);
-  }
-
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const row = headers.map(h => questionData[h] || '');
-  sheet.appendRow(row);
-
-  CacheService.getScriptCache().remove('all_questions');
-  return questionData;
 }
 
 /**
