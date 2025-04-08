@@ -1412,27 +1412,55 @@ function handleQuestionFormSubmit(e) {
 
   function renderQuestionTable(questions) {
   const tbody = document.getElementById('questionListBody');
+  if (!tbody) return;
+
   tbody.innerHTML = ''; // Clear existing rows
+
+  if (questions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No questions available</td></tr>';
+    return;
+  }
 
   questions.forEach(q => {
     const row = document.createElement('tr');
+
     row.innerHTML = `
-      <td>${q.sequenceId}</td>
-      <td>${q.requestType}</td>
-      <td>${q.taskType}</td>
-      <td>${q.questionText}</td>
-      <td>${q.pointsPossible}</td>
+      <td>${q.sequenceId || ''}</td>
+      <td>${q.requestType || ''}</td>
+      <td>${q.taskType || ''}</td>
+      <td>${q.questionText || ''}</td>
+      <td>${q.pointsPossible || ''}</td>
       <td>
-        <input type="checkbox" ${q.active ? 'checked' : ''} 
-               data-id="${q.id}" 
-               class="toggle-active" 
-               title="Toggle Active Status">
+        <input type="checkbox"
+               class="toggle-active"
+               data-id="${q.id}"
+               ${q.active ? 'checked' : ''}>
       </td>
       <td>
         <button class="btn btn-sm btn-primary" data-id="${q.id}" data-action="edit">Edit</button>
       </td>
     `;
+
     tbody.appendChild(row);
+  });
+}
+
+const questionTableBody = document.getElementById('questionListBody');
+if (questionTableBody) {
+  questionTableBody.addEventListener('click', function (e) {
+    const target = e.target;
+    const id = target.getAttribute('data-id');
+
+    if (target.classList.contains('toggle-active')) {
+      const isActive = target.checked;
+      google.script.run.toggleQuestionActive(id, isActive);
+    }
+
+    if (target.getAttribute('data-action') === 'edit') {
+      google.script.run
+        .withSuccessHandler(showQuestionForm)
+        .getQuestionById(id);
+    }
   });
 }
 
