@@ -607,13 +607,19 @@ function saveEvaluation(data) {
   updateAuditStatus(data.evalId || data.auditId, 'evaluated');
   CacheService.getScriptCache().removeAll(['all_evaluations', 'all_audits']);
 
-  return {
+  const evaluation = {
     id: evalId,
     ...data,
     stopTimestamp: stopTime,
     evalScore: score,
     questions: data.questions
   };
+
+  // ✅ Send the notification
+  sendEvaluationNotification(evaluation);
+
+  // ✅ Return the evaluation object
+  return evaluation;
 }
 
 function updateEvaluationStatus(evalId, status) {
@@ -824,3 +830,92 @@ function getDisputeStats() {
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
+
+function sendEvaluationNotification(evaluation) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = ss.getSheetByName('users');
+  const auditsSheet = ss.getSheetByName('auditQueue');
+
+  const usersData = usersSheet.getDataRange().getValues();
+  const userHeaders = usersData[0];
+  const emailIdx = userHeaders.indexOf('email');
+  const managerIdx = userHeaders.indexOf('managerEmail');
+
+  const agentEmail = getAuditField(auditsSheet, evaluation.auditId, 'agentEmail');
+  const agentRow = usersData.find(row => row[emailIdx] === agentEmail);
+  const managerEmail = agentRow ? row[managerIdx] : '';
+
+  const html = buildScorecardHtml(evaluation);
+  const subject = `Evaluation Completed: ${evaluation.referenceNumber || 'N/A'}`;
+
+  const recipients = [agentEmail, managerEmail].filter(Boolean).join(',');
+
+  MailApp.sendEmail({
+    to: recipients,
+    subject,
+    htmlBody: html
+  });
+}
+
+function buildScorecardHtml(evaluation) {
+  const scorePercentage = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
+
+  let questionHtml = '';
+  evaluation.questions.forEach(q => {
+    const highlight = q.response === 'no' ? 'background-color:#ffe6e6;' : '';
+    questionHtml += `
+      <tr style="${highlight}">
+        <td style="padding:8px;">${q.questionText}</td>
+        <td style="padding:8px;text-align:center;">${q.response.toUpperCase()}</td>
+        <td style="padding:8px;text-align:center;">${q.pointsEarned}/${q.pointsPossible}</td>
+        <td style="padding:8px;">${q.feedback || ''}</td>
+      </tr>
+    `;
+  });
+
+  return `
+    <div style="font-family:Arial,sans-serif;font-size:14px;color:#333;">
+      <h2 style="color:#0066cc;">Evaluation Summary</h2>
+      <table style="border-collapse:collapse;margin-bottom:20px;">
+        <tr><td><strong>Reference Number:</strong></td><td>${evaluation.referenceNumber || 'N/A'}</td></tr>
+        <tr><td><strong>Task Type:</strong></td><td>${evaluation.taskType || 'N/A'}</td></tr>
+        <tr><td><strong>Outcome:</strong></td><td>${evaluation.outcome || 'N/A'}</td></tr>
+        <tr><td><strong>Score:</strong></td><td>${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</td></tr>
+        <tr><td><strong>Evaluator:</strong></td><td>${evaluation.qaEmail || 'QA Team'}</td></tr>
+        <tr><td><strong>Date:</strong></td><td>${new Date(evaluation.stopTimestamp || evaluation.startTimestamp).toLocaleDateString()}</td></tr>
+      </table>
+
+      <h3 style="color:#0066cc;">Evaluation Details</h3>
+      <table style="border-collapse:collapse;width:100%;border:1px solid #ccc;">
+        <thead style="background-color:#f0f0f0;">
+          <tr>
+            <th style="padding:8px;text-align:left;">Question</th>
+            <th style="padding:8px;text-align:center;">Response</th>
+            <th style="padding:8px;text-align:center;">Score</th>
+            <th style="padding:8px;text-align:left;">Feedback</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${questionHtml}
+        </tbody>
+      </table>
+
+      ${evaluation.feedback ? `
+        <div style="margin-top:20px;">
+          <h4>Overall Feedback</h4>
+          <p>${evaluation.feedback}</p>
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function getAuditField(sheet, auditId, columnName) {
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIdx = headers.indexOf('auditId');
+  const colIdx = headers.indexOf(columnName);
+
+  const row = data.find((r, i) => i > 0 && r[idIdx] === auditId);
+  return row ? row[colIdx] : '';
+}
+
