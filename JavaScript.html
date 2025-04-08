@@ -1376,7 +1376,8 @@ function showQuestionForm(question = null) {
 
 
 function hideQuestionForm() {
-  document.getElementById('questionForm').classList.add('hidden');
+  document.getElementById('questionForm').reset();
+  document.getElementById('questionFormView').classList.add('hidden');
 }
 
 function handleQuestionFormSubmit(e) {
