@@ -66,8 +66,10 @@ function setupSpreadsheet() {
     [SHEET_USERS]: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl'],
     [SHEET_AUDIT_QUEUE]: [
       'auditId', 'taskId', 'referenceNumber', 'auditStatus', 'agentEmail',
-      'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp', 'locked'
+      'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp',
+      'lockedBy', 'lockedAt'
     ],
+
     [SHEET_EVAL_SUMMARY]: [
       'id', 'evalId', 'referenceNumber', 'taskType', 'outcome',
       'qaEmail', 'startTimestamp', 'stopTimestamp', 'totalPoints',
@@ -437,18 +439,57 @@ function updateAuditStatusAndLock(auditId, status) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
+
   const idIdx = headers.indexOf('auditId');
   const statusIdx = headers.indexOf('auditStatus');
-  const lockedIdx = headers.indexOf('locked');
+  const lockedByIdx = headers.indexOf('lockedBy');
+  const lockedAtIdx = headers.indexOf('lockedAt');
 
   const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === auditId);
   if (rowIndex === -1) throw new Error('Audit not found');
 
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(status);
-  sheet.getRange(rowIndex + 1, lockedIdx + 1).setValue(status === 'evaluated' ? false : true);
+  sheet.getRange(rowIndex + 1, lockedByIdx + 1).setValue('');
+  sheet.getRange(rowIndex + 1, lockedAtIdx + 1).setValue('');
+
   CacheService.getScriptCache().remove('all_audits');
 
   return { success: true };
+}
+
+/*
+Automatically unlocks audits stuck "In Process" for too long.
+{time-driven trigger}
+*/
+function unlockStaleAudits() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const statusIdx = headers.indexOf('auditStatus');
+  const lockedByIdx = headers.indexOf('lockedBy');
+  const lockedAtIdx = headers.indexOf('lockedAt');
+
+  const now = new Date();
+
+  for (let i = 1; i < data.length; i++) {
+    const status = data[i][statusIdx];
+    const lockedBy = data[i][lockedByIdx];
+    const lockedAtRaw = data[i][lockedAtIdx];
+
+    if (status === 'In Process' && lockedBy && lockedAtRaw) {
+      const lockedAt = new Date(lockedAtRaw);
+      const minutesLocked = (now - lockedAt) / 60000;
+
+      if (minutesLocked > 30) {
+        sheet.getRange(i + 1, statusIdx + 1).setValue('pending');
+        sheet.getRange(i + 1, lockedByIdx + 1).setValue('');
+        sheet.getRange(i + 1, lockedAtIdx + 1).setValue('');
+      }
+    }
+  }
+
+  CacheService.getScriptCache().remove('all_audits');
 }
 
 /**
@@ -460,29 +501,30 @@ function prepareEvaluation(auditId) {
   const headers = data[0];
 
   const idIdx = headers.indexOf('auditId');
-  const lockedIdx = headers.indexOf('locked');
+  const lockedByIdx = headers.indexOf('lockedBy');
+  const lockedAtIdx = headers.indexOf('lockedAt');
   const statusIdx = headers.indexOf('auditStatus');
-  const timestampIdx = headers.indexOf('auditTimestamp');
 
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === auditId);
+  const rowIndex = data.findIndex((row, i) => i > 0 && row[idIdx] === auditId);
   if (rowIndex === -1) throw new Error('Audit not found');
 
-  const isLocked = data[rowIndex][lockedIdx];
-  if (isLocked === true || isLocked === 'TRUE') {
+  const lockedBy = data[rowIndex][lockedByIdx];
+  if (lockedBy && lockedBy !== '') {
     throw new Error('This audit is currently being evaluated by another user.');
   }
 
-  // Mark as in process and lock it
+  const userEmail = Session.getActiveUser().getEmail();
+  const now = new Date().toISOString();
+
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue('In Process');
-  sheet.getRange(rowIndex + 1, lockedIdx + 1).setValue(true);
-  sheet.getRange(rowIndex + 1, timestampIdx + 1).setValue(new Date()); // Update timestamp for timeout unlocks
+  sheet.getRange(rowIndex + 1, lockedByIdx + 1).setValue(userEmail);
+  sheet.getRange(rowIndex + 1, lockedAtIdx + 1).setValue(now);
 
   CacheService.getScriptCache().remove('all_audits');
 
   const audits = getAllAudits();
   return audits.find(a => a.auditId === auditId);
 }
-
 
 // ====================
 // Evaluations Module
