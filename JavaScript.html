@@ -1313,11 +1313,11 @@ function deleteUser(userId) {
 
 function loadQuestions() {
   console.log("🔄 loadQuestions triggered");
+
   google.script.run
     .withSuccessHandler(renderQuestionTable)
     .getAllQuestions();
 }
-
 
 function showQuestionForm(question = null) {
   // Load fresh dropdowns every time
@@ -1342,13 +1342,14 @@ function hideQuestionForm() {
   const form = document.getElementById('questionForm');
   form.reset();
   document.getElementById('questionFormView').classList.add('hidden');
-}
 
+  console.log("🔄 Reloading questions from hideQuestionForm()");
+  loadQuestions(); // ✅ ensure this is always run
+}
 
 function handleQuestionFormSubmit(e) {
   e.preventDefault();
 
-  const form = document.getElementById('questionForm');
   const id = document.getElementById('questionId').value;
   const sequenceId = parseInt(document.getElementById('sequenceId').value);
   const requestType = document.getElementById('requestTypeDropdown').value;
@@ -1363,13 +1364,16 @@ function handleQuestionFormSubmit(e) {
 
   const data = { id, sequenceId, requestType, taskType, questionText, pointsPossible };
 
+  console.log("🚀 Saving question:", data); // debug log
+
   google.script.run
     .withSuccessHandler(() => {
+      console.log("✅ Question saved successfully");
+      hideQuestionForm(); // <-- we’ll add loadQuestions() in here next
       showToast(`Question ${id ? 'updated' : 'created'} successfully.`, 'success');
-      hideQuestionForm();
-      loadQuestions();
     })
     .withFailureHandler(err => {
+      console.error("❌ Error saving question:", err.message);
       showToast("Error saving question: " + err.message, 'error');
     })
     .saveQuestion(data);
