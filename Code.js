@@ -833,8 +833,8 @@ function toTitleCase(str) {
 
 function sendEvaluationNotification(evaluation) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const usersSheet = ss.getSheetByName('users');
-  const auditsSheet = ss.getSheetByName('auditQueue');
+  const usersSheet = ss.getSheetByName(SHEET_USERS);
+  const auditsSheet = ss.getSheetByName(SHEET_AUDIT_QUEUE);
 
   const usersData = usersSheet.getDataRange().getValues();
   const userHeaders = usersData[0];
@@ -843,17 +843,17 @@ function sendEvaluationNotification(evaluation) {
 
   const agentEmail = getAuditField(auditsSheet, evaluation.auditId, 'agentEmail');
   const agentRow = usersData.find(row => row[emailIdx] === agentEmail);
-  const managerEmail = agentRow ? row[managerIdx] : '';
+  const managerEmail = agentRow ? agentRow[managerIdx] : '';
 
   const html = buildScorecardHtml(evaluation);
-  const subject = `Evaluation Completed: ${evaluation.referenceNumber || 'N/A'}`;
+  const stopTime = new Date(evaluation.stopTimestamp).toLocaleString();
+  const subject = `Evaluation has been completed for ${evaluation.referenceNumber || 'N/A'} at ${stopTime}`;
 
-  const recipients = [agentEmail, managerEmail].filter(Boolean).join(',');
-
-  MailApp.sendEmail({
-    to: recipients,
-    subject,
-    htmlBody: html
+  GmailApp.sendEmail(agentEmail, subject, '', {
+    htmlBody: html,
+    cc: managerEmail || '',
+    name: 'QA Team',
+    replyTo: 'qa-team@equifax.com'
   });
 }
 
