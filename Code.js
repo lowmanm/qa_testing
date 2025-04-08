@@ -853,7 +853,8 @@ function sendEvaluationNotification(evaluation) {
     htmlBody: html,
     cc: managerEmail || '',
     name: 'QA Team',
-    replyTo: 'qa-team@equifax.com'
+    replyTo: 'qa-team@equifax.com',
+    noReply: true
   });
 }
 
