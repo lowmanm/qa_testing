@@ -320,7 +320,8 @@ function showAdminTab(tabId) {
 
   // ✅ Load dynamic dropdowns when opening the Questions tab
   if (tabId === 'adminQuestionsView') {
-    loadQuestionFormDropdowns();
+  loadQuestionFormDropdowns();
+  loadQuestions(); // ✅ This triggers rendering
   }
 }
 
@@ -1311,49 +1312,9 @@ function deleteUser(userId) {
 }
 
   function loadQuestions() {
-  const tableBody = document.getElementById('questionListBody');
-  tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Loading...</td></tr>';
-
-  const filter = document.getElementById('taskTypeFilter').value;
-
-  google.script.run.withSuccessHandler(function(questions) {
-    const filtered = filter ? questions.filter(q => q.taskType === filter) : questions;
-
-    if (!filtered.length) {
-      tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500">No questions found${filter ? ' for this task type' : ''}</td></tr>`;
-      return;
-    }
-
-    tableBody.innerHTML = '';
-    filtered.forEach(q => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${q.questionText}</td>
-        <td>${formatTaskType(q.taskType)}</td>
-        <td>${q.pointsPossible}</td>
-        <td>
-          <button class="edit-question-button btn btn-sm btn-primary" data-question-id="${q.id}">Edit</button>
-          <button class="delete-question-button btn btn-sm btn-danger" data-question-id="${q.id}">Delete</button>
-        </td>
-      `;
-      tableBody.appendChild(row);
-    });
-
-    document.querySelectorAll('.edit-question-button').forEach(btn =>
-      btn.addEventListener('click', () => {
-        const qid = btn.getAttribute('data-question-id');
-        const question = filtered.find(q => q.id === qid);
-        showQuestionForm(question);
-      })
-    );
-
-    document.querySelectorAll('.delete-question-button').forEach(btn =>
-      btn.addEventListener('click', () => {
-        const qid = btn.getAttribute('data-question-id');
-        if (confirm('Delete this question?')) deleteQuestion(qid);
-      })
-    );
-  }).getAllQuestions();
+  google.script.run
+    .withSuccessHandler(renderQuestionTable)
+    .getAllQuestions();
 }
 
 function showQuestionForm(question = null) {
