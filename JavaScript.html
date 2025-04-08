@@ -1410,6 +1410,33 @@ function handleQuestionFormSubmit(e) {
     .saveQuestion(data);
 }
 
+  function renderQuestionTable(questions) {
+  const tbody = document.getElementById('questionListBody');
+  tbody.innerHTML = ''; // Clear existing rows
+
+  questions.forEach(q => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${q.sequenceId}</td>
+      <td>${q.requestType}</td>
+      <td>${q.taskType}</td>
+      <td>${q.questionText}</td>
+      <td>${q.pointsPossible}</td>
+      <td>
+        <input type="checkbox" ${q.active ? 'checked' : ''} 
+               data-id="${q.id}" 
+               class="toggle-active" 
+               title="Toggle Active Status">
+      </td>
+      <td>
+        <button class="btn btn-sm btn-primary" data-id="${q.id}" data-action="edit">Edit</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+  
 function deleteQuestion(qid) {
   google.script.run
     .withSuccessHandler(() => {
