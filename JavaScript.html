@@ -288,19 +288,61 @@ function showAddQuestionForm() {
     hideUserForm();
   }
 
-  function showAdminTab(tabId) {
-    document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.add('hidden'));
-    document.getElementById(tabId)?.classList.remove('hidden');
+function showAdminTab(tabId) {
+  document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.add('hidden'));
+  document.getElementById(tabId)?.classList.remove('hidden');
 
-    document.querySelectorAll('.admin-tab-item').forEach(tab => tab.classList.remove('active'));
-    const tabButtonMap = {
-      'adminUsersView': 'adminUsers',
-      'adminQuestionsView': 'adminQuestions',
-      'adminSettingsView': 'adminSettings'
-    };
-    const activeBtn = tabButtonMap[tabId];
-    document.getElementById(activeBtn)?.classList.add('active');
+  document.querySelectorAll('.admin-tab-item').forEach(tab => tab.classList.remove('active'));
+  const tabButtonMap = {
+    'adminUsersView': 'adminUsers',
+    'adminQuestionsView': 'adminQuestions',
+    'adminSettingsView': 'adminSettings'
+  };
+  const activeBtn = tabButtonMap[tabId];
+  document.getElementById(activeBtn)?.classList.add('active');
+
+  // ✅ Load dynamic dropdowns when opening the Questions tab
+  if (tabId === 'adminQuestionsView') {
+    loadQuestionFormDropdowns();
   }
+}
+
+  function loadQuestionFormDropdowns() {
+  google.script.run
+    .withSuccessHandler(populateRequestTypeOptions)
+    .getUniqueRequestTypes();
+
+  google.script.run
+    .withSuccessHandler(populateTaskTypeOptions)
+    .getUniqueTaskTypes();
+}
+
+  function populateRequestTypeOptions(types) {
+  const dropdown = document.getElementById('requestTypeDropdown');
+  if (!dropdown) return;
+
+  dropdown.innerHTML = '<option value="">Select Request Type</option>';
+  types.forEach(type => {
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = type;
+    dropdown.appendChild(option);
+  });
+}
+
+function populateTaskTypeOptions(types) {
+  const dropdown = document.getElementById('taskTypeDropdown');
+  if (!dropdown) return;
+
+  dropdown.innerHTML = '<option value="">Select Task Type</option>';
+  types.forEach(type => {
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = type;
+    dropdown.appendChild(option);
+  });
+}
+
 
   function showAuditQueue() {
   hideAllViews();
