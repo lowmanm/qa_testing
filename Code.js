@@ -992,3 +992,26 @@ function toggleQuestionActive(id, isActive) {
   }
 }
 
+function getUniqueRequestTypes() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const reqIndex = headers.indexOf('requestType');
+
+  const values = data.slice(1).map(row => row[reqIndex]);
+  const unique = [...new Set(values)].filter(v => v);
+  return unique.sort();
+}
+
+function getUniqueTaskTypes() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const taskIndex = headers.indexOf('taskType');
+
+  const values = data.slice(1).map(row => row[taskIndex]);
+  const unique = [...new Set(values)].filter(v => v);
+  return unique.sort();
+}
+
+
