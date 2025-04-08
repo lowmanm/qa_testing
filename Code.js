@@ -455,15 +455,30 @@ function updateAuditStatusAndLock(auditId, status) {
  * Prepares an evaluation by updating the audit status to 'In Process'.
  */
 function prepareEvaluation(auditId) {
-  const result = updateAuditStatusAndLock(auditId, 'In Process');
-  if (!result.success) throw new Error('Failed to update audit status');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIdx = headers.indexOf('auditId');
+  const lockedIdx = headers.indexOf('locked');
+  const statusIdx = headers.indexOf('auditStatus');
+
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === auditId);
+  if (rowIndex === -1) throw new Error('Audit not found');
+
+  const isLocked = data[rowIndex][lockedIdx];
+  if (isLocked === true || isLocked === 'TRUE') {
+    throw new Error('This record is currently being evaluated by another user.');
+  }
+
+  sheet.getRange(rowIndex + 1, lockedIdx + 1).setValue(true);
+  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue('In Process');
+
+  CacheService.getScriptCache().remove('all_audits');
 
   const audits = getAllAudits();
-  const audit = audits.find(a => a.auditId === auditId);
-  if (!audit) throw new Error('Audit not found');
-
-  return audit;
+  return audits.find(a => a.auditId === auditId);
 }
+
 
 // ====================
 // Evaluations Module
