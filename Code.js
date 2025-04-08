@@ -458,20 +458,24 @@ function prepareEvaluation(auditId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
+
   const idIdx = headers.indexOf('auditId');
   const lockedIdx = headers.indexOf('locked');
   const statusIdx = headers.indexOf('auditStatus');
+  const timestampIdx = headers.indexOf('auditTimestamp');
 
   const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === auditId);
   if (rowIndex === -1) throw new Error('Audit not found');
 
   const isLocked = data[rowIndex][lockedIdx];
   if (isLocked === true || isLocked === 'TRUE') {
-    throw new Error('This record is currently being evaluated by another user.');
+    throw new Error('This audit is currently being evaluated by another user.');
   }
 
-  sheet.getRange(rowIndex + 1, lockedIdx + 1).setValue(true);
+  // Mark as in process and lock it
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue('In Process');
+  sheet.getRange(rowIndex + 1, lockedIdx + 1).setValue(true);
+  sheet.getRange(rowIndex + 1, timestampIdx + 1).setValue(new Date()); // Update timestamp for timeout unlocks
 
   CacheService.getScriptCache().remove('all_audits');
 
