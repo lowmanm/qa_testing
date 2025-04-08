@@ -1339,17 +1339,23 @@ function deleteUser(userId) {
   }).getAllQuestions();
 }
 
-  function showQuestionForm(question = null) {
+function showQuestionForm(question = null) {
+  // Load fresh dropdowns every time
+  loadQuestionFormDropdowns();
+
   const isEdit = !!question;
   document.getElementById('questionFormTitle').textContent = isEdit ? 'Edit Question' : 'Add Question';
+
   document.getElementById('questionId').value = question?.id || '';
   document.getElementById('questionText').value = question?.questionText || '';
-  document.getElementById('questionTaskType').value = question?.taskType || 'phone_call';
-  document.getElementById('questionPoints').value = question?.pointsPossible || '10';
-  document.getElementById('questionSetId').value = question?.setId || '';
+  document.getElementById('requestTypeDropdown').value = question?.requestType || '';
+  document.getElementById('taskTypeDropdown').value = question?.taskType || '';
+  document.getElementById('pointsPossible').value = question?.pointsPossible || '';
+  document.getElementById('sequenceId').value = question?.sequenceId || '';
 
-  document.getElementById('questionForm').classList.remove('hidden');
+  document.getElementById('questionFormView').classList.remove('hidden');
 }
+
 
 function hideQuestionForm() {
   document.getElementById('questionForm').classList.add('hidden');
@@ -1358,28 +1364,31 @@ function hideQuestionForm() {
 function handleQuestionFormSubmit(e) {
   e.preventDefault();
 
+  const form = document.getElementById('questionForm');
   const id = document.getElementById('questionId').value;
-  const data = {
-    id,
-    questionText: document.getElementById('questionText').value,
-    taskType: document.getElementById('questionTaskType').value,
-    pointsPossible: parseInt(document.getElementById('questionPoints').value),
-    setId: document.getElementById('questionSetId').value
-  };
+  const sequenceId = parseInt(document.getElementById('sequenceId').value);
+  const requestType = document.getElementById('requestTypeDropdown').value;
+  const taskType = document.getElementById('taskTypeDropdown').value;
+  const questionText = document.getElementById('questionText').value;
+  const pointsPossible = parseFloat(document.getElementById('pointsPossible').value);
 
-  const onSuccess = () => {
-    showToast(`Question ${id ? 'updated' : 'created'} successfully.`, 'success');
-    hideQuestionForm();
-    loadQuestions();
-  };
-
-  const onFailure = err => showToast("Error saving question: " + err.message, 'error');
-
-  if (id) {
-    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).updateQuestion(data);
-  } else {
-    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).createQuestion(data);
+  if (!sequenceId || !requestType || !taskType || !questionText || !pointsPossible) {
+    showToast("Please fill out all fields correctly.", "warning");
+    return;
   }
+
+  const data = { id, sequenceId, requestType, taskType, questionText, pointsPossible };
+
+  google.script.run
+    .withSuccessHandler(() => {
+      showToast(`Question ${id ? 'updated' : 'created'} successfully.`, 'success');
+      hideQuestionForm();
+      loadQuestions();
+    })
+    .withFailureHandler(err => {
+      showToast("Error saving question: " + err.message, 'error');
+    })
+    .saveQuestion(data);
 }
 
 function deleteQuestion(qid) {
