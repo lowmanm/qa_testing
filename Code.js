@@ -860,40 +860,49 @@ function sendEvaluationNotification(evaluation) {
 
 function buildScorecardHtml(evaluation) {
   const scorePercentage = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
+  const dateStr = new Date(evaluation.stopTimestamp || evaluation.startTimestamp).toLocaleDateString();
+
+  const headerStyle = "font-weight: bold; color: #333;";
+  const labelStyle = "font-size: 13px; color: #777;";
+  const valueStyle = "font-size: 14px; color: #222; font-weight: 500;";
+  const tableHeadStyle = "background-color:#f5f5f5; text-align:left; font-size:13px; border-bottom:1px solid #ddd;";
+  const highlightRed = "background-color:#fff0f0;";
 
   let questionHtml = '';
   evaluation.questions.forEach(q => {
-    const highlight = q.response === 'no' ? 'background-color:#ffe6e6;' : '';
+    const highlight = q.response === 'no' ? highlightRed : '';
     questionHtml += `
       <tr style="${highlight}">
-        <td style="padding:8px;">${q.questionText}</td>
-        <td style="padding:8px;text-align:center;">${q.response.toUpperCase()}</td>
-        <td style="padding:8px;text-align:center;">${q.pointsEarned}/${q.pointsPossible}</td>
-        <td style="padding:8px;">${q.feedback || ''}</td>
+        <td style="padding:10px; border-bottom:1px solid #eee;">${q.questionText}</td>
+        <td style="padding:10px; text-align:center; border-bottom:1px solid #eee;">${q.response.toUpperCase()}</td>
+        <td style="padding:10px; text-align:center; border-bottom:1px solid #eee;">${q.pointsEarned}/${q.pointsPossible}</td>
+        <td style="padding:10px; border-bottom:1px solid #eee;">${q.feedback || ''}</td>
       </tr>
     `;
   });
 
   return `
-    <div style="font-family:Arial,sans-serif;font-size:14px;color:#333;">
-      <h2 style="color:#0066cc;">Evaluation Summary</h2>
-      <table style="border-collapse:collapse;margin-bottom:20px;">
-        <tr><td><strong>Reference Number:</strong></td><td>${evaluation.referenceNumber || 'N/A'}</td></tr>
-        <tr><td><strong>Task Type:</strong></td><td>${evaluation.taskType || 'N/A'}</td></tr>
-        <tr><td><strong>Outcome:</strong></td><td>${evaluation.outcome || 'N/A'}</td></tr>
-        <tr><td><strong>Score:</strong></td><td>${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</td></tr>
-        <tr><td><strong>Evaluator:</strong></td><td>${evaluation.qaEmail || 'QA Team'}</td></tr>
-        <tr><td><strong>Date:</strong></td><td>${new Date(evaluation.stopTimestamp || evaluation.startTimestamp).toLocaleDateString()}</td></tr>
-      </table>
+    <div style="font-family:Arial, sans-serif; max-width:800px; margin:0 auto; padding:20px; color:#333;">
+      <div style="border-radius:10px; padding:20px; background-color:#f8faff; border:1px solid #d0e6f9;">
+        <h2 style="color:#1a73e8; margin-top:0;">Evaluation Summary</h2>
+        <table style="width:100%; margin-top:10px;">
+          <tr><td style="${labelStyle}">Reference Number:</td><td style="${valueStyle}">${evaluation.referenceNumber || 'N/A'}</td></tr>
+          <tr><td style="${labelStyle}">Task Type:</td><td style="${valueStyle}">${evaluation.taskType || 'N/A'}</td></tr>
+          <tr><td style="${labelStyle}">Outcome:</td><td style="${valueStyle}">${evaluation.outcome || 'N/A'}</td></tr>
+          <tr><td style="${labelStyle}">Score:</td><td style="${valueStyle}">${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</td></tr>
+          <tr><td style="${labelStyle}">Evaluator:</td><td style="${valueStyle}">${evaluation.qaEmail || 'QA Team'}</td></tr>
+          <tr><td style="${labelStyle}">Date:</td><td style="${valueStyle}">${dateStr}</td></tr>
+        </table>
+      </div>
 
-      <h3 style="color:#0066cc;">Evaluation Details</h3>
-      <table style="border-collapse:collapse;width:100%;border:1px solid #ccc;">
-        <thead style="background-color:#f0f0f0;">
-          <tr>
-            <th style="padding:8px;text-align:left;">Question</th>
-            <th style="padding:8px;text-align:center;">Response</th>
-            <th style="padding:8px;text-align:center;">Score</th>
-            <th style="padding:8px;text-align:left;">Feedback</th>
+      <h3 style="color:#1a73e8; margin-top:30px;">Evaluation Details</h3>
+      <table style="width:100%; border-collapse:collapse; border:1px solid #ddd; margin-top:10px;">
+        <thead>
+          <tr style="${tableHeadStyle}">
+            <th style="padding:10px;">Question</th>
+            <th style="padding:10px; text-align:center;">Response</th>
+            <th style="padding:10px; text-align:center;">Score</th>
+            <th style="padding:10px;">Feedback</th>
           </tr>
         </thead>
         <tbody>
@@ -902,9 +911,11 @@ function buildScorecardHtml(evaluation) {
       </table>
 
       ${evaluation.feedback ? `
-        <div style="margin-top:20px;">
-          <h4>Overall Feedback</h4>
-          <p>${evaluation.feedback}</p>
+        <div style="margin-top:25px;">
+          <h4 style="color:#1a73e8;">Overall Feedback</h4>
+          <p style="background-color:#f9f9f9; padding:12px; border-left:4px solid #1a73e8; border-radius:4px;">
+            ${evaluation.feedback}
+          </p>
         </div>` : ''}
     </div>
   `;
