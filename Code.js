@@ -71,7 +71,7 @@ function setupSpreadsheet() {
     ],
 
     [SHEET_EVAL_SUMMARY]: [
-      'id', 'evalId', 'referenceNumber', 'taskType', 'outcome',
+      'id', 'auditId', 'referenceNumber', 'taskType', 'outcome',
       'qaEmail', 'startTimestamp', 'stopTimestamp', 'totalPoints',
       'totalPointsPossible', 'status', 'feedback', 'evalScore'
     ],
@@ -587,17 +587,17 @@ function saveEvaluation(data) {
   return evaluation;
 }
 
-function updateEvaluationStatus(evalId, status) {
+function updateEvaluationStatus(auditId, newStatus) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const idIdx = headers.indexOf('id');
+  const auditIdIdx = headers.indexOf('auditId'); // ✅ updated header
   const statusIdx = headers.indexOf('status');
 
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === id);
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[auditIdIdx] === auditId);
   if (rowIndex === -1) return;
 
-  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(status);
+  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
   clearCache('all_evaluations');
 }
 
@@ -628,22 +628,32 @@ function getAllDisputes() {
 
 function saveDispute(dispute) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
-  const id = 'dispute' + Date.now();
+  const id = `dispute${Date.now()}`;
   const timestamp = new Date().toISOString();
   const userEmail = dispute.userEmail || Session.getActiveUser().getEmail();
-  const questionIds = dispute.questionIds.join(',');
+  const status = dispute.status || 'pending';
 
+  // Defensive: Ensure evalId exists
+  if (!dispute.evalId) {
+    throw new Error("Missing evaluation ID for dispute.");
+  }
+
+  const questionIds = (dispute.questionIds || []).join(',');
+
+  // Save to Disputes Sheet
   sheet.appendRow([
     id,
-    dispute.evalId,
+    dispute.evalId,     // corresponds to evalSummary.id
     userEmail,
     timestamp,
     dispute.reason,
     questionIds,
-    dispute.status || 'pending'
+    status
   ]);
 
+  // Update evalSummary status via evalId (which is actually the 'id' field in evalSummary)
   updateEvaluationStatus(dispute.evalId, 'disputed');
+
   clearCache(['all_disputes', 'all_evaluations']);
 
   return {
@@ -653,7 +663,7 @@ function saveDispute(dispute) {
     disputeTimestamp: timestamp,
     reason: dispute.reason,
     questionIds: dispute.questionIds,
-    status: dispute.status || 'pending'
+    status
   };
 }
 
@@ -664,14 +674,21 @@ function updateEvaluationStatus(evalId, newStatus) {
   const idIdx = headers.indexOf('id');
   const statusIdx = headers.indexOf('status');
 
-  if (idIdx === -1 || statusIdx === -1) return;
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idIdx] === evalId) {
-      sheet.getRange(i + 1, statusIdx + 1).setValue(newStatus);
-      break;
-    }
+  if (idIdx === -1 || statusIdx === -1) {
+    Logger.log('❌ Missing expected headers in evalSummary');
+    return;
   }
+
+  const rowIndex = data.findIndex((row, i) => i > 0 && row[idIdx] === evalId);
+
+  if (rowIndex === -1) {
+    Logger.log(`⚠️ Evaluation with ID ${evalId} not found in evalSummary.`);
+    return;
+  }
+
+  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
+  clearCache('all_evaluations');
+  Logger.log(`✅ Evaluation status updated: ID ${evalId} → ${newStatus}`);
 }
 
 
