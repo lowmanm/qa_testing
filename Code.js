@@ -913,29 +913,52 @@ function getUniqueColumnValues(sheetName, columnName) {
 function saveQuestion(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
   const headers = sheet.getDataRange().getValues()[0];
+  const existingData = sheet.getDataRange().getValues();
+  const idIndex = headers.indexOf('id');
 
-  const id = `q_${Date.now()}`;
-  const sequenceId = Number(data.sequenceId || 0);
-  const setId = `${data.requestType}_${data.taskType}`.toLowerCase().replace(/\s+/g, '_');
-  const createdBy = Session.getActiveUser().getEmail();
-  const createdTimestamp = new Date().toISOString();
+  if (data.id) {
+    // Update existing question
+    for (let i = 1; i < existingData.length; i++) {
+      if (existingData[i][idIndex] === data.id) {
+        const row = i + 1;
+        sheet.getRange(row, headers.indexOf('sequenceId') + 1).setValue(data.sequenceId);
+        sheet.getRange(row, headers.indexOf('requestType') + 1).setValue(data.requestType);
+        sheet.getRange(row, headers.indexOf('taskType') + 1).setValue(data.taskType);
+        sheet.getRange(row, headers.indexOf('questionText') + 1).setValue(data.questionText);
+        sheet.getRange(row, headers.indexOf('pointsPossible') + 1).setValue(data.pointsPossible);
+        return true;
+      }
+    }
+  } else {
+    // Create new question
+    const newId = 'q_' + new Date().getTime();
+    const setId = `${data.requestType}_${data.taskType}`;
+    const createdBy = Session.getActiveUser().getEmail();
+    const createdTimestamp = new Date().toISOString();
+    const active = true;
 
-  const row = [
-    id,                          // id
-    sequenceId,                  // sequenceId
-    setId,                       // setId
-    data.requestType,            // requestType
-    data.taskType,               // taskType
-    data.questionText,           // questionText
-    Number(data.pointsPossible), // pointsPossible
-    createdBy,                   // createdBy
-    createdTimestamp,            // createdTimestamp
-    true                         // active
-  ];
+    const newRow = [];
+    headers.forEach(header => {
+      switch (header) {
+        case 'id': newRow.push(newId); break;
+        case 'sequenceId': newRow.push(data.sequenceId); break;
+        case 'requestType': newRow.push(data.requestType); break;
+        case 'taskType': newRow.push(data.taskType); break;
+        case 'setId': newRow.push(setId); break;
+        case 'questionText': newRow.push(data.questionText); break;
+        case 'pointsPossible': newRow.push(data.pointsPossible); break;
+        case 'createdBy': newRow.push(createdBy); break;
+        case 'createdTimestamp': newRow.push(createdTimestamp); break;
+        case 'active': newRow.push(active); break;
+        default: newRow.push('');
+      }
+    });
 
-  sheet.appendRow(row);
-  return { success: true, id };
+    sheet.appendRow(newRow);
+    return true;
+  }
 }
+
 
 function getQuestionsBySet(requestType, taskType) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
