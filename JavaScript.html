@@ -1153,6 +1153,72 @@ function viewDispute(disputeId) {
     });
 }
 
+function handleDisputeSubmit(e) {
+  e.preventDefault();
+
+  const form = document.getElementById('disputeForm');
+  if (!form) return showToast("Dispute form not found.", 'error');
+
+  const evaluationId = form.getAttribute('data-evaluation-id');
+  const reasonField = document.getElementById('disputeReason');
+  const reason = reasonField ? reasonField.value.trim() : '';
+
+  if (!reason) {
+    showToast("Please provide a reason for the dispute.", 'warning');
+    return;
+  }
+
+  const disputedQuestionIds = Array.from(document.querySelectorAll('input[name^="dispute_question_"]:checked'))
+    .map(cb => cb.value);
+
+  if (disputedQuestionIds.length === 0) {
+    showToast("Please select at least one question to dispute.", 'warning');
+    return;
+  }
+
+  // Optional UX: disable while submitting
+  form.classList.add('disabled');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+  }
+
+  google.script.run.withSuccessHandler(function(disputes) {
+    const alreadyDisputed = disputes.some(d => d.evalId === evaluationId);
+
+    if (alreadyDisputed) {
+      showToast("This evaluation has already been disputed.", 'warning');
+      showEvaluations();
+      return;
+    }
+
+    const disputeData = {
+      evalId: evaluationId,
+      reason,
+      questionIds: disputedQuestionIds,
+      status: 'pending'
+    };
+
+    google.script.run
+      .withSuccessHandler(() => {
+        showToast("Dispute submitted successfully!", 'success');
+        showEvaluations(); // ✅ Back to evaluations view
+      })
+      .withFailureHandler(error => {
+        console.error(error.message);
+        showToast("Error submitting dispute: " + error.message, 'error');
+        form.classList.remove('disabled');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Dispute';
+        }
+      })
+      .saveDispute(disputeData);
+
+  }).getAllDisputes(); // Live validation
+}
+
   function resolveDispute(disputeId) {
   hideAllViews();
   const resolveDisputeView = document.getElementById('resolveDisputeView');
