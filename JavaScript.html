@@ -1352,21 +1352,51 @@ function loadQuestions() {
 }
 
 function showQuestionForm(question = null) {
-  // Load fresh dropdowns every time
-  loadQuestionFormDropdowns();
-  attachQuestionFormHandler();
+  const form = document.getElementById('questionForm');
+  if (!form) return;
 
-  const isEdit = !!question;
-  document.getElementById('questionFormTitle').textContent = isEdit ? 'Edit Question' : 'Add Question';
-
-  document.getElementById('questionId').value = question?.id || '';
-  document.getElementById('questionText').value = question?.questionText || '';
-  document.getElementById('requestTypeDropdown').value = question?.requestType || '';
-  document.getElementById('taskTypeDropdown').value = question?.taskType || '';
-  document.getElementById('pointsPossible').value = question?.pointsPossible || '';
-  document.getElementById('sequenceId').value = question?.sequenceId || '';
-
+  form.reset();
   document.getElementById('questionFormView').classList.remove('hidden');
+  document.getElementById('questionFormTitle').textContent = question ? 'Edit Question' : 'Add Question';
+
+  // Set static fields immediately
+  document.getElementById('questionId').value = question?.id || '';
+  document.getElementById('sequenceId').value = question?.sequenceId || '';
+  document.getElementById('pointsPossible').value = question?.pointsPossible || '';
+  document.getElementById('questionText').value = question?.questionText || '';
+
+  // Load dropdowns first
+  google.script.run.withSuccessHandler(types => {
+    const dropdown = document.getElementById('requestTypeDropdown');
+    dropdown.innerHTML = '';
+    types.forEach(type => {
+      const option = document.createElement('option');
+      option.value = type;
+      option.textContent = type;
+      dropdown.appendChild(option);
+    });
+
+    // ✅ Set selected value AFTER loading options
+    if (question?.requestType) {
+      dropdown.value = question.requestType;
+    }
+  }).getUniqueRequestTypes();
+
+  google.script.run.withSuccessHandler(types => {
+    const dropdown = document.getElementById('taskTypeDropdown');
+    dropdown.innerHTML = '';
+    types.forEach(type => {
+      const option = document.createElement('option');
+      option.value = type;
+      option.textContent = type;
+      dropdown.appendChild(option);
+    });
+
+    // ✅ Set selected value AFTER loading options
+    if (question?.taskType) {
+      dropdown.value = question.taskType;
+    }
+  }).getUniqueTaskTypes();
 }
 
 
