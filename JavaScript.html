@@ -1081,62 +1081,76 @@ function viewDispute(disputeId) {
   });
 }
 
-  function handleDisputeSubmit(e) {
+  function handleResolveDisputeSubmit(e) {
   e.preventDefault();
 
-  const form = document.getElementById('disputeForm');
-  if (!form) return showToast("Dispute form not found.", 'error');
+  const form = e.target;
+  const evalId = form.getAttribute('data-eval-id');
+  const disputeId = form.getAttribute('data-dispute-id');
+  const resolutionNotes = document.getElementById('resolutionNotes')?.value || '';
 
-  const evaluationId = form.getAttribute('data-evaluation-id');
-  const reasonField = document.getElementById('disputeReason');
-  const reason = reasonField ? reasonField.value.trim() : '';
+  const decisions = [];
+  let overturnCount = 0;
+  let hasMissing = false;
 
-  if (!reason) {
-    showToast("Please provide a reason for the dispute.", 'warning');
-    return;
-  }
+  const cards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
 
-  const disputedQuestionIds = [];
-  document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(checkbox => {
-    disputedQuestionIds.push(checkbox.value);
-  });
+  cards.forEach(card => {
+    const radioInputs = card.querySelectorAll('input[type="radio"]');
 
-  if (disputedQuestionIds.length === 0) {
-    showToast("Please select at least one question to dispute.", 'warning');
-    return;
-  }
+    // Dynamically extract questionId from the input name (e.g., resolution_abcd1234)
+    const nameAttr = radioInputs[0]?.name;
+    const qid = nameAttr?.startsWith('resolution_') ? nameAttr.split('resolution_')[1] : null;
 
-  // Realtime dispute check
-  google.script.run.withSuccessHandler(function(disputes) {
-    const alreadyDisputed = disputes.some(d => d.evalId === evaluationId);
+    if (!qid) return;
 
-    if (alreadyDisputed) {
-      showToast("This evaluation has already been disputed.", 'warning');
-      showEvaluations(); // Optional: navigate back
+    const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
+    const note = form.querySelector(`#note_${qid}`)?.value || '';
+
+    if (!selected) {
+      hasMissing = true;
       return;
     }
 
-    const disputeData = {
-      evalId: evaluationId,
-      reason,
-      questionIds: disputedQuestionIds,
-      status: 'pending'
-    };
+    if (selected.value === 'upheld' && !note.trim()) {
+      showToast('Justification is required for upheld questions.', 'warning');
+      hasMissing = true;
+      return;
+    }
 
-    form.innerHTML = '<div class="loading">Submitting dispute...</div>';
+    if (selected.value === 'overturned') overturnCount++;
 
-    google.script.run
-      .withSuccessHandler(() => {
-        showToast("Dispute submitted successfully!", 'success');
-        showEvaluations(); // ✅ Back to evaluations view
-      })
-      .withFailureHandler(error => {
-        form.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
-        setTimeout(() => showEvaluations(), 3000);
-      })
-      .saveDispute(disputeData);
+    decisions.push({ questionId: qid, resolution: selected.value, note });
+  });
 
-  }).getAllDisputes(); // Fresh call to ensure no duplication
+  // Only show this toast once after checking all questions
+  if (hasMissing) {
+    showToast('Please make a selection for all disputed questions.', 'warning');
+    return;
+  }
+
+  // Determine new dispute status
+  const totalDisputed = decisions.length;
+  let newStatus = 'upheld';
+  if (overturnCount === totalDisputed) newStatus = 'overturned';
+  else if (overturnCount > 0) newStatus = 'partial overturn';
+
+  google.script.run
+    .withSuccessHandler(() => {
+      showToast('Dispute resolved successfully.', 'success');
+      showDisputes();
+    })
+    .withFailureHandler(error => {
+      console.error('Error resolving dispute:', error);
+      showToast('Failed to resolve dispute: ' + error.message, 'error');
+    })
+    .resolveDispute({
+      disputeId,
+      evalId,
+      decisions,
+      resolutionNotes,
+      status: newStatus
+    });
 }
 
   function resolveDispute(disputeId) {
