@@ -1300,37 +1300,38 @@ function resolveDispute(disputeId) {
     const container = document.getElementById('resolveDisputeQuestions');
     container.innerHTML = '';
 
-    evaluation.questions.forEach(q => {
-      if (!q.questionId || !q.questionText) return;
-      if (!dispute.questionIds.includes(q.questionId)) return;
+evaluation.questions.forEach(q => {
+  if (!q.questionId || !q.questionText) return;
+  if (!dispute.questionIds.includes(String(q.questionId))) return; // ✅ Ensures proper comparison
 
-      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
-      const card = document.createElement('div');
-      card.className = `question-card ${highlightClass}`;
-      card.innerHTML = `
-        <div class="question-header">
-          <h3 class="question-text">${q.questionText}</h3>
-          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
-        </div>
-        <div class="question-body">
-          <div class="radio-group">
-            <label>
-              <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
-              <span>Uphold</span>
-            </label>
-            <label>
-              <input type="radio" name="resolution_${q.questionId}" value="overturned">
-              <span>Overturn</span>
-            </label>
-          </div>
-          <div class="form-group mt-2">
-            <label for="note_${q.questionId}">Justification (required if Upheld)</label>
-            <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
-          </div>
-        </div>
-      `;
-      container.appendChild(card);
-    });
+  const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+  const card = document.createElement('div');
+  card.className = `question-card ${highlightClass}`;
+  card.innerHTML = `
+    <div class="question-header">
+      <h3 class="question-text">${q.questionText}</h3>
+      <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+    </div>
+    <div class="question-body">
+      <div class="radio-group">
+        <label>
+          <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
+          <span>Uphold</span>
+        </label>
+        <label>
+          <input type="radio" name="resolution_${q.questionId}" value="overturned">
+          <span>Overturn</span>
+        </label>
+      </div>
+      <div class="form-group mt-2">
+        <label for="note_${q.questionId}">Justification (required if Upheld)</label>
+        <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+});
+
   }).getAllEvaluationsAndDisputes();
 }
 
