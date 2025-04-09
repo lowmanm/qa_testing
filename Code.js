@@ -66,12 +66,10 @@ function setupSpreadsheet() {
     [SHEET_USERS]: ['id', 'name', 'email', 'managerEmail', 'role', 'createdBy', 'createdTimestamp', 'avatarUrl'],
     [SHEET_AUDIT_QUEUE]: [
       'auditId', 'taskId', 'referenceNumber', 'auditStatus', 'agentEmail',
-      'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp',
-      'lockedBy', 'lockedAt'
+      'requestType', 'taskType', 'outcome', 'taskTimestamp', 'auditTimestamp', 'locked'
     ],
-
     [SHEET_EVAL_SUMMARY]: [
-      'id', 'auditId', 'referenceNumber', 'taskType', 'outcome',
+      'id', 'evalId', 'referenceNumber', 'taskType', 'outcome',
       'qaEmail', 'startTimestamp', 'stopTimestamp', 'totalPoints',
       'totalPointsPossible', 'status', 'feedback', 'evalScore'
     ],
@@ -80,8 +78,8 @@ function setupSpreadsheet() {
       'pointsEarned', 'pointsPossible', 'feedback'
     ],
     [SHEET_QUESTIONS]: [
-      'id', 'sequenceId', 'setId', 'requestType', 'taskType',
-      'questionText', 'pointsPossible', 'createdBy', 'createdTimestamp', 'active'
+      'id', 'setId', 'taskType', 'questionText', 'pointsPossible',
+      'createdBy', 'createdTimestamp'
     ],
     [SHEET_DISPUTES_QUEUE]: [
       'id', 'evalId', 'userEmail', 'disputeTimestamp', 'reason',
@@ -120,47 +118,18 @@ function getCachedOrFetch(key, fetchFn) {
     try {
       return JSON.parse(cached);
     } catch (e) {
-      Logger.log(`❌ Error parsing cache for ${key}: ${e.message}`);
+      Logger.log(`Error parsing cache for ${key}: ${e.message}`);
     }
-  } else {
-    Logger.log(`⚠️ Cache miss for key: ${key}`);
   }
 
   const fresh = fetchFn();
-
-  if (fresh !== undefined && fresh !== null) {
-    try {
-      cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
-    } catch (e) {
-      Logger.log(`❌ Failed to cache ${key}: ${e.message}`);
-    }
-  } else {
-    Logger.log(`⚠️ Skipped caching for ${key} due to empty or invalid data.`);
+  try {
+    cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
+  } catch (e) {
+    Logger.log(`Failed to cache ${key}: ${e.message}`);
   }
 
   return fresh;
-}
-
-function clearCache(keys) {
-  const cache = CacheService.getScriptCache();
-
-  if (!keys) return;
-
-  if (Array.isArray(keys)) {
-    try {
-      cache.removeAll(keys);
-      Logger.log(`✅ Cleared cache keys: ${keys.join(', ')}`);
-    } catch (e) {
-      Logger.log(`❌ Error clearing multiple cache keys: ${e.message}`);
-    }
-  } else {
-    try {
-      cache.remove(keys);
-      Logger.log(`✅ Cleared cache key: ${keys}`);
-    } catch (e) {
-      Logger.log(`❌ Error clearing cache key "${keys}": ${e.message}`);
-    }
-  }
 }
 
 // ====================
@@ -244,7 +213,7 @@ function createUser(userData) {
   const row = headers.map(header => userData[header] || '');
 
   sheet.appendRow(row);
-  clearCache('all_users');
+  CacheService.getScriptCache().remove('all_users');
 
   return userData;
 }
@@ -267,7 +236,7 @@ function updateUser(userData) {
     }
   });
 
-  clearCache('all_users');
+  CacheService.getScriptCache().remove('all_users');
   return userData;
 }
 
@@ -284,7 +253,7 @@ function deleteUser(userId) {
   if (rowIndex === -1) throw new Error(`User ID ${userId} not found`);
 
   sheet.deleteRow(rowIndex + 1);
-  clearCache('all_users');
+  CacheService.getScriptCache().remove('all_users');
 
   return { success: true, message: 'User deleted successfully' };
 }
@@ -300,6 +269,18 @@ function getAllQuestions() {
   return getCachedOrFetch('all_questions', () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
     return getSheetDataAsObjects(sheet);
+  });
+}
+
+/**
+ * Retrieves questions for a specific task type.
+ */
+function getQuestionsForTaskType(taskType) {
+  const cacheKey = 'questions_' + taskType;
+  return getCachedOrFetch(cacheKey, () => {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+    const data = getSheetDataAsObjects(sheet);
+    return data.filter(q => q.taskType === taskType);
   });
 }
 
@@ -330,6 +311,76 @@ function markAuditAsMisconfigured(auditId) {
   throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
 }
 
+/**
+ * Creates a new question and adds to the questions sheet.
+ */
+function createQuestion(questionData) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+
+  if (!questionData.id) {
+    questionData.id = 'q' + Date.now() + '-' + questionData.taskType;
+  }
+
+  questionData.createdTimestamp = new Date().toISOString();
+  questionData.createdBy = questionData.createdBy || Session.getActiveUser().getEmail() || 'system';
+
+  if (!questionData.setId) {
+    const data = sheet.getDataRange().getValues();
+    const headers = data.shift();
+    const setIdIdx = headers.indexOf('setId');
+    const taskTypeIdx = headers.indexOf('taskType');
+
+    const setIds = [...new Set(data.filter(r => r[taskTypeIdx] === questionData.taskType).map(r => r[setIdIdx]))];
+    questionData.setId = setIds.length > 0 ? setIds[0] : 'set' + (Date.now() % 1000);
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const row = headers.map(h => questionData[h] || '');
+  sheet.appendRow(row);
+
+  CacheService.getScriptCache().remove('all_questions');
+  return questionData;
+}
+
+/**
+ * Updates an existing question in the questions sheet.
+ */
+function updateQuestion(questionData) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[idCol] === questionData.id);
+  if (rowIndex === -1) throw new Error(`Question ID ${questionData.id} not found`);
+
+  headers.forEach((header, i) => {
+    if (header in questionData && header !== 'createdTimestamp' && header !== 'createdBy') {
+      sheet.getRange(rowIndex + 1, i + 1).setValue(questionData[header]);
+    }
+  });
+
+  CacheService.getScriptCache().remove('all_questions');
+  return questionData;
+}
+
+/**
+ * Deletes a question from the questions sheet.
+ */
+function deleteQuestion(questionId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[idCol] === questionId);
+  if (rowIndex === -1) throw new Error(`Question ID ${questionId} not found`);
+
+  sheet.deleteRow(rowIndex + 1);
+  CacheService.getScriptCache().remove('all_questions');
+  return { success: true, message: 'Question deleted successfully' };
+}
+
 // ====================
 // Audit Queue Module
 // ====================
@@ -340,34 +391,22 @@ function markAuditAsMisconfigured(auditId) {
 function getAllAudits() {
   return getCachedOrFetch('all_audits', () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
-    const audits = getSheetDataAsObjects(sheet);
-
-    // Optional: normalize key fields (safety and consistency)
-    audits.forEach(audit => {
-      audit.auditStatus = (audit.auditStatus || '').toLowerCase();
-      audit.taskType = audit.taskType || '';
-      audit.requestType = audit.requestType || '';
-      audit.auditId = audit.auditId || '';
-    });
-
-    return audits;
+    return getSheetDataAsObjects(sheet);
   });
 }
-
 
 /**
  * Retrieves pending audits from the audit queue sheet.
  */
 function getPendingAudits() {
-  Logger.log('📥 Fetching pending audits (from cache or fresh)...');
+  Logger.log('Fetching pending audits...');
   return getCachedOrFetch('pending_audits', () => {
     const audits = getAllAudits();
     const evaluations = getAllEvaluations();
 
     const evaluatedIds = new Set(evaluations.map(e => e.evalId));
-
     return audits.filter(a =>
-      a.auditStatus?.toLowerCase() === 'pending' &&
+      a.auditStatus.toLowerCase() === 'pending' &&
       !evaluatedIds.has(a.auditId)
     );
   });
@@ -387,7 +426,7 @@ function updateAuditStatus(auditId, newStatus) {
   if (rowIndex === -1) return;
 
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
-  clearCache('all_audits');
+  CacheService.getScriptCache().remove('all_audits');
 }
 
 
@@ -398,91 +437,32 @@ function updateAuditStatusAndLock(auditId, status) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-
   const idIdx = headers.indexOf('auditId');
   const statusIdx = headers.indexOf('auditStatus');
-  const lockedByIdx = headers.indexOf('lockedBy');
-  const lockedAtIdx = headers.indexOf('lockedAt');
+  const lockedIdx = headers.indexOf('locked');
 
   const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === auditId);
   if (rowIndex === -1) throw new Error('Audit not found');
 
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(status);
-  sheet.getRange(rowIndex + 1, lockedByIdx + 1).setValue('');
-  sheet.getRange(rowIndex + 1, lockedAtIdx + 1).setValue('');
-
-  clearCache('all_audits');
+  sheet.getRange(rowIndex + 1, lockedIdx + 1).setValue(status === 'evaluated' ? false : true);
+  CacheService.getScriptCache().remove('all_audits');
 
   return { success: true };
-}
-
-/*
-Automatically unlocks audits stuck "In Process" for too long.
-{time-driven trigger}
-*/
-function unlockStaleAudits() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-
-  const statusIdx = headers.indexOf('auditStatus');
-  const lockedByIdx = headers.indexOf('lockedBy');
-  const lockedAtIdx = headers.indexOf('lockedAt');
-
-  const now = new Date();
-
-  for (let i = 1; i < data.length; i++) {
-    const status = data[i][statusIdx];
-    const lockedBy = data[i][lockedByIdx];
-    const lockedAtRaw = data[i][lockedAtIdx];
-
-    if (status === 'In Process' && lockedBy && lockedAtRaw) {
-      const lockedAt = new Date(lockedAtRaw);
-      const minutesLocked = (now - lockedAt) / 60000;
-
-      if (minutesLocked > 30) {
-        sheet.getRange(i + 1, statusIdx + 1).setValue('pending');
-        sheet.getRange(i + 1, lockedByIdx + 1).setValue('');
-        sheet.getRange(i + 1, lockedAtIdx + 1).setValue('');
-      }
-    }
-  }
-
-  clearCache('all_audits');
 }
 
 /**
  * Prepares an evaluation by updating the audit status to 'In Process'.
  */
 function prepareEvaluation(auditId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-
-  const idIdx = headers.indexOf('auditId');
-  const lockedByIdx = headers.indexOf('lockedBy');
-  const lockedAtIdx = headers.indexOf('lockedAt');
-  const statusIdx = headers.indexOf('auditStatus');
-
-  const rowIndex = data.findIndex((row, i) => i > 0 && row[idIdx] === auditId);
-  if (rowIndex === -1) throw new Error('Audit not found');
-
-  const lockedBy = data[rowIndex][lockedByIdx];
-  if (lockedBy && lockedBy !== '') {
-    throw new Error('This audit is currently being evaluated by another user.');
-  }
-
-  const userEmail = Session.getActiveUser().getEmail();
-  const now = new Date().toISOString();
-
-  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue('In Process');
-  sheet.getRange(rowIndex + 1, lockedByIdx + 1).setValue(userEmail);
-  sheet.getRange(rowIndex + 1, lockedAtIdx + 1).setValue(now);
-
-  clearCache('all_audits');
+  const result = updateAuditStatusAndLock(auditId, 'In Process');
+  if (!result.success) throw new Error('Failed to update audit status');
 
   const audits = getAllAudits();
-  return audits.find(a => a.auditId === auditId);
+  const audit = audits.find(a => a.auditId === auditId);
+  if (!audit) throw new Error('Audit not found');
+
+  return audit;
 }
 
 // ====================
@@ -498,10 +478,9 @@ function getAllEvaluations() {
     const evalSheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
     const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
 
-    const summaries = getSheetDataAsObjects(evalSheet);   // Main evals
-    const questions = getSheetDataAsObjects(questSheet);  // Detailed questions
+    const summaries = getSheetDataAsObjects(evalSheet);
+    const questions = getSheetDataAsObjects(questSheet);
 
-    // Group questions by evalId
     const map = {};
     questions.forEach(q => {
       if (!map[q.evalId]) map[q.evalId] = [];
@@ -516,11 +495,7 @@ function getAllEvaluations() {
       });
     });
 
-    // Attach grouped questions to each summary
-    summaries.forEach(s => {
-      s.questions = map[s.id] || [];
-    });
-
+    summaries.forEach(s => s.questions = map[s.id] || []);
     return summaries;
   });
 }
@@ -569,36 +544,29 @@ function saveEvaluation(data) {
   }
 
   updateAuditStatus(data.evalId || data.auditId, 'evaluated');
-  clearCache(['all_evaluations', 'all_audits', 'pending_audits']);
+  CacheService.getScriptCache().removeAll(['all_evaluations', 'all_audits']);
 
-
-  const evaluation = {
+  return {
     id: evalId,
     ...data,
     stopTimestamp: stopTime,
     evalScore: score,
     questions: data.questions
   };
-
-  // ✅ Send the notification
-  sendEvaluationNotification(evaluation);
-
-  // ✅ Return the evaluation object
-  return evaluation;
 }
 
-function updateEvaluationStatus(auditId, newStatus) {
+function updateEvaluationStatus(evalId, status) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const auditIdIdx = headers.indexOf('auditId'); // ✅ updated header
+  const idIdx = headers.indexOf('id');
   const statusIdx = headers.indexOf('status');
 
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[auditIdIdx] === auditId);
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === id);
   if (rowIndex === -1) return;
 
-  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
-  clearCache('all_evaluations');
+  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(status);
+  CacheService.getScriptCache().remove('all_evaluations');
 }
 
 // ====================
@@ -610,15 +578,10 @@ function getAllDisputes() {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
     const data = getSheetDataAsObjects(sheet);
 
-    // Convert questionIds from comma-separated string to trimmed array
+    // Convert questionIds from string to array
     data.forEach(d => {
-      if (typeof d.questionIds === 'string') {
-        d.questionIds = d.questionIds
-          .split(',')
-          .map(q => q.trim())
-          .filter(Boolean); // removes empty values
-      } else {
-        d.questionIds = []; // fallback
+      if (d.questionIds && typeof d.questionIds === 'string') {
+        d.questionIds = d.questionIds.split(',');
       }
     });
 
@@ -628,33 +591,23 @@ function getAllDisputes() {
 
 function saveDispute(dispute) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
-  const id = `dispute${Date.now()}`;
+  const id = 'dispute' + Date.now();
   const timestamp = new Date().toISOString();
   const userEmail = dispute.userEmail || Session.getActiveUser().getEmail();
-  const status = dispute.status || 'pending';
+  const questionIds = dispute.questionIds.join(',');
 
-  // Defensive: Ensure evalId exists
-  if (!dispute.evalId) {
-    throw new Error("Missing evaluation ID for dispute.");
-  }
-
-  const questionIds = (dispute.questionIds || []).join(',');
-
-  // Save to Disputes Sheet
   sheet.appendRow([
     id,
-    dispute.evalId,     // corresponds to evalSummary.id
+    dispute.evalId,
     userEmail,
     timestamp,
     dispute.reason,
     questionIds,
-    status
+    dispute.status || 'pending'
   ]);
 
-  // Update evalSummary status via evalId (which is actually the 'id' field in evalSummary)
   updateEvaluationStatus(dispute.evalId, 'disputed');
-
-  clearCache(['all_disputes', 'all_evaluations']);
+  CacheService.getScriptCache().removeAll(['all_disputes', 'all_evaluations']);
 
   return {
     id,
@@ -663,58 +616,23 @@ function saveDispute(dispute) {
     disputeTimestamp: timestamp,
     reason: dispute.reason,
     questionIds: dispute.questionIds,
-    status
+    status: dispute.status || 'pending'
   };
 }
 
-/**
- * Updates the status of a dispute in the disputesQueue sheet.
- */
 function updateDisputeStatus(disputeId, newStatus) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-
   const idIdx = headers.indexOf('id');
   const statusIdx = headers.indexOf('status');
 
   const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === disputeId);
-  if (rowIndex === -1) {
-    Logger.log(`❌ Dispute ID ${disputeId} not found.`);
-    return { success: false, message: 'Dispute not found' };
-  }
+  if (rowIndex === -1) return { success: false, message: "Dispute not found" };
 
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
-  clearCache('all_disputes');
-
-  Logger.log(`✅ Dispute ${disputeId} status updated to "${newStatus}"`);
   return { success: true };
 }
-
-function updateEvaluationStatus(evalId, newStatus) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idIdx = headers.indexOf('id');
-  const statusIdx = headers.indexOf('status');
-
-  if (idIdx === -1 || statusIdx === -1) {
-    Logger.log('❌ Missing expected headers in evalSummary');
-    return;
-  }
-
-  const rowIndex = data.findIndex((row, i) => i > 0 && row[idIdx] === evalId);
-
-  if (rowIndex === -1) {
-    Logger.log(`⚠️ Evaluation with ID ${evalId} not found in evalSummary.`);
-    return;
-  }
-
-  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
-  clearCache('all_evaluations');
-  Logger.log(`✅ Evaluation status updated: ID ${evalId} → ${newStatus}`);
-}
-
 
 /**
  * Resolves a dispute and updates relevant sheets.
@@ -729,82 +647,84 @@ function resolveDispute(resolution) {
   const resolvedBy = Session.getActiveUser().getEmail();
   const resolvedAt = new Date().toISOString();
 
-  // Update questions in evalQuest
+  // Get evalQuest data
   const questData = questSheet.getDataRange().getValues();
-  const qHeaders = questData[0];
-  const qEvalIdx = qHeaders.indexOf('evalId');
-  const qQIdIdx = qHeaders.indexOf('questionId');
-  const qRespIdx = qHeaders.indexOf('response');
-  const qPtsEarnedIdx = qHeaders.indexOf('pointsEarned');
-  const qPtsPossibleIdx = qHeaders.indexOf('pointsPossible');
-  const qFeedbackIdx = qHeaders.indexOf('feedback');
+  const headers = questData[0];
+  const idIndex = headers.indexOf('evalId');
+  const questionIdIndex = headers.indexOf('questionId');
+  const responseIndex = headers.indexOf('response');
+  const pointsEarnedIndex = headers.indexOf('pointsEarned');
+  const feedbackIndex = headers.indexOf('feedback');
+  const pointsPossibleIndex = headers.indexOf('pointsPossible');
 
-  const updatedQuestRows = [];
-
+  // Update affected questions
+  const updatedRows = [];
   for (let i = 1; i < questData.length; i++) {
     const row = questData[i];
-    if (row[qEvalIdx] !== evalId) continue;
+    if (row[idIndex] !== evalId) continue;
 
-    const decision = decisions.find(d => d.questionId === row[qQIdIdx]);
+    const decision = decisions.find(d => d.questionId === row[questionIdIndex]);
     if (!decision) continue;
 
     if (decision.resolution === 'overturned') {
-      row[qRespIdx] = 'yes';
-      row[qPtsEarnedIdx] = row[qPtsPossibleIdx]; // award full points
+      row[responseIndex] = 'yes';
+      row[pointsEarnedIndex] = row[pointsPossibleIndex];
     }
-    row[qFeedbackIdx] = decision.note || '';
-    updatedQuestRows.push(row);
+
+    row[feedbackIndex] = decision.note || '';
+    updatedRows.push(row);
   }
 
-  if (updatedQuestRows.length) {
-    questSheet.getRange(2, 1, updatedQuestRows.length, qHeaders.length).setValues(updatedQuestRows);
+  if (updatedRows.length) {
+    questSheet.getRange(2, 1, updatedRows.length, headers.length).setValues(updatedRows);
   }
 
-  // Recalculate totals
-  const relevantRows = questData.filter(r => r[qEvalIdx] === evalId);
-  const totalPoints = relevantRows.reduce((sum, row) => sum + (parseFloat(row[qPtsEarnedIdx]) || 0), 0);
-  const totalPossible = relevantRows.reduce((sum, row) => sum + (parseFloat(row[qPtsPossibleIdx]) || 0), 0);
+  // Recalculate score totals
+  const updatedQuestData = questSheet.getDataRange().getValues().filter(row => row[idIndex] === evalId);
+  const totalPoints = updatedQuestData.reduce((sum, row) => sum + (parseFloat(row[pointsEarnedIndex]) || 0), 0);
+  const totalPossible = updatedQuestData.reduce((sum, row) => sum + (parseFloat(row[pointsPossibleIndex]) || 0), 0);
   const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
 
   // Update evalSummary
   const summaryData = summarySheet.getDataRange().getValues();
   const sHeaders = summaryData[0];
-  const sIdIdx = sHeaders.indexOf('id');
-  const sPtsIdx = sHeaders.indexOf('totalPoints');
-  const sScoreIdx = sHeaders.indexOf('evalScore');
-  const sStatusIdx = sHeaders.indexOf('status');
+  const sIdIndex = sHeaders.indexOf('id');
+  const totalPointsIndex = sHeaders.indexOf('totalPoints');
+  const evalScoreIndex = sHeaders.indexOf('evalScore');
+  const statusIndex = sHeaders.indexOf('status');
 
   for (let i = 1; i < summaryData.length; i++) {
     const row = summaryData[i];
-    if (row[sIdIdx] === evalId) {
-      summarySheet.getRange(i + 1, sPtsIdx + 1).setValue(totalPoints);
-      summarySheet.getRange(i + 1, sScoreIdx + 1).setValue(evalScore);
-      summarySheet.getRange(i + 1, sStatusIdx + 1).setValue(status || 'resolved');
+    if (row[sIdIndex] === evalId) {
+      summarySheet.getRange(i + 1, totalPointsIndex + 1).setValue(totalPoints);
+      summarySheet.getRange(i + 1, evalScoreIndex + 1).setValue(evalScore);
+      summarySheet.getRange(i + 1, statusIndex + 1).setValue(status || 'resolved');
       break;
     }
   }
 
-  // Update disputesQueue
+  // Update dispute row
   const disputeData = disputeSheet.getDataRange().getValues();
   const dHeaders = disputeData[0];
-  const dIdIdx = dHeaders.indexOf('id');
-  const dStatusIdx = dHeaders.indexOf('status');
-  const dNotesIdx = dHeaders.indexOf('resolutionNotes');
-  const dByIdx = dHeaders.indexOf('resolvedBy');
-  const dTimeIdx = dHeaders.indexOf('resolutionTimestamp');
+  const dIdIndex = dHeaders.indexOf('id');
+  const dStatusIndex = dHeaders.indexOf('status');
+  const dNotesIndex = dHeaders.indexOf('resolutionNotes');
+  const dByIndex = dHeaders.indexOf('resolvedBy');
+  const dTimeIndex = dHeaders.indexOf('resolutionTimestamp');
 
   for (let i = 1; i < disputeData.length; i++) {
     const row = disputeData[i];
-    if (row[dIdIdx] === disputeId) {
-      if (dStatusIdx !== -1) disputeSheet.getRange(i + 1, dStatusIdx + 1).setValue(status || 'resolved');
-      if (dNotesIdx !== -1) disputeSheet.getRange(i + 1, dNotesIdx + 1).setValue(resolutionNotes || '');
-      if (dByIdx !== -1) disputeSheet.getRange(i + 1, dByIdx + 1).setValue(resolvedBy);
-      if (dTimeIdx !== -1) disputeSheet.getRange(i + 1, dTimeIdx + 1).setValue(resolvedAt);
+    if (row[dIdIndex] === disputeId) {
+      disputeSheet.getRange(i + 1, dStatusIndex + 1).setValue(status || 'resolved');
+      disputeSheet.getRange(i + 1, dNotesIndex + 1).setValue(resolutionNotes || '');
+      disputeSheet.getRange(i + 1, dByIndex + 1).setValue(resolvedBy);
+      disputeSheet.getRange(i + 1, dTimeIndex + 1).setValue(resolvedAt);
       break;
     }
   }
 
-  clearCache(['all_disputes', 'all_evaluations']);
+  // Invalidate caches
+  CacheService.getScriptCache().removeAll(['all_disputes', 'all_evaluations']);
   return true;
 }
 
@@ -843,257 +763,3 @@ function getDisputeStats() {
 function toTitleCase(str) {
   return (str || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
-
-function sendEvaluationNotification(evaluation) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const usersSheet = ss.getSheetByName(SHEET_USERS);
-  const auditsSheet = ss.getSheetByName(SHEET_AUDIT_QUEUE);
-
-  const usersData = usersSheet.getDataRange().getValues();
-  const userHeaders = usersData[0];
-  const emailIdx = userHeaders.indexOf('email');
-  const managerIdx = userHeaders.indexOf('managerEmail');
-
-  const agentEmail = getAuditField(auditsSheet, evaluation.auditId, 'agentEmail');
-  const agentRow = usersData.find(row => row[emailIdx] === agentEmail);
-  const managerEmail = agentRow ? agentRow[managerIdx] : '';
-
-  const html = buildScorecardHtml(evaluation);
-  const stopTime = new Date(evaluation.stopTimestamp).toLocaleString();
-  const subject = `Evaluation has been completed for ${evaluation.referenceNumber || 'N/A'} at ${stopTime}`;
-
-  GmailApp.sendEmail(agentEmail, subject, '', {
-    htmlBody: html,
-    cc: managerEmail || '',
-    name: 'QA Team',
-    replyTo: 'qa-team@equifax.com',
-    noReply: true
-  });
-}
-
-function buildScorecardHtml(evaluation) {
-  const scorePercentage = Math.round((evaluation.totalPoints / evaluation.totalPointsPossible) * 100);
-  const dateStr = new Date(evaluation.stopTimestamp || evaluation.startTimestamp).toLocaleDateString();
-
-  const headerStyle = "font-weight: bold; color: #333;";
-  const labelStyle = "font-size: 13px; color: #777;";
-  const valueStyle = "font-size: 14px; color: #222; font-weight: 500;";
-  const tableHeadStyle = "background-color:#f5f5f5; text-align:left; font-size:13px; border-bottom:1px solid #ddd;";
-  const highlightRed = "background-color:#fff0f0;";
-
-  let questionHtml = '';
-  evaluation.questions.forEach(q => {
-    const highlight = q.response === 'no' ? highlightRed : '';
-    questionHtml += `
-      <tr style="${highlight}">
-        <td style="padding:10px; border-bottom:1px solid #eee;">${q.questionText}</td>
-        <td style="padding:10px; text-align:center; border-bottom:1px solid #eee;">${q.response.toUpperCase()}</td>
-        <td style="padding:10px; text-align:center; border-bottom:1px solid #eee;">${q.pointsEarned}/${q.pointsPossible}</td>
-        <td style="padding:10px; border-bottom:1px solid #eee;">${q.feedback || ''}</td>
-      </tr>
-    `;
-  });
-
-  return `
-    <div style="font-family:Arial, sans-serif; max-width:800px; margin:0 auto; padding:20px; color:#333;">
-      <div style="border-radius:10px; padding:20px; background-color:#f8faff; border:1px solid #d0e6f9;">
-        <h2 style="color:#007298; margin-top:0;">Evaluation Summary</h2>
-        <table style="width:100%; margin-top:10px;">
-          <tr><td style="${labelStyle}">Reference Number:</td><td style="${valueStyle}">${evaluation.referenceNumber || 'N/A'}</td></tr>
-          <tr><td style="${labelStyle}">Task Type:</td><td style="${valueStyle}">${evaluation.taskType || 'N/A'}</td></tr>
-          <tr><td style="${labelStyle}">Outcome:</td><td style="${valueStyle}">${evaluation.outcome || 'N/A'}</td></tr>
-          <tr><td style="${labelStyle}">Score:</td><td style="${valueStyle}">${evaluation.totalPoints}/${evaluation.totalPointsPossible} (${scorePercentage}%)</td></tr>
-          <tr><td style="${labelStyle}">Evaluator:</td><td style="${valueStyle}">${evaluation.qaEmail || 'QA Team'}</td></tr>
-          <tr><td style="${labelStyle}">Date:</td><td style="${valueStyle}">${dateStr}</td></tr>
-        </table>
-      </div>
-
-      <h3 style="color:#007298; margin-top:30px;">Evaluation Details</h3>
-      <table style="width:100%; border-collapse:collapse; border:1px solid #ddd; margin-top:10px;">
-        <thead>
-          <tr style="${tableHeadStyle}">
-            <th style="padding:10px;">Question</th>
-            <th style="padding:10px; text-align:center;">Response</th>
-            <th style="padding:10px; text-align:center;">Score</th>
-            <th style="padding:10px;">Feedback</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${questionHtml}
-        </tbody>
-      </table>
-
-      ${evaluation.feedback ? `
-        <div style="margin-top:25px;">
-          <h4 style="color:#007298;">Overall Feedback</h4>
-          <p style="background-color:#f9f9f9; padding:12px; border-left:4px solid #007298; border-radius:4px;">
-            ${evaluation.feedback}
-          </p>
-        </div>` : ''}
-    </div>
-  `;
-}
-
-function getAuditField(sheet, auditId, columnName) {
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idIdx = headers.indexOf('auditId');
-  const colIdx = headers.indexOf(columnName);
-
-  const row = data.find((r, i) => i > 0 && r[idIdx] === auditId);
-  return row ? row[colIdx] : '';
-}
-
-function getUniqueTaskTypes() {
-  return getUniqueColumnValues(SHEET_AUDIT_QUEUE, 'taskType');
-}
-
-function getUniqueRequestTypes() {
-  return getUniqueColumnValues(SHEET_AUDIT_QUEUE, 'requestType');
-}
-
-function getUniqueColumnValues(sheetName, columnName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const colIdx = headers.indexOf(columnName);
-
-  return data
-    .slice(1)
-    .map(row => row[colIdx])
-    .filter(v => v)
-    .filter((v, i, arr) => arr.indexOf(v) === i)
-    .sort();
-}
-
-function saveQuestion(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const headers = sheet.getDataRange().getValues()[0];
-  const existingData = sheet.getDataRange().getValues();
-  const idIndex = headers.indexOf('id');
-
-  if (data.id) {
-    // Update existing question
-    for (let i = 1; i < existingData.length; i++) {
-      if (existingData[i][idIndex] === data.id) {
-        const row = i + 1;
-        sheet.getRange(row, headers.indexOf('sequenceId') + 1).setValue(data.sequenceId);
-        sheet.getRange(row, headers.indexOf('requestType') + 1).setValue(data.requestType);
-        sheet.getRange(row, headers.indexOf('taskType') + 1).setValue(data.taskType);
-        sheet.getRange(row, headers.indexOf('questionText') + 1).setValue(data.questionText);
-        sheet.getRange(row, headers.indexOf('pointsPossible') + 1).setValue(data.pointsPossible);
-        return true;
-      }
-    }
-  } else {
-    // Create new question
-    const newId = 'q_' + new Date().getTime();
-    const setId = `${data.requestType}_${data.taskType}`;
-    const createdBy = Session.getActiveUser().getEmail();
-    const createdTimestamp = new Date().toISOString();
-    const active = true;
-
-    const newRow = [];
-    headers.forEach(header => {
-      switch (header) {
-        case 'id': newRow.push(newId); break;
-        case 'sequenceId': newRow.push(data.sequenceId); break;
-        case 'requestType': newRow.push(data.requestType); break;
-        case 'taskType': newRow.push(data.taskType); break;
-        case 'setId': newRow.push(setId); break;
-        case 'questionText': newRow.push(data.questionText); break;
-        case 'pointsPossible': newRow.push(data.pointsPossible); break;
-        case 'createdBy': newRow.push(createdBy); break;
-        case 'createdTimestamp': newRow.push(createdTimestamp); break;
-        case 'active': newRow.push(active); break;
-        default: newRow.push('');
-      }
-    });
-
-    sheet.appendRow(newRow);
-    clearCache('all_questions');
-    return true;
-  }
-}
-
-function getQuestionsBySet(requestType, taskType) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-
-  const questions = data.slice(1)
-    .filter(row => row[headers.indexOf('active')])
-    .filter(row =>
-      row[headers.indexOf('requestType')] === requestType &&
-      row[headers.indexOf('taskType')] === taskType
-    )
-    .sort((a, b) => a[headers.indexOf('sequenceId')] - b[headers.indexOf('sequenceId')])
-    .map(row => ({
-      id: row[headers.indexOf('id')],
-      sequenceId: row[headers.indexOf('sequenceId')],
-      setId: row[headers.indexOf('setId')],
-      requestType: row[headers.indexOf('requestType')],
-      taskType: row[headers.indexOf('taskType')],
-      questionText: row[headers.indexOf('questionText')],
-      pointsPossible: row[headers.indexOf('pointsPossible')],
-      active: row[headers.indexOf('active')]
-    }));
-
-  return questions;
-}
-
-function getQuestionById(id) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idIdx = headers.indexOf('id');
-
-  const row = data.find((r, i) => i > 0 && r[idIdx] === id);
-  if (!row) return null;
-
-  const obj = {};
-  headers.forEach((h, i) => obj[h] = row[i]);
-  return obj;
-}
-
-function toggleQuestionActive(id, isActive) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idIdx = headers.indexOf('id');
-  const activeIdx = headers.indexOf('active');
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idIdx] === id) {
-      sheet.getRange(i + 1, activeIdx + 1).setValue(isActive);
-      clearCache('all_questions');
-      return true;
-    }
-  }
-
-  return false; // not found
-}
-
-function getUniqueRequestTypes() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const reqIndex = headers.indexOf('requestType');
-
-  const values = data.slice(1).map(row => row[reqIndex]);
-  const unique = [...new Set(values)].filter(v => v);
-  return unique.sort();
-}
-
-function getUniqueTaskTypes() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('auditQueue');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const taskIndex = headers.indexOf('taskType');
-
-  const values = data.slice(1).map(row => row[taskIndex]);
-  const unique = [...new Set(values)].filter(v => v);
-  return unique.sort();
-}
-
-
