@@ -657,19 +657,23 @@ function saveDispute(dispute) {
   };
 }
 
-function updateDisputeStatus(disputeId, newStatus) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
+function updateEvaluationStatus(evalId, newStatus) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idIdx = headers.indexOf('id');
   const statusIdx = headers.indexOf('status');
 
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === disputeId);
-  if (rowIndex === -1) return { success: false, message: "Dispute not found" };
+  if (idIdx === -1 || statusIdx === -1) return;
 
-  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
-  return { success: true };
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === evalId) {
+      sheet.getRange(i + 1, statusIdx + 1).setValue(newStatus);
+      break;
+    }
+  }
 }
+
 
 /**
  * Resolves a dispute and updates relevant sheets.
