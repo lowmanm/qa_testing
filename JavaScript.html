@@ -1081,6 +1081,62 @@ function viewDispute(disputeId) {
   });
 }
 
+function showResolveDisputeForm(disputeId) {
+  hideAllViews();
+  document.getElementById('resolveDisputeView')?.classList.remove('hidden');
+
+  const questionsContainer = document.getElementById('resolveDisputeQuestions');
+  questionsContainer.innerHTML = '<div class="loading">Loading disputed questions...</div>';
+
+  google.script.run.withSuccessHandler(function(payload) {
+    const { evaluation, disputedQuestionIds } = payload;
+    const detailsContainer = document.getElementById('resolveEvaluationDetails');
+
+    // Populate evaluation summary
+    detailsContainer.innerHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Agent</p><p class="field-value">${evaluation.agentEmail}</p></div>
+        <div><p class="field-label">Task Type</p><p class="field-value">${evaluation.taskType}</p></div>
+        <div><p class="field-label">Reference Number</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
+        <div><p class="field-label">Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
+        <div><p class="field-label">Outcome</p><p class="field-value">${evaluation.outcome}</p></div>
+      </div>
+    `;
+
+    // Render disputed questions only
+    questionsContainer.innerHTML = '';
+    evaluation.questions
+      .filter(q => disputedQuestionIds.includes(q.questionId))
+      .forEach(q => {
+        const questionCard = document.createElement('div');
+        questionCard.className = 'question-card';
+        questionCard.setAttribute('data-question-id', q.questionId);
+
+        questionCard.innerHTML = `
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">Points: ${q.pointsPossible}</span>
+          </div>
+          <div class="question-body">
+            <div class="radio-group">
+              <label><input type="radio" name="resolution_q_${q.questionId}" value="yes"> <span>Yes</span></label>
+              <label><input type="radio" name="resolution_q_${q.questionId}" value="no"> <span>No</span></label>
+            </div>
+            <div class="feedback-field">
+              <label for="feedback_res_${q.questionId}">Resolution Notes:</label>
+              <textarea id="feedback_res_${q.questionId}" name="feedback_res_${q.questionId}" rows="2" class="form-control"></textarea>
+            </div>
+          </div>
+        `;
+        questionsContainer.appendChild(questionCard);
+      });
+
+    // Store disputed questionIds in a hidden field for validation on submit
+    document.getElementById('resolveDisputeForm').setAttribute('data-question-ids', disputedQuestionIds.join(','));
+
+  }).getDisputedEvaluationById(disputeId);
+}
+
 function handleResolveDisputeSubmit(e) {
   e.preventDefault();
 
