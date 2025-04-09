@@ -1,13 +1,10 @@
 <script>
-let currentUserEmail = '';
-  
   document.addEventListener('DOMContentLoaded', () => {
   initializeApp();
   attachNavHandlers();
   attachFormHandlers();
   attachAdminHandlers();
   attachDisputeHandlers();
-  attachQuestionFormHandler();
 });
 
   function showToast(message, type = 'info') {
@@ -27,7 +24,6 @@ let currentUserEmail = '';
 
   function initializeApp() {
     google.script.run.withSuccessHandler(user => {
-      currentUserEmail = user.email; // ✅ Save current user
       document.getElementById('userName').textContent = user.name;
       document.getElementById('userRole').textContent = formatRole(user.role);
 
@@ -87,22 +83,6 @@ function attachAuditTabHandlers() {
   form.addEventListener('submit', handleResolveDisputeSubmit);
 }
 
-function attachQuestionFormHandler() {
-  const form = document.getElementById('questionForm');
-  if (!form) return;
-
-  // Prevent multiple bindings
-  form.removeEventListener('submit', handleQuestionFormSubmit); 
-  form.addEventListener('submit', handleQuestionFormSubmit);
-
-  // Cancel button logic
-  document.getElementById('cancelQuestion')?.addEventListener('click', () => {
-    form.reset();
-    document.getElementById('questionFormView').classList.add('hidden');
-  });
-}
-
-
   function showDashboard() {
     hideAllViews();
     document.getElementById('dashboardView')?.classList.remove('hidden');
@@ -161,21 +141,7 @@ function attachQuestionFormHandler() {
   function attachFormHandlers() {
   const cancelEval = document.getElementById('cancelEvaluation');
   const evalForm = document.getElementById('evaluationForm');
-  if (cancelEval) {
-  cancelEval.addEventListener('click', () => {
-    const form = document.getElementById('evaluationForm');
-    const auditId = form.getAttribute('data-audit-id');
-
-    if (auditId) {
-      // Unlock the audit before navigating away
-      google.script.run.updateAuditStatusAndLock(auditId, 'pending');
-    }
-
-    resetEvaluationForm();  // optional: clear form
-    showAuditQueue();
-  });
-}
-
+  if (cancelEval) cancelEval.addEventListener('click', showAuditQueue);
   if (evalForm) evalForm.addEventListener('submit', handleEvaluationSubmit);
 
   const cancelDispute = document.getElementById('cancelDispute');
@@ -305,94 +271,19 @@ function showAddQuestionForm() {
     hideUserForm();
   }
 
-function showAdminTab(tabId) {
-  document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.add('hidden'));
-  document.getElementById(tabId)?.classList.remove('hidden');
+  function showAdminTab(tabId) {
+    document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(tabId)?.classList.remove('hidden');
 
-  document.querySelectorAll('.admin-tab-item').forEach(tab => tab.classList.remove('active'));
-  const tabButtonMap = {
-    'adminUsersView': 'adminUsers',
-    'adminQuestionsView': 'adminQuestions',
-    'adminSettingsView': 'adminSettings'
-  };
-  const activeBtn = tabButtonMap[tabId];
-  document.getElementById(activeBtn)?.classList.add('active');
-
-  // ✅ Load dynamic dropdowns when opening the Questions tab
-  if (tabId === 'adminQuestionsView') {
-  loadQuestionFilters();     // ✅ Populate filters
-  loadQuestionFormDropdowns();
-  loadQuestions();           // ✅ Load questions list
-}
-}
-
-  function loadQuestionFormDropdowns() {
-  google.script.run
-    .withSuccessHandler(populateRequestTypeOptions)
-    .getUniqueRequestTypes();
-
-  google.script.run
-    .withSuccessHandler(populateTaskTypeOptions)
-    .getUniqueTaskTypes();
-}
-
-  function loadQuestionFilters() {
-  google.script.run.withSuccessHandler(types => {
-    const dropdown = document.getElementById('taskTypeFilter');
-    dropdown.innerHTML = '<option value="">All Types</option>';
-    types.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t;
-      opt.textContent = t;
-      dropdown.appendChild(opt);
-    });
-  }).getUniqueTaskTypes();
-
-  google.script.run.withSuccessHandler(types => {
-    const dropdown = document.getElementById('requestTypeFilter');
-    dropdown.innerHTML = '<option value="">All Requests</option>';
-    types.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t;
-      opt.textContent = t;
-      dropdown.appendChild(opt);
-    });
-  }).getUniqueRequestTypes();
-}
-  
-/*
-This ensures the table refreshes whenever a filter is changed.
-*/
-document.getElementById('taskTypeFilter').addEventListener('change', loadQuestions);
-document.getElementById('requestTypeFilter').addEventListener('change', loadQuestions);
-
-
-  function populateRequestTypeOptions(types) {
-  const dropdown = document.getElementById('requestTypeDropdown');
-  if (!dropdown) return;
-
-  dropdown.innerHTML = '<option value="">Select Request Type</option>';
-  types.forEach(type => {
-    const option = document.createElement('option');
-    option.value = type;
-    option.textContent = type;
-    dropdown.appendChild(option);
-  });
-}
-
-function populateTaskTypeOptions(types) {
-  const dropdown = document.getElementById('taskTypeDropdown');
-  if (!dropdown) return;
-
-  dropdown.innerHTML = '<option value="">Select Task Type</option>';
-  types.forEach(type => {
-    const option = document.createElement('option');
-    option.value = type;
-    option.textContent = type;
-    dropdown.appendChild(option);
-  });
-}
-
+    document.querySelectorAll('.admin-tab-item').forEach(tab => tab.classList.remove('active'));
+    const tabButtonMap = {
+      'adminUsersView': 'adminUsers',
+      'adminQuestionsView': 'adminQuestions',
+      'adminSettingsView': 'adminSettings'
+    };
+    const activeBtn = tabButtonMap[tabId];
+    document.getElementById(activeBtn)?.classList.add('active');
+  }
 
   function showAuditQueue() {
   hideAllViews();
@@ -403,7 +294,7 @@ function populateTaskTypeOptions(types) {
   loadPendingTasks();       // default tab on load
 }
 
-function loadPendingTasks() {
+  function loadPendingTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
@@ -414,32 +305,21 @@ function loadPendingTasks() {
     }
 
     const fragment = document.createDocumentFragment();
-
     audits.forEach(function(audit) {
       const row = document.createElement('tr');
-      const isLocked = audit.lockedBy && audit.lockedBy !== '';
-      const isLockedByUser = audit.lockedBy === currentUserEmail;
-
-      row.className = isLocked && !isLockedByUser ? 'row-locked' : '';
-
       row.innerHTML = `
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
         <td>${formatDate(audit.taskTimestamp)}</td>
         <td>
-          ${isLocked
-            ? `<span class="badge badge-warning" title="Locked by ${audit.lockedBy}">
-                 ${isLockedByUser ? 'Locked by you' : 'Locked'}
-               </span>`
-            : `<span class="badge badge-pending">Pending</span>`}
-        </td>
+  <span class="badge ${audit.auditStatus === 'misconfigured' ? 'badge-danger' : 'badge-' + audit.auditStatus}"
+        title="${audit.auditStatus === 'misconfigured' ? 'No questions configured for this task type' : audit.auditStatus}">
+    ${audit.auditStatus}
+  </span>
+</td>
         <td>
-          ${isLocked && !isLockedByUser
-            ? `<button class="btn btn-sm btn-secondary" disabled title="This audit is currently being evaluated by ${audit.lockedBy}">In Use</button>`
-            : `<button class="evaluate-button btn btn-sm btn-primary" data-audit-id="${audit.auditId}">
-                 ${isLockedByUser ? 'Resume' : 'Evaluate'}
-               </button>`}
+          <button class="evaluate-button btn btn-sm btn-primary" data-audit-id="${audit.auditId}">Evaluate</button>
         </td>
       `;
       fragment.appendChild(row);
@@ -449,16 +329,13 @@ function loadPendingTasks() {
     tableBody.appendChild(fragment);
   }).getPendingAudits();
 
-  // ✅ Attach the event listener just once
-  if (!tableBody.hasListenerAttached) {
-    tableBody.addEventListener('click', function(event) {
-      if (event.target.classList.contains('evaluate-button')) {
-        const auditId = event.target.getAttribute('data-audit-id');
-        showEvaluationForm(auditId);
-      }
-    });
-    tableBody.hasListenerAttached = true;
-  }
+  // Delegate event for all evaluate buttons
+  tableBody.addEventListener('click', function(event) {
+    if (event.target.classList.contains('evaluate-button')) {
+      const auditId = event.target.getAttribute('data-audit-id');
+      showEvaluationForm(auditId);
+    }
+  });
 }
 
 function loadErrorTasks() {
@@ -505,7 +382,7 @@ function loadErrorTasks() {
   });
 }
 
-function showEvaluationForm(auditId) {
+  function showEvaluationForm(auditId) {
   hideAllViews();
   document.getElementById('evaluationFormView').classList.remove('hidden');
 
@@ -523,47 +400,39 @@ function showEvaluationForm(auditId) {
   ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr => form.removeAttribute(attr));
 
   // Fetch and render new audit
-  google.script.run
-    .withSuccessHandler(function(audit) {
-      taskDetails.innerHTML = `
-        <div class="grid-2">
-          <div><p class="field-label">Agent</p><p class="field-value">${audit.agentEmail}</p></div>
-          <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(audit.taskType)}</p></div>
-          <div><p class="field-label">Reference Number</p><p class="field-value">${audit.referenceNumber || 'N/A'}</p></div>
-          <div><p class="field-label">Date</p><p class="field-value">${formatDate(audit.taskTimestamp)}</p></div>
-          <div><p class="field-label">Request Type</p><p class="field-value">${escapeHTML(audit.requestType || 'N/A')}</p></div>
-          <div><p class="field-label">Outcome</p><p class="field-value">${audit.outcome || 'N/A'}</p></div>
-        </div>
-      `;
+  google.script.run.withSuccessHandler(function(audit) {
+    taskDetails.innerHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Agent</p><p class="field-value">${audit.agentEmail}</p></div>
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(audit.taskType)}</p></div>
+        <div><p class="field-label">Reference Number</p><p class="field-value">${audit.referenceNumber || 'N/A'}</p></div>
+        <div><p class="field-label">Date</p><p class="field-value">${formatDate(audit.taskTimestamp)}</p></div>
+        <div><p class="field-label">Request Type</p><p class="field-value">${formatTaskType(audit.requestType || 'N/A')}</p></div>
+        <div><p class="field-label">Outcome</p><p class="field-value">${audit.outcome || 'N/A'}</p></div>
+      </div>
+    `;
 
-      // Form metadata
-      form.setAttribute('data-audit-id', auditId);
-      form.setAttribute('data-reference-number', audit.referenceNumber || '');
-      form.setAttribute('data-task-type', audit.taskType || '');
-      form.setAttribute('data-outcome', audit.outcome || '');
+    // Form metadata
+    form.setAttribute('data-audit-id', auditId);
+    form.setAttribute('data-reference-number', audit.referenceNumber || '');
+    form.setAttribute('data-task-type', audit.taskType || '');
+    form.setAttribute('data-outcome', audit.outcome || '');
 
-      // Load relevant questions
-      loadQuestionsForEvaluation(audit);
-    })
-    .withFailureHandler(function(error) {
-      showToast(error.message || 'This audit is currently locked by another user.', 'warning');
-      resetEvaluationForm();
-      showAuditQueue();
-      loadPendingTasks();
-    })
-    .prepareEvaluation(auditId);
+    // Load relevant questions
+    loadQuestionsForEvaluation(audit.taskType);
+  }).prepareEvaluation(auditId);
 }
-  
+
   let toastShown = false;
 
-function loadQuestionsForEvaluation(audit, attempt = 1) {
+function loadQuestionsForEvaluation(taskType, attempt = 1) {
   const maxRetries = 5;
   const questionsContainer = document.getElementById('questions');
   const form = document.getElementById('evaluationForm');
 
   if (!questionsContainer) {
     if (attempt < maxRetries) {
-      return setTimeout(() => loadQuestionsForEvaluation(audit, attempt + 1), 300);
+      return setTimeout(() => loadQuestionsForEvaluation(taskType, attempt + 1), 300);
     } else {
       alert('Failed to load questions. Please return to the Audit Queue and try again.');
       return;
@@ -572,17 +441,17 @@ function loadQuestionsForEvaluation(audit, attempt = 1) {
 
   questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
 
-  google.script.run.withSuccessHandler(function (questions) {
+  google.script.run.withSuccessHandler(function(questions) {
     let maxPossibleScore = 0;
     questionsContainer.innerHTML = '';
 
     if (questions.length === 0) {
       if (!toastShown) {
-        showToast("No evaluation questions are set up for this request + task type.", 'error');
+        showToast("No evaluation questions are set up for this task type.", 'error');
         toastShown = true;
       }
       markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
-      showAuditQueue();
+      showAuditQueue(); // return user to queue
       return;
     }
 
@@ -616,7 +485,7 @@ function loadQuestionsForEvaluation(audit, attempt = 1) {
 
     form.setAttribute('data-max-score', maxPossibleScore);
     form.classList.remove('disabled');
-  }).getQuestionsBySet(audit.requestType, audit.taskType);
+  }).getQuestionsForTaskType(taskType);
 }
 
 function markAuditAsMisconfigured(auditId) {
@@ -731,11 +600,9 @@ function markAuditAsMisconfigured(auditId) {
     .saveEvaluation(evaluationData);
 }
 
-function resetEvaluationForm() {
+  function resetEvaluationForm() {
   const form = document.getElementById('evaluationForm');
-  if (!form) return;
-
-  form.reset(); // Clear all inputs
+  form.reset();
 
   const questionsContainer = document.getElementById('questions');
   if (questionsContainer) questionsContainer.innerHTML = '';
@@ -743,19 +610,10 @@ function resetEvaluationForm() {
   const feedbackField = document.getElementById('feedback');
   if (feedbackField) feedbackField.value = '';
 
-  // Remove audit-specific metadata
   ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr =>
     form.removeAttribute(attr)
   );
-
-  // Hide the evaluation form view (optional, but improves UX)
-  document.getElementById('evaluationFormView')?.classList.add('hidden');
-
-  // Remove loading indicator if still present
-  document.getElementById('evaluationLoadingIndicator')?.remove();
 }
-
-
 
   function loadEvaluations() {
   const tableBody = document.getElementById('evaluationsBody');
@@ -1081,134 +939,7 @@ function viewDispute(disputeId) {
   });
 }
 
-function showResolveDisputeForm(disputeId) {
-  hideAllViews();
-  document.getElementById('resolveDisputeView')?.classList.remove('hidden');
-
-  const questionsContainer = document.getElementById('resolveDisputeQuestions');
-  questionsContainer.innerHTML = '<div class="loading">Loading disputed questions...</div>';
-
-  google.script.run.withSuccessHandler(function(payload) {
-    const { evaluation, disputedQuestionIds } = payload;
-    const detailsContainer = document.getElementById('resolveEvaluationDetails');
-
-    // Populate evaluation summary
-    detailsContainer.innerHTML = `
-      <div class="grid-2">
-        <div><p class="field-label">Agent</p><p class="field-value">${evaluation.agentEmail}</p></div>
-        <div><p class="field-label">Task Type</p><p class="field-value">${evaluation.taskType}</p></div>
-        <div><p class="field-label">Reference Number</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
-        <div><p class="field-label">Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
-        <div><p class="field-label">Outcome</p><p class="field-value">${evaluation.outcome}</p></div>
-      </div>
-    `;
-
-    // Render disputed questions only
-    questionsContainer.innerHTML = '';
-    evaluation.questions
-      .filter(q => disputedQuestionIds.includes(q.questionId))
-      .forEach(q => {
-        const questionCard = document.createElement('div');
-        questionCard.className = 'question-card';
-        questionCard.setAttribute('data-question-id', q.questionId);
-
-        questionCard.innerHTML = `
-          <div class="question-header">
-            <h3 class="question-text">${q.questionText}</h3>
-            <span class="question-points">Points: ${q.pointsPossible}</span>
-          </div>
-          <div class="question-body">
-            <div class="radio-group">
-              <label><input type="radio" name="resolution_q_${q.questionId}" value="yes"> <span>Yes</span></label>
-              <label><input type="radio" name="resolution_q_${q.questionId}" value="no"> <span>No</span></label>
-            </div>
-            <div class="feedback-field">
-              <label for="feedback_res_${q.questionId}">Resolution Notes:</label>
-              <textarea id="feedback_res_${q.questionId}" name="feedback_res_${q.questionId}" rows="2" class="form-control"></textarea>
-            </div>
-          </div>
-        `;
-        questionsContainer.appendChild(questionCard);
-      });
-
-    // Store disputed questionIds in a hidden field for validation on submit
-    document.getElementById('resolveDisputeForm').setAttribute('data-question-ids', disputedQuestionIds.join(','));
-
-  }).getDisputedEvaluationById(disputeId);
-}
-
-function handleResolveDisputeSubmit(e) {
-  e.preventDefault();
-
-  const form = e.target;
-  const evalId = form.getAttribute('data-eval-id');
-  const disputeId = form.getAttribute('data-dispute-id');
-  const resolutionNotes = document.getElementById('resolutionNotes')?.value || '';
-
-  const decisions = [];
-  let overturnCount = 0;
-  let validationFailed = false;
-
-  const questionCards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
-
-  questionCards.forEach(card => {
-    const radioInputs = card.querySelectorAll('input[type="radio"]');
-    if (!radioInputs.length) return;
-
-    const nameAttr = radioInputs[0].name; // e.g., resolution_q_123456
-    const questionId = nameAttr.replace('resolution_q_', '').trim();
-    const selected = form.querySelector(`input[name="${nameAttr}"]:checked`);
-    const note = form.querySelector(`#note_${questionId}`)?.value.trim() || '';
-
-    if (!selected) {
-      validationFailed = true;
-      return;
-    }
-
-    const resolution = selected.value;
-
-    if (resolution === 'upheld' && !note) {
-      showToast(`Justification is required for upheld question ${questionId}.`, 'warning');
-      validationFailed = true;
-      return;
-    }
-
-    if (resolution === 'overturned') overturnCount++;
-
-    decisions.push({ questionId, resolution, note });
-  });
-
-  if (validationFailed) {
-    showToast("Please select a resolution for all disputed questions.", 'warning');
-    return;
-  }
-
-  const total = decisions.length;
-  let status = 'upheld';
-  if (overturnCount === total && total > 0) status = 'overturned';
-  else if (overturnCount > 0) status = 'partial overturn';
-
-  const payload = {
-    disputeId,
-    evalId,
-    resolutionNotes,
-    decisions,
-    status
-  };
-
-  google.script.run
-    .withSuccessHandler(() => {
-      showToast('Dispute resolved successfully.', 'success');
-      showDisputes();
-    })
-    .withFailureHandler(error => {
-      console.error('Error resolving dispute:', error);
-      showToast('Failed to resolve dispute: ' + error.message, 'error');
-    })
-    .resolveDispute(payload);
-}
-
-function handleDisputeSubmit(e) {
+  function handleDisputeSubmit(e) {
   e.preventDefault();
 
   const form = document.getElementById('disputeForm');
@@ -1216,35 +947,28 @@ function handleDisputeSubmit(e) {
 
   const evaluationId = form.getAttribute('data-evaluation-id');
   const reasonField = document.getElementById('disputeReason');
-  const reason = reasonField ? reasonField.value.trim() : '';
+  const reason = reasonField ? reasonField.value : '';
 
   if (!reason) {
     showToast("Please provide a reason for the dispute.", 'warning');
     return;
   }
 
-  const disputedQuestionIds = Array.from(document.querySelectorAll('input[name^="dispute_question_"]:checked'))
-    .map(cb => cb.value);
+  google.script.run.withSuccessHandler(function(disputesQueue) {
+    const isDisputed = disputesQueue.some(d => d.evalId === evaluationId);
 
-  if (disputedQuestionIds.length === 0) {
-    showToast("Please select at least one question to dispute.", 'warning');
-    return;
-  }
-
-  // Optional UX: disable while submitting
-  form.classList.add('disabled');
-  const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting...';
-  }
-
-  google.script.run.withSuccessHandler(function(disputes) {
-    const alreadyDisputed = disputes.some(d => d.evalId === evaluationId);
-
-    if (alreadyDisputed) {
+    if (isDisputed) {
       showToast("This evaluation has already been disputed.", 'warning');
-      showEvaluations();
+      return;
+    }
+
+    const disputedQuestionIds = [];
+    document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(checkbox => {
+      disputedQuestionIds.push(checkbox.value);
+    });
+
+    if (disputedQuestionIds.length === 0) {
+      showToast("Please select at least one question to dispute.", 'warning');
       return;
     }
 
@@ -1255,79 +979,130 @@ function handleDisputeSubmit(e) {
       status: 'pending'
     };
 
+    form.innerHTML = '<div class="loading">Submitting dispute...</div>';
+
     google.script.run
       .withSuccessHandler(() => {
         showToast("Dispute submitted successfully!", 'success');
-        showEvaluations(); // ✅ Back to evaluations view
+        showEvaluations();
       })
       .withFailureHandler(error => {
-        console.error(error.message);
-        showToast("Error submitting dispute: " + error.message, 'error');
-        form.classList.remove('disabled');
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Submit Dispute';
-        }
+        form.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
+        setTimeout(() => showEvaluations(), 3000);
       })
       .saveDispute(disputeData);
-
-  }).getAllDisputes(); // Live validation
+  }).getAllDisputes();
 }
 
-function showResolveDisputeForm(disputeId) {
+
+  function resolveDispute(disputeId) {
   hideAllViews();
-  document.getElementById('resolveDisputeView')?.classList.remove('hidden');
+  const resolveDisputeView = document.getElementById('resolveDisputeView');
+  resolveDisputeView.classList.remove('hidden');
+  resolveDisputeView.innerHTML = ''; // Clear previous content
 
-  const questionsContainer = document.getElementById('resolveDisputeQuestions');
-  questionsContainer.innerHTML = '<div class="loading">Loading disputed questions...</div>';
+  google.script.run.withSuccessHandler(function(data) {
+    const dispute = data.disputes.find(d => d.id === disputeId);
+    const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
 
-  google.script.run.withSuccessHandler(function(payload) {
-    const { evaluation, disputedQuestionIds } = payload;
-    const detailsContainer = document.getElementById('resolveEvaluationDetails');
+    if (!dispute || !evaluation) {
+      showToast("Dispute or evaluation not found.", 'error');
+      return;
+    }
 
-    // Populate evaluation summary
-    detailsContainer.innerHTML = `
-      <div class="grid-2">
-        <div><p class="field-label">Agent</p><p class="field-value">${evaluation.agentEmail}</p></div>
-        <div><p class="field-label">Task Type</p><p class="field-value">${evaluation.taskType}</p></div>
-        <div><p class="field-label">Reference Number</p><p class="field-value">${evaluation.referenceNumber || 'N/A'}</p></div>
-        <div><p class="field-label">Date</p><p class="field-value">${formatDate(evaluation.stopTimestamp)}</p></div>
-        <div><p class="field-label">Outcome</p><p class="field-value">${evaluation.outcome}</p></div>
+    // Update status to "reviewing"
+    google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
+
+    // Inject HTML structure for the resolve view
+    resolveDisputeView.innerHTML = `
+      <div class="card">
+        <h2>Resolve Dispute</h2>
+        <div id="resolveEvaluationDetails" class="mb-4">Loading...</div>
+
+        <form id="resolveDisputeForm">
+          <div id="resolveDisputeQuestions" class="questions-container mb-4">Loading questions...</div>
+
+          <div class="form-group mt-3">
+            <label for="resolutionNotes">General Notes (optional)</label>
+            <textarea id="resolutionNotes" name="resolutionNotes" rows="3" class="form-control"></textarea>
+          </div>
+
+          <div class="button-group">
+            <button type="button" id="cancelResolveDispute" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">Submit Resolution</button>
+          </div>
+        </form>
       </div>
     `;
 
-    // Render disputed questions only
-    questionsContainer.innerHTML = '';
-    evaluation.questions
-      .filter(q => disputedQuestionIds.includes(q.questionId))
-      .forEach(q => {
-        const questionCard = document.createElement('div');
-        questionCard.className = 'question-card';
-        questionCard.setAttribute('data-question-id', q.questionId);
+    const form = document.getElementById('resolveDisputeForm');
+    form.setAttribute('data-eval-id', evaluation.id);
+    form.setAttribute('data-dispute-id', dispute.id);
 
-        questionCard.innerHTML = `
-          <div class="question-header">
-            <h3 class="question-text">${q.questionText}</h3>
-            <span class="question-points">Points: ${q.pointsPossible}</span>
+    // Attach the submit handler directly here
+    form.addEventListener('submit', handleResolveDisputeSubmit);
+
+    // Attach the cancel handler
+    document.getElementById('cancelResolveDispute').addEventListener('click', function() {
+      google.script.run
+        .withSuccessHandler(() => {
+          showToast('Dispute status updated to pending.', 'success');
+          showDisputes();
+        })
+        .withFailureHandler(error => {
+          console.error('Error updating dispute status:', error);
+          showToast('Failed to update dispute status: ' + error.message, 'error');
+        })
+        .updateDisputeStatus(dispute.id, 'pending');
+    });
+
+    // Render evaluation metadata
+    const detailsHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+        <div><p class="field-label">QA Agent</p><p class="field-value">${evaluation.qaEmail}</p></div>
+        <div><p class="field-label">Dispute Reason</p><p class="field-value">${dispute.reason}</p></div>
+      </div>
+    `;
+    document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
+
+    // Render disputed questions
+    const container = document.getElementById('resolveDisputeQuestions');
+    container.innerHTML = '';
+
+    evaluation.questions.forEach(q => {
+      if (!q.questionId || !q.questionText) return; // skip invalid
+      if (!dispute.questionIds.includes(q.questionId)) return;
+
+      const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+      const card = document.createElement('div');
+      card.className = `question-card ${highlightClass}`;
+      card.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="resolution_${q.questionId}" value="upheld" required>
+              <span>Uphold</span>
+            </label>
+            <label>
+              <input type="radio" name="resolution_${q.questionId}" value="overturned">
+              <span>Overturn</span>
+            </label>
           </div>
-          <div class="question-body">
-            <div class="radio-group">
-              <label><input type="radio" name="resolution_q_${q.questionId}" value="yes"> <span>Yes</span></label>
-              <label><input type="radio" name="resolution_q_${q.questionId}" value="no"> <span>No</span></label>
-            </div>
-            <div class="feedback-field">
-              <label for="feedback_res_${q.questionId}">Resolution Notes:</label>
-              <textarea id="feedback_res_${q.questionId}" name="feedback_res_${q.questionId}" rows="2" class="form-control"></textarea>
-            </div>
+          <div class="form-group mt-2">
+            <label for="note_${q.questionId}">Justification (required if Upheld)</label>
+            <textarea class="form-control" id="note_${q.questionId}" name="note_${q.questionId}" rows="2"></textarea>
           </div>
-        `;
-        questionsContainer.appendChild(questionCard);
-      });
-
-    // Store disputed questionIds in a hidden field for validation on submit
-    document.getElementById('resolveDisputeForm').setAttribute('data-question-ids', disputedQuestionIds.join(','));
-
-  }).getDisputedEvaluationById(disputeId);
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }).getAllEvaluationsAndDisputes();
 }
 
   function loadUsers() {
@@ -1426,163 +1201,95 @@ function deleteUser(userId) {
     .deleteUser(userId);
 }
 
-function loadQuestions() {
-  console.log("🔄 loadQuestions triggered");
+  function loadQuestions() {
+  const tableBody = document.getElementById('questionsBody');
+  tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Loading...</td></tr>';
 
-  google.script.run
-    .withSuccessHandler(renderQuestionTable)
-    .getAllQuestions();
+  const filter = document.getElementById('taskTypeFilter').value;
+
+  google.script.run.withSuccessHandler(function(questions) {
+    const filtered = filter ? questions.filter(q => q.taskType === filter) : questions;
+
+    if (!filtered.length) {
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500">No questions found${filter ? ' for this task type' : ''}</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = '';
+    filtered.forEach(q => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${q.questionText}</td>
+        <td>${formatTaskType(q.taskType)}</td>
+        <td>${q.pointsPossible}</td>
+        <td>
+          <button class="edit-question-button btn btn-sm btn-primary" data-question-id="${q.id}">Edit</button>
+          <button class="delete-question-button btn btn-sm btn-danger" data-question-id="${q.id}">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+
+    document.querySelectorAll('.edit-question-button').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const qid = btn.getAttribute('data-question-id');
+        const question = filtered.find(q => q.id === qid);
+        showQuestionForm(question);
+      })
+    );
+
+    document.querySelectorAll('.delete-question-button').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const qid = btn.getAttribute('data-question-id');
+        if (confirm('Delete this question?')) deleteQuestion(qid);
+      })
+    );
+  }).getAllQuestions();
 }
 
-function showQuestionForm(question = null) {
-  const form = document.getElementById('questionForm');
-  if (!form) return;
-
-  form.reset();
-  document.getElementById('questionFormView').classList.remove('hidden');
-  document.getElementById('questionFormTitle').textContent = question ? 'Edit Question' : 'Add Question';
-
-  // Set static fields immediately
+  function showQuestionForm(question = null) {
+  const isEdit = !!question;
+  document.getElementById('questionFormTitle').textContent = isEdit ? 'Edit Question' : 'Add Question';
   document.getElementById('questionId').value = question?.id || '';
-  document.getElementById('sequenceId').value = question?.sequenceId || '';
-  document.getElementById('pointsPossible').value = question?.pointsPossible || '';
   document.getElementById('questionText').value = question?.questionText || '';
+  document.getElementById('questionTaskType').value = question?.taskType || 'phone_call';
+  document.getElementById('questionPoints').value = question?.pointsPossible || '10';
+  document.getElementById('questionSetId').value = question?.setId || '';
 
-  // Load dropdowns first
-  google.script.run.withSuccessHandler(types => {
-    const dropdown = document.getElementById('requestTypeDropdown');
-    dropdown.innerHTML = '';
-    types.forEach(type => {
-      const option = document.createElement('option');
-      option.value = type;
-      option.textContent = type;
-      dropdown.appendChild(option);
-    });
-
-    // ✅ Set selected value AFTER loading options
-    if (question?.requestType) {
-      dropdown.value = question.requestType;
-    }
-  }).getUniqueRequestTypes();
-
-  google.script.run.withSuccessHandler(types => {
-    const dropdown = document.getElementById('taskTypeDropdown');
-    dropdown.innerHTML = '';
-    types.forEach(type => {
-      const option = document.createElement('option');
-      option.value = type;
-      option.textContent = type;
-      dropdown.appendChild(option);
-    });
-
-    // ✅ Set selected value AFTER loading options
-    if (question?.taskType) {
-      dropdown.value = question.taskType;
-    }
-  }).getUniqueTaskTypes();
+  document.getElementById('questionForm').classList.remove('hidden');
 }
-
 
 function hideQuestionForm() {
-  const form = document.getElementById('questionForm');
-  form.reset();
-  document.getElementById('questionFormView').classList.add('hidden');
-
-  console.log("🔄 Reloading questions from hideQuestionForm()");
-  loadQuestions(); // ✅ ensure this is always run
+  document.getElementById('questionForm').classList.add('hidden');
 }
 
 function handleQuestionFormSubmit(e) {
   e.preventDefault();
 
-  const form = document.getElementById('questionForm');
-  const id = document.getElementById('questionId')?.value || null;
-  const sequenceId = parseInt(document.getElementById('sequenceId').value);
-  const requestType = document.getElementById('requestTypeDropdown').value;
-  const taskType = document.getElementById('taskTypeDropdown').value;
-  const questionText = document.getElementById('questionText').value;
-  const pointsPossible = parseFloat(document.getElementById('pointsPossible').value);
+  const id = document.getElementById('questionId').value;
+  const data = {
+    id,
+    questionText: document.getElementById('questionText').value,
+    taskType: document.getElementById('questionTaskType').value,
+    pointsPossible: parseInt(document.getElementById('questionPoints').value),
+    setId: document.getElementById('questionSetId').value
+  };
 
-  if (!sequenceId || !requestType || !taskType || !questionText || !pointsPossible) {
-    showToast("Please fill out all fields correctly.", "warning");
-    return;
+  const onSuccess = () => {
+    showToast(`Question ${id ? 'updated' : 'created'} successfully.`, 'success');
+    hideQuestionForm();
+    loadQuestions();
+  };
+
+  const onFailure = err => showToast("Error saving question: " + err.message, 'error');
+
+  if (id) {
+    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).updateQuestion(data);
+  } else {
+    google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).createQuestion(data);
   }
-
-  const data = { id, sequenceId, requestType, taskType, questionText, pointsPossible };
-
-  console.log("🚀 Submitting question data:", data); // Debug log
-
-  google.script.run
-    .withSuccessHandler(() => {
-      showToast(`Question ${id ? 'updated' : 'created'} successfully.`, 'success');
-      hideQuestionForm();
-      loadQuestions(); // ✅ Refresh table
-    })
-    .withFailureHandler(err => {
-      showToast("Error saving question: " + err.message, 'error');
-    })
-    .saveQuestion(data);
 }
 
-function renderQuestionTable(questions) {
-  const tbody = document.getElementById('questionListBody');
-  if (!tbody) return;
-
-  const taskFilter = document.getElementById('taskTypeFilter').value;
-  const requestFilter = document.getElementById('requestTypeFilter').value;
-
-  const filtered = questions.filter(q => {
-    const matchTask = !taskFilter || q.taskType === taskFilter;
-    const matchRequest = !requestFilter || q.requestType === requestFilter;
-    return matchTask && matchRequest;
-  });
-
-  tbody.innerHTML = '';
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No questions available</td></tr>';
-    return;
-  }
-
-  filtered.forEach(q => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${q.sequenceId || ''}</td>
-      <td>${q.requestType || ''}</td>
-      <td>${q.taskType || ''}</td>
-      <td>${q.questionText || ''}</td>
-      <td>${q.pointsPossible || ''}</td>
-      <td>
-        <input type="checkbox" class="toggle-active" data-id="${q.id}" ${q.active ? 'checked' : ''}>
-      </td>
-      <td>
-        <button class="btn btn-sm btn-primary" data-id="${q.id}" data-action="edit">Edit</button>
-      </td>
-    `;
-    tbody.appendChild(row);
-  });
-}
-
-const questionTableBody = document.getElementById('questionListBody');
-if (questionTableBody) {
-  questionTableBody.addEventListener('click', function (e) {
-    const target = e.target;
-    const id = target.getAttribute('data-id');
-
-    if (target.classList.contains('toggle-active')) {
-      const isActive = target.checked;
-      google.script.run.toggleQuestionActive(id, isActive);
-    }
-
-    if (target.getAttribute('data-action') === 'edit') {
-      google.script.run
-        .withSuccessHandler(showQuestionForm)
-        .getQuestionById(id);
-    }
-  });
-}
-
-  
 function deleteQuestion(qid) {
   google.script.run
     .withSuccessHandler(() => {
@@ -1601,19 +1308,6 @@ function deleteQuestion(qid) {
 function formatTaskType(type) {
   if (!type) return 'Unknown';
   return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-}
-
-function escapeHTML(str) {
-  if (!str) return '';
-  return str.replace(/[&<>"']/g, function (char) {
-    return ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    })[char];
-  });
 }
 
   function formatDate(dateStr) {
@@ -1726,5 +1420,75 @@ document.addEventListener('DOMContentLoaded', function () {
     cancelQuestionBtn.addEventListener('click', hideQuestionForm);
   }
 });
+
+function handleResolveDisputeSubmit(e) {
+  e.preventDefault();
+
+  const form = e.target;
+  const evalId = form.getAttribute('data-eval-id');
+  const disputeId = form.getAttribute('data-dispute-id');
+  const resolutionNotes = document.getElementById('resolutionNotes')?.value || '';
+
+  const decisions = [];
+  let overturnCount = 0;
+
+  const cards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
+  let hasMissing = false;
+
+  cards.forEach(card => {
+  const radioInput = card.querySelector('input[type="radio"]');
+  if (!radioInput || !radioInput.name.includes('_')) return;
+
+  const qid = radioInput.name.split('_')[1];
+  if (!qid) return; // extra guard
+
+  const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
+  const note = form.querySelector(`#note_${qid}`)?.value || '';
+
+  if (!selected) {
+    showToast('Please make a selection for all disputed questions.', 'warning');
+    hasMissing = true;
+    return;
+  }
+
+  const resolution = selected.value;
+  if (resolution === 'upheld' && !note.trim()) {
+    showToast('Justification is required for upheld questions.', 'warning');
+    hasMissing = true;
+    return;
+  }
+
+  if (resolution === 'overturned') overturnCount++;
+
+  decisions.push({ questionId: qid, resolution, note });
+});
+
+  if (hasMissing) return;
+
+  const totalDisputed = decisions.length;
+  let newStatus = 'upheld';
+  if (overturnCount === totalDisputed && totalDisputed > 0) {
+    newStatus = 'overturned';
+  } else if (overturnCount > 0) {
+    newStatus = 'partial overturn';
+  }
+
+  google.script.run
+    .withSuccessHandler(() => {
+      showToast('Dispute resolved successfully.', 'success');
+      showDisputes();
+    })
+    .withFailureHandler(error => {
+      console.error('Error resolving dispute:', error);
+      showToast('Failed to resolve dispute: ' + error.message, 'error');
+    })
+    .resolveDispute({
+      disputeId,
+      evalId,
+      decisions,
+      resolutionNotes,
+      status: newStatus
+    });
+}
 
 </script>
