@@ -719,96 +719,52 @@ function updateEvaluationStatus(evalId, newStatus) {
 /**
  * Resolves a dispute and updates relevant sheets.
  */
-function resolveDispute(resolution) {
+function resolveDispute(payload) {
+  const {
+    disputeId,
+    evalId,
+    decisions,
+    resolutionNotes,
+    status
+  } = payload;
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
-  const summarySheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
+  const evalSheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
+  const evalData = evalSheet.getDataRange().getValues();
+  const evalHeaders = evalData[0];
+  const idIdx = evalHeaders.indexOf('id');
+  const statusIdx = evalHeaders.indexOf('status');
+
   const disputeSheet = ss.getSheetByName(SHEET_DISPUTES_QUEUE);
-
-  const { disputeId, evalId, decisions, resolutionNotes, status } = resolution;
-  const resolvedBy = Session.getActiveUser().getEmail();
-  const resolvedAt = new Date().toISOString();
-
-  // Get evalQuest data
-  const questData = questSheet.getDataRange().getValues();
-  const headers = questData[0];
-  const idIndex = headers.indexOf('evalId');
-  const questionIdIndex = headers.indexOf('questionId');
-  const responseIndex = headers.indexOf('response');
-  const pointsEarnedIndex = headers.indexOf('pointsEarned');
-  const feedbackIndex = headers.indexOf('feedback');
-  const pointsPossibleIndex = headers.indexOf('pointsPossible');
-
-  // Update affected questions
-  const updatedRows = [];
-  for (let i = 1; i < questData.length; i++) {
-    const row = questData[i];
-    if (row[idIndex] !== evalId) continue;
-
-    const decision = decisions.find(d => d.questionId === row[questionIdIndex]);
-    if (!decision) continue;
-
-    if (decision.resolution === 'overturned') {
-      row[responseIndex] = 'yes';
-      row[pointsEarnedIndex] = row[pointsPossibleIndex];
-    }
-
-    row[feedbackIndex] = decision.note || '';
-    updatedRows.push(row);
-  }
-
-  if (updatedRows.length) {
-    questSheet.getRange(2, 1, updatedRows.length, headers.length).setValues(updatedRows);
-  }
-
-  // Recalculate score totals
-  const updatedQuestData = questSheet.getDataRange().getValues().filter(row => row[idIndex] === evalId);
-  const totalPoints = updatedQuestData.reduce((sum, row) => sum + (parseFloat(row[pointsEarnedIndex]) || 0), 0);
-  const totalPossible = updatedQuestData.reduce((sum, row) => sum + (parseFloat(row[pointsPossibleIndex]) || 0), 0);
-  const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
-
-  // Update evalSummary
-  const summaryData = summarySheet.getDataRange().getValues();
-  const sHeaders = summaryData[0];
-  const sIdIndex = sHeaders.indexOf('id');
-  const totalPointsIndex = sHeaders.indexOf('totalPoints');
-  const evalScoreIndex = sHeaders.indexOf('evalScore');
-  const statusIndex = sHeaders.indexOf('status');
-
-  for (let i = 1; i < summaryData.length; i++) {
-    const row = summaryData[i];
-    if (row[sIdIndex] === evalId) {
-      summarySheet.getRange(i + 1, totalPointsIndex + 1).setValue(totalPoints);
-      summarySheet.getRange(i + 1, evalScoreIndex + 1).setValue(evalScore);
-      summarySheet.getRange(i + 1, statusIndex + 1).setValue(status || 'resolved');
-      break;
-    }
-  }
-
-  // Update dispute row
   const disputeData = disputeSheet.getDataRange().getValues();
-  const dHeaders = disputeData[0];
-  const dIdIndex = dHeaders.indexOf('id');
-  const dStatusIndex = dHeaders.indexOf('status');
-  const dNotesIndex = dHeaders.indexOf('resolutionNotes');
-  const dByIndex = dHeaders.indexOf('resolvedBy');
-  const dTimeIndex = dHeaders.indexOf('resolutionTimestamp');
+  const disputeHeaders = disputeData[0];
+  const disputeIdIdx = disputeHeaders.indexOf('id');
+  const disputeStatusIdx = disputeHeaders.indexOf('status');
+  const notesIdx = disputeHeaders.indexOf('resolutionNotes');
 
-  for (let i = 1; i < disputeData.length; i++) {
-    const row = disputeData[i];
-    if (row[dIdIndex] === disputeId) {
-      disputeSheet.getRange(i + 1, dStatusIndex + 1).setValue(status || 'resolved');
-      disputeSheet.getRange(i + 1, dNotesIndex + 1).setValue(resolutionNotes || '');
-      disputeSheet.getRange(i + 1, dByIndex + 1).setValue(resolvedBy);
-      disputeSheet.getRange(i + 1, dTimeIndex + 1).setValue(resolvedAt);
-      break;
+  // ✅ 1. Update status on EVALUATION sheet
+  const evalRow = evalData.findIndex((row, i) => i > 0 && row[idIdx] === evalId);
+  if (evalRow > 0 && statusIdx !== -1) {
+    evalSheet.getRange(evalRow + 1, statusIdx + 1).setValue(status);
+  }
+
+  // ✅ 2. Update status on DISPUTES sheet
+  const disputeRow = disputeData.findIndex((row, i) => i > 0 && row[disputeIdIdx] === disputeId);
+  if (disputeRow > 0 && disputeStatusIdx !== -1) {
+    disputeSheet.getRange(disputeRow + 1, disputeStatusIdx + 1).setValue(status);
+    if (notesIdx !== -1) {
+      disputeSheet.getRange(disputeRow + 1, notesIdx + 1).setValue(resolutionNotes || '');
     }
   }
 
-  // Invalidate caches
-  clearCache('all_disputes', 'all_evaluations');
+  // ✅ 3. (Optional/Future) Save resolutions per question if needed
+  // You can persist individual question decisions to another sheet if needed
+  // For now, it's not required since status covers the summary.
 
-  return true;
+  // ✅ 4. Invalidate caches
+  clearCache(['all_disputes', 'all_evaluations']);
+
+  return { success: true };
 }
 
 function getAllEvaluationsAndDisputes() {
