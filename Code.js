@@ -141,6 +141,27 @@ function getCachedOrFetch(key, fetchFn) {
   return fresh;
 }
 
+function clearCache(keys) {
+  const cache = CacheService.getScriptCache();
+
+  if (!keys) return;
+
+  if (Array.isArray(keys)) {
+    try {
+      cache.removeAll(keys);
+      Logger.log(`✅ Cleared cache keys: ${keys.join(', ')}`);
+    } catch (e) {
+      Logger.log(`❌ Error clearing multiple cache keys: ${e.message}`);
+    }
+  } else {
+    try {
+      cache.remove(keys);
+      Logger.log(`✅ Cleared cache key: ${keys}`);
+    } catch (e) {
+      Logger.log(`❌ Error clearing cache key "${keys}": ${e.message}`);
+    }
+  }
+}
 
 // ====================
 // Sheet Data Helpers
@@ -223,7 +244,7 @@ function createUser(userData) {
   const row = headers.map(header => userData[header] || '');
 
   sheet.appendRow(row);
-  CacheService.getScriptCache().remove('all_users');
+  clearCache('all_users');
 
   return userData;
 }
@@ -246,7 +267,7 @@ function updateUser(userData) {
     }
   });
 
-  CacheService.getScriptCache().remove('all_users');
+  clearCache('all_users');
   return userData;
 }
 
@@ -263,7 +284,7 @@ function deleteUser(userId) {
   if (rowIndex === -1) throw new Error(`User ID ${userId} not found`);
 
   sheet.deleteRow(rowIndex + 1);
-  CacheService.getScriptCache().remove('all_users');
+  clearCache('all_users');
 
   return { success: true, message: 'User deleted successfully' };
 }
@@ -319,22 +340,34 @@ function markAuditAsMisconfigured(auditId) {
 function getAllAudits() {
   return getCachedOrFetch('all_audits', () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
-    return getSheetDataAsObjects(sheet);
+    const audits = getSheetDataAsObjects(sheet);
+
+    // Optional: normalize key fields (safety and consistency)
+    audits.forEach(audit => {
+      audit.auditStatus = (audit.auditStatus || '').toLowerCase();
+      audit.taskType = audit.taskType || '';
+      audit.requestType = audit.requestType || '';
+      audit.auditId = audit.auditId || '';
+    });
+
+    return audits;
   });
 }
+
 
 /**
  * Retrieves pending audits from the audit queue sheet.
  */
 function getPendingAudits() {
-  Logger.log('Fetching pending audits...');
+  Logger.log('📥 Fetching pending audits (from cache or fresh)...');
   return getCachedOrFetch('pending_audits', () => {
     const audits = getAllAudits();
     const evaluations = getAllEvaluations();
 
     const evaluatedIds = new Set(evaluations.map(e => e.evalId));
+
     return audits.filter(a =>
-      a.auditStatus.toLowerCase() === 'pending' &&
+      a.auditStatus?.toLowerCase() === 'pending' &&
       !evaluatedIds.has(a.auditId)
     );
   });
@@ -354,7 +387,7 @@ function updateAuditStatus(auditId, newStatus) {
   if (rowIndex === -1) return;
 
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
-  CacheService.getScriptCache().remove('all_audits');
+  clearCache('all_audits');
 }
 
 
@@ -378,7 +411,7 @@ function updateAuditStatusAndLock(auditId, status) {
   sheet.getRange(rowIndex + 1, lockedByIdx + 1).setValue('');
   sheet.getRange(rowIndex + 1, lockedAtIdx + 1).setValue('');
 
-  CacheService.getScriptCache().remove('all_audits');
+  clearCache('all_audits');
 
   return { success: true };
 }
@@ -415,7 +448,7 @@ function unlockStaleAudits() {
     }
   }
 
-  CacheService.getScriptCache().remove('all_audits');
+  clearCache('all_audits');
 }
 
 /**
@@ -446,7 +479,7 @@ function prepareEvaluation(auditId) {
   sheet.getRange(rowIndex + 1, lockedByIdx + 1).setValue(userEmail);
   sheet.getRange(rowIndex + 1, lockedAtIdx + 1).setValue(now);
 
-  CacheService.getScriptCache().remove('all_audits');
+  clearCache('all_audits');
 
   const audits = getAllAudits();
   return audits.find(a => a.auditId === auditId);
@@ -465,9 +498,10 @@ function getAllEvaluations() {
     const evalSheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
     const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
 
-    const summaries = getSheetDataAsObjects(evalSheet);
-    const questions = getSheetDataAsObjects(questSheet);
+    const summaries = getSheetDataAsObjects(evalSheet);   // Main evals
+    const questions = getSheetDataAsObjects(questSheet);  // Detailed questions
 
+    // Group questions by evalId
     const map = {};
     questions.forEach(q => {
       if (!map[q.evalId]) map[q.evalId] = [];
@@ -482,7 +516,11 @@ function getAllEvaluations() {
       });
     });
 
-    summaries.forEach(s => s.questions = map[s.id] || []);
+    // Attach grouped questions to each summary
+    summaries.forEach(s => {
+      s.questions = map[s.id] || [];
+    });
+
     return summaries;
   });
 }
@@ -531,7 +569,8 @@ function saveEvaluation(data) {
   }
 
   updateAuditStatus(data.evalId || data.auditId, 'evaluated');
-  CacheService.getScriptCache().removeAll(['all_evaluations', 'all_audits']);
+  clearCache(['all_evaluations', 'all_audits', 'pending_audits']);
+
 
   const evaluation = {
     id: evalId,
@@ -559,7 +598,7 @@ function updateEvaluationStatus(evalId, status) {
   if (rowIndex === -1) return;
 
   sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(status);
-  CacheService.getScriptCache().remove('all_evaluations');
+  clearCache('all_evaluations');
 }
 
 // ====================
@@ -571,10 +610,15 @@ function getAllDisputes() {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
     const data = getSheetDataAsObjects(sheet);
 
-    // Convert questionIds from string to array
+    // Convert questionIds from comma-separated string to trimmed array
     data.forEach(d => {
-      if (d.questionIds && typeof d.questionIds === 'string') {
-        d.questionIds = d.questionIds.split(',');
+      if (typeof d.questionIds === 'string') {
+        d.questionIds = d.questionIds
+          .split(',')
+          .map(q => q.trim())
+          .filter(Boolean); // removes empty values
+      } else {
+        d.questionIds = []; // fallback
       }
     });
 
@@ -600,7 +644,7 @@ function saveDispute(dispute) {
   ]);
 
   updateEvaluationStatus(dispute.evalId, 'disputed');
-  CacheService.getScriptCache().removeAll(['all_disputes', 'all_evaluations']);
+  clearCache(['all_disputes', 'all_evaluations']);
 
   return {
     id,
@@ -717,7 +761,8 @@ function resolveDispute(resolution) {
   }
 
   // Invalidate caches
-  CacheService.getScriptCache().removeAll(['all_disputes', 'all_evaluations']);
+  clearCache('all_disputes', 'all_evaluations');
+
   return true;
 }
 
@@ -924,11 +969,10 @@ function saveQuestion(data) {
     });
 
     sheet.appendRow(newRow);
-    CacheService.getScriptCache().remove('all_questions');
+    clearCache('all_questions');
     return true;
   }
 }
-
 
 function getQuestionsBySet(requestType, taskType) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
@@ -980,7 +1024,7 @@ function toggleQuestionActive(id, isActive) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][idIdx] === id) {
       sheet.getRange(i + 1, activeIdx + 1).setValue(isActive);
-      CacheService.getScriptCache().remove('all_questions'); // ✅ clear cached question list
+      clearCache('all_questions');
       return true;
     }
   }
