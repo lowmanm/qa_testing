@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
   <head>
@@ -331,89 +330,77 @@
             </div>
           </div>
 
-<div id="adminQuestionsView" class="admin-tab-content hidden">
-  <div class="admin-actions mb-3">
-    <button id="addQuestionBtn" class="btn btn-primary">Add Question</button>
+          <div id="adminQuestionsView" class="admin-tab-content hidden">
+            <div class="admin-actions mb-3">
+              <button id="addQuestionBtn" class="btn btn-primary">Add Question</button>
+              <div class="filter-group">
+                <label for="taskTypeFilter">Filter by Task Type:</label>
+                <select id="taskTypeFilter" class="form-control">
+                  <option value="">All Types</option>
+                  <option value="phone_call">Phone Call</option>
+                  <option value="email">Email</option>
+                  <option value="chat">Chat</option>
+                </select>
+              </div>
+            </div>
 
-    <div class="filter-group">
-      <label for="requestTypeFilter">Filter by Request Type:</label>
-      <select id="requestTypeFilter" class="form-control" 
-              aria-label="Filter by Request Type" title="Filter by Request Type">
-        <option value="">All Requests</option>
-      </select>
-    </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Task Type</th>
+                    <th>Points</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="questionsBody">
+                  <tr>
+                    <td colspan="4" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-    <div class="filter-group">
-      <label for="taskTypeFilter">Filter by Task Type:</label>
-      <select id="taskTypeFilter" class="form-control" 
-              aria-label="Filter by Task Type" title="Filter by Task Type">
-        <option value="">All Types</option>
-      </select>
-    </div>
-  </div>
+            <div id="questionForm" class="form-modal hidden">
+              <div class="form-modal-content">
+                <h3 id="questionFormTitle">Add Question</h3>
+                <form id="questionFormElement">
+                  <input type="hidden" id="questionId" name="questionId">
 
-  <div class="table-container">
-    <table class="data-table" id="questionListTable">
-      <thead>
-        <tr>
-          <th>Seq</th>
-          <th>Request Type</th>
-          <th>Task Type</th>
-          <th>Question</th>
-          <th>Points</th>
-          <th>Active</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="questionListBody">
-        <tr>
-          <td colspan="7" class="text-center">Loading...</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+                  <div class="form-group">
+                    <label for="questionText">Question Text</label>
+                    <textarea id="questionText" name="questionText" class="form-control" required></textarea>
+                  </div>
 
-  <div id="questionFormView" class="form-modal hidden">
-    <div class="form-modal-content">
-      <h3 id="questionFormTitle">Add Question</h3>
-      <form id="questionForm" class="form-section">
-        <input type="hidden" id="questionId" name="questionId">
-        
-        <div class="grid-2">
-          <div>
-            <label for="sequenceId">Sequence ID</label>
-            <input type="number" id="sequenceId" name="sequenceId" class="form-control" placeholder="e.g., 1" required>
+                  <div class="form-group">
+                    <label for="questionTaskType">Task Type</label>
+                    <select id="questionTaskType" name="questionTaskType" class="form-control" required>
+                      <option value="phone_call">Phone Call</option>
+                      <option value="email">Email</option>
+                      <option value="chat">Chat</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="questionPoints">Points Possible</label>
+                    <input type="number" id="questionPoints" name="questionPoints" class="form-control" min="1" max="100" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="questionSetId">Question Set ID (optional)</label>
+                    <input type="text" id="questionSetId" name="questionSetId" class="form-control">
+                    <small class="form-text">Questions in the same set will be grouped together during evaluation.</small>
+                  </div>
+
+                  <div class="button-group">
+                    <button type="button" id="cancelQuestionForm" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
-          <div>
-            <label for="pointsPossible">Points Possible</label>
-            <input type="number" id="pointsPossible" name="pointsPossible" class="form-control" placeholder="e.g., 5" required>
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <div>
-            <label for="requestTypeDropdown">Request Type</label>
-            <select id="requestTypeDropdown" class="form-control" required></select>
-          </div>
-          <div>
-            <label for="taskTypeDropdown">Task Type</label>
-            <select id="taskTypeDropdown" class="form-control" required></select>
-          </div>
-        </div>
-
-        <div>
-          <label for="questionText">Question Text</label>
-          <textarea id="questionText" name="questionText" class="form-control" rows="3" required></textarea>
-        </div>
-
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Save Question</button>
-          <button type="button" class="btn btn-secondary" id="cancelQuestion">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
 
           <div id="adminSettingsView" class="admin-tab-content hidden">
             <h3>System Settings</h3>
