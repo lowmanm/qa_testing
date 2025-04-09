@@ -1226,7 +1226,7 @@ function resolveDispute(disputeId) {
   hideAllViews();
   const resolveDisputeView = document.getElementById('resolveDisputeView');
   resolveDisputeView.classList.remove('hidden');
-  resolveDisputeView.innerHTML = ''; // Clear previous content
+  resolveDisputeView.innerHTML = '';
 
   google.script.run.withSuccessHandler(function(data) {
     const dispute = data.disputes.find(d => d.id === disputeId);
@@ -1237,15 +1237,16 @@ function resolveDispute(disputeId) {
       return;
     }
 
-    // ✅ Ensure questionIds is an array
-    if (typeof dispute.questionIds === 'string') {
-      dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim());
-    }
+    // ✅ Normalize questionIds (remove "q_" if present)
+    let questionIds = Array.isArray(dispute.questionIds)
+      ? dispute.questionIds
+      : (dispute.questionIds || '').split(',');
+    questionIds = questionIds.map(id => id.trim().replace(/^q_/, ''));
 
     // Update status to "reviewing"
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
-    // Inject HTML structure for the resolve view
+    // Inject HTML layout
     resolveDisputeView.innerHTML = `
       <div class="card">
         <h2>Resolve Dispute</h2>
@@ -1267,29 +1268,27 @@ function resolveDispute(disputeId) {
       </div>
     `;
 
+    // Set form metadata
     const form = document.getElementById('resolveDisputeForm');
     form.setAttribute('data-eval-id', evaluation.id);
     form.setAttribute('data-dispute-id', dispute.id);
-
-    // Attach the submit handler directly here
     form.addEventListener('submit', handleResolveDisputeSubmit);
 
-    // Attach the cancel handler
-    document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+    document.getElementById('cancelResolveDispute').addEventListener('click', () => {
       google.script.run
         .withSuccessHandler(() => {
           showToast('Dispute status updated to pending.', 'success');
           showDisputes();
         })
         .withFailureHandler(error => {
-          console.error('Error updating dispute status:', error);
+          console.error(error);
           showToast('Failed to update dispute status: ' + error.message, 'error');
         })
         .updateDisputeStatus(dispute.id, 'pending');
     });
 
-    // Render evaluation metadata
-    const detailsHTML = `
+    // Inject metadata details
+    document.getElementById('resolveEvaluationDetails').innerHTML = `
       <div class="grid-2">
         <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
         <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
@@ -1297,15 +1296,14 @@ function resolveDispute(disputeId) {
         <div><p class="field-label">Dispute Reason</p><p class="field-value">${dispute.reason}</p></div>
       </div>
     `;
-    document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
 
-    // ✅ Render disputed questions
+    // Render disputed questions only
     const container = document.getElementById('resolveDisputeQuestions');
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
       if (!q.questionId || !q.questionText) return;
-      if (!dispute.questionIds.includes(q.questionId)) return;
+      if (!questionIds.includes(q.questionId)) return;
 
       const highlightClass = q.response === 'no' ? 'highlight-no' : '';
       const card = document.createElement('div');
