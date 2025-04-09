@@ -120,19 +120,27 @@ function getCachedOrFetch(key, fetchFn) {
     try {
       return JSON.parse(cached);
     } catch (e) {
-      Logger.log(`Error parsing cache for ${key}: ${e.message}`);
+      Logger.log(`❌ Error parsing cache for ${key}: ${e.message}`);
     }
+  } else {
+    Logger.log(`⚠️ Cache miss for key: ${key}`);
   }
 
   const fresh = fetchFn();
-  try {
-    cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
-  } catch (e) {
-    Logger.log(`Failed to cache ${key}: ${e.message}`);
+
+  if (fresh !== undefined && fresh !== null) {
+    try {
+      cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
+    } catch (e) {
+      Logger.log(`❌ Failed to cache ${key}: ${e.message}`);
+    }
+  } else {
+    Logger.log(`⚠️ Skipped caching for ${key} due to empty or invalid data.`);
   }
 
   return fresh;
 }
+
 
 // ====================
 // Sheet Data Helpers
@@ -916,6 +924,7 @@ function saveQuestion(data) {
     });
 
     sheet.appendRow(newRow);
+    CacheService.getScriptCache().remove('all_questions');
     return true;
   }
 }
@@ -971,9 +980,12 @@ function toggleQuestionActive(id, isActive) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][idIdx] === id) {
       sheet.getRange(i + 1, activeIdx + 1).setValue(isActive);
-      break;
+      CacheService.getScriptCache().remove('all_questions'); // ✅ clear cached question list
+      return true;
     }
   }
+
+  return false; // not found
 }
 
 function getUniqueRequestTypes() {
