@@ -1382,7 +1382,8 @@ function hideQuestionForm() {
 function handleQuestionFormSubmit(e) {
   e.preventDefault();
 
-  const id = document.getElementById('questionId').value;
+  const form = document.getElementById('questionForm');
+  const id = document.getElementById('questionId')?.value || null;
   const sequenceId = parseInt(document.getElementById('sequenceId').value);
   const requestType = document.getElementById('requestTypeDropdown').value;
   const taskType = document.getElementById('taskTypeDropdown').value;
@@ -1396,16 +1397,15 @@ function handleQuestionFormSubmit(e) {
 
   const data = { id, sequenceId, requestType, taskType, questionText, pointsPossible };
 
-  console.log("🚀 Saving question:", data); // debug log
+  console.log("🚀 Submitting question data:", data); // Debug log
 
   google.script.run
     .withSuccessHandler(() => {
-      console.log("✅ Question saved successfully");
-      hideQuestionForm(); // <-- we’ll add loadQuestions() in here next
       showToast(`Question ${id ? 'updated' : 'created'} successfully.`, 'success');
+      hideQuestionForm();
+      loadQuestions(); // ✅ Refresh table
     })
     .withFailureHandler(err => {
-      console.error("❌ Error saving question:", err.message);
       showToast("Error saving question: " + err.message, 'error');
     })
     .saveQuestion(data);
