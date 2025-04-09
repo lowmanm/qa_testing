@@ -667,6 +667,30 @@ function saveDispute(dispute) {
   };
 }
 
+/**
+ * Updates the status of a dispute in the disputesQueue sheet.
+ */
+function updateDisputeStatus(disputeId, newStatus) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+
+  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === disputeId);
+  if (rowIndex === -1) {
+    Logger.log(`❌ Dispute ID ${disputeId} not found.`);
+    return { success: false, message: 'Dispute not found' };
+  }
+
+  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(newStatus);
+  clearCache('all_disputes');
+
+  Logger.log(`✅ Dispute ${disputeId} status updated to "${newStatus}"`);
+  return { success: true };
+}
+
 function updateEvaluationStatus(evalId, newStatus) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
   const data = sheet.getDataRange().getValues();
