@@ -1089,28 +1089,30 @@ function viewDispute(disputeId) {
 
   const evaluationId = form.getAttribute('data-evaluation-id');
   const reasonField = document.getElementById('disputeReason');
-  const reason = reasonField ? reasonField.value : '';
+  const reason = reasonField ? reasonField.value.trim() : '';
 
   if (!reason) {
     showToast("Please provide a reason for the dispute.", 'warning');
     return;
   }
 
-  google.script.run.withSuccessHandler(function(disputesQueue) {
-    const isDisputed = disputesQueue.some(d => d.evalId === evaluationId);
+  const disputedQuestionIds = [];
+  document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(checkbox => {
+    disputedQuestionIds.push(checkbox.value);
+  });
 
-    if (isDisputed) {
+  if (disputedQuestionIds.length === 0) {
+    showToast("Please select at least one question to dispute.", 'warning');
+    return;
+  }
+
+  // Realtime dispute check
+  google.script.run.withSuccessHandler(function(disputes) {
+    const alreadyDisputed = disputes.some(d => d.evalId === evaluationId);
+
+    if (alreadyDisputed) {
       showToast("This evaluation has already been disputed.", 'warning');
-      return;
-    }
-
-    const disputedQuestionIds = [];
-    document.querySelectorAll('input[name^="dispute_question_"]:checked').forEach(checkbox => {
-      disputedQuestionIds.push(checkbox.value);
-    });
-
-    if (disputedQuestionIds.length === 0) {
-      showToast("Please select at least one question to dispute.", 'warning');
+      showEvaluations(); // Optional: navigate back
       return;
     }
 
@@ -1126,16 +1128,16 @@ function viewDispute(disputeId) {
     google.script.run
       .withSuccessHandler(() => {
         showToast("Dispute submitted successfully!", 'success');
-        showEvaluations();
+        showEvaluations(); // ✅ Back to evaluations view
       })
       .withFailureHandler(error => {
         form.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
         setTimeout(() => showEvaluations(), 3000);
       })
       .saveDispute(disputeData);
-  }).getAllDisputes();
-}
 
+  }).getAllDisputes(); // Fresh call to ensure no duplication
+}
 
   function resolveDispute(disputeId) {
   hideAllViews();
