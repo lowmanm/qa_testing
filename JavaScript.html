@@ -1219,7 +1219,7 @@ function handleDisputeSubmit(e) {
   }).getAllDisputes(); // Live validation
 }
 
-  function resolveDispute(disputeId) {
+function resolveDispute(disputeId) {
   hideAllViews();
   const resolveDisputeView = document.getElementById('resolveDisputeView');
   resolveDisputeView.classList.remove('hidden');
@@ -1232,6 +1232,11 @@ function handleDisputeSubmit(e) {
     if (!dispute || !evaluation) {
       showToast("Dispute or evaluation not found.", 'error');
       return;
+    }
+
+    // ✅ Ensure questionIds is an array
+    if (typeof dispute.questionIds === 'string') {
+      dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim());
     }
 
     // Update status to "reviewing"
@@ -1267,7 +1272,7 @@ function handleDisputeSubmit(e) {
     form.addEventListener('submit', handleResolveDisputeSubmit);
 
     // Attach the cancel handler
-    document.getElementById('cancelResolveDispute').addEventListener('click', function() {
+    document.getElementById('cancelResolveDispute').addEventListener('click', function () {
       google.script.run
         .withSuccessHandler(() => {
           showToast('Dispute status updated to pending.', 'success');
@@ -1291,12 +1296,12 @@ function handleDisputeSubmit(e) {
     `;
     document.getElementById('resolveEvaluationDetails').innerHTML = detailsHTML;
 
-    // Render disputed questions
+    // ✅ Render disputed questions
     const container = document.getElementById('resolveDisputeQuestions');
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
-      if (!q.questionId || !q.questionText) return; // skip invalid
+      if (!q.questionId || !q.questionText) return;
       if (!dispute.questionIds.includes(q.questionId)) return;
 
       const highlightClass = q.response === 'no' ? 'highlight-no' : '';
@@ -1736,48 +1741,48 @@ function handleResolveDisputeSubmit(e) {
 
   const decisions = [];
   let overturnCount = 0;
+  let validationFailed = false;
 
-  const cards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
-  let hasMissing = false;
+  const questionCards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
 
-  cards.forEach(card => {
-  const radioInput = card.querySelector('input[type="radio"]');
-  if (!radioInput || !radioInput.name.includes('_')) return;
+  questionCards.forEach(card => {
+    const radioInputs = card.querySelectorAll('input[type="radio"]');
+    if (!radioInputs.length) return;
 
-  const qid = radioInput.name.split('_')[1];
-  if (!qid) return; // extra guard
+    const radioName = radioInputs[0].name;
+    const questionId = radioName.split('_')[1];
 
-  const selected = form.querySelector(`input[name="resolution_${qid}"]:checked`);
-  const note = form.querySelector(`#note_${qid}`)?.value || '';
+    const selected = form.querySelector(`input[name="resolution_${questionId}"]:checked`);
+    const note = form.querySelector(`#note_${questionId}`)?.value.trim() || '';
 
-  if (!selected) {
-    showToast('Please make a selection for all disputed questions.', 'warning');
-    hasMissing = true;
-    return;
-  }
+    if (!selected) {
+      showToast(`Please select a resolution for all disputed questions.`, 'warning');
+      validationFailed = true;
+      return;
+    }
 
-  const resolution = selected.value;
-  if (resolution === 'upheld' && !note.trim()) {
-    showToast('Justification is required for upheld questions.', 'warning');
-    hasMissing = true;
-    return;
-  }
+    const resolution = selected.value;
 
-  if (resolution === 'overturned') overturnCount++;
+    if (resolution === 'upheld' && !note) {
+      showToast(`Justification is required when upholding a question.`, 'warning');
+      validationFailed = true;
+      return;
+    }
 
-  decisions.push({ questionId: qid, resolution, note });
-});
+    if (resolution === 'overturned') overturnCount++;
 
-  if (hasMissing) return;
+    decisions.push({ questionId, resolution, note });
+  });
 
-  const totalDisputed = decisions.length;
-  let newStatus = 'upheld';
-  if (overturnCount === totalDisputed && totalDisputed > 0) {
-    newStatus = 'overturned';
-  } else if (overturnCount > 0) {
-    newStatus = 'partial overturn';
-  }
+  if (validationFailed) return;
 
+  // Determine overall status
+  const total = decisions.length;
+  let status = 'upheld';
+  if (overturnCount === total && total > 0) status = 'overturned';
+  else if (overturnCount > 0) status = 'partial overturn';
+
+  // Send to server
   google.script.run
     .withSuccessHandler(() => {
       showToast('Dispute resolved successfully.', 'success');
@@ -1790,10 +1795,9 @@ function handleResolveDisputeSubmit(e) {
     .resolveDispute({
       disputeId,
       evalId,
-      decisions,
       resolutionNotes,
-      status: newStatus
+      decisions,
+      status
     });
 }
-
 </script>
