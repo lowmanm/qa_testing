@@ -301,45 +301,6 @@ function markAuditAsMisconfigured(auditId) {
   throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
 }
 
-/**
- * Updates an existing question in the questions sheet.
- */
-function updateQuestion(questionData) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf('id');
-
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idCol] === questionData.id);
-  if (rowIndex === -1) throw new Error(`Question ID ${questionData.id} not found`);
-
-  headers.forEach((header, i) => {
-    if (header in questionData && header !== 'createdTimestamp' && header !== 'createdBy') {
-      sheet.getRange(rowIndex + 1, i + 1).setValue(questionData[header]);
-    }
-  });
-
-  CacheService.getScriptCache().remove('all_questions');
-  return questionData;
-}
-
-/**
- * Deletes a question from the questions sheet.
- */
-function deleteQuestion(questionId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf('id');
-
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idCol] === questionId);
-  if (rowIndex === -1) throw new Error(`Question ID ${questionId} not found`);
-
-  sheet.deleteRow(rowIndex + 1);
-  CacheService.getScriptCache().remove('all_questions');
-  return { success: true, message: 'Question deleted successfully' };
-}
-
 // ====================
 // Audit Queue Module
 // ====================
