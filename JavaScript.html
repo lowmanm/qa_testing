@@ -1162,7 +1162,12 @@ function resolveDispute(disputeId) {
       return;
     }
 
-    dispute.questionIds = dispute.questionIds.toString().split(',').map(id => id.trim()); // ✅ robust normalization
+// ✅ Critical normalization fix here
+if (typeof dispute.questionIds === 'string') {
+  dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
+} else if (!Array.isArray(dispute.questionIds)) {
+  dispute.questionIds = [];
+}
 
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
