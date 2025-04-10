@@ -629,9 +629,10 @@ function getAllDisputes() {
 
     // ✅ Improved logging to detect empty/missing questionIds
     Logger.log(`✅ Disputes Retrieved (${data.length}):`);
-    data.forEach((d, i) => {
-      Logger.log(`Dispute #${i + 1}: ID=${d.id}, EvalID=${d.evalId}, questionIds=${JSON.stringify(d.questionIds)}`);
-    });
+data.forEach((d, i) => {
+  Logger.log(`Dispute #${i + 1}: ID=${d.id}, EvalID=${d.evalId}, questionIds=${Array.isArray(d.questionIds) ? d.questionIds.join(', ') : '[INVALID]'}`);
+});
+
 
     return data;
   });
