@@ -170,7 +170,8 @@ function attachQuestionFormHandler() {
       // Unlock the audit before navigating away
       google.script.run.updateAuditStatusAndLock(auditId, 'pending');
     }
-
+    clearInterval(window.auditHeartbeat);
+    window.removeEventListener('beforeunload', window.handleUnloadUnlock);
     resetEvaluationForm();  // optional: clear form
     showAuditQueue();
   });
@@ -569,8 +570,19 @@ function showEvaluationForm(auditId) {
       form.setAttribute('data-task-type', audit.taskType || '');
       form.setAttribute('data-outcome', audit.outcome || '');
 
-      // Load relevant questions
+      // ✅ Load relevant questions
       loadQuestionsForEvaluation(audit);
+
+      // ✅ Start heartbeat ping every 5 minutes
+      window.auditHeartbeat = setInterval(() => {
+        google.script.run.keepAuditLockAlive(auditId);
+      }, 5 * 60 * 1000);
+
+      // ✅ Unlock audit if user closes tab or navigates away
+      window.handleUnloadUnlock = () => {
+        google.script.run.updateAuditStatusAndLock(auditId, 'pending');
+      };
+      window.addEventListener('beforeunload', window.handleUnloadUnlock);
     })
     .withFailureHandler(function(error) {
       showToast(error.message || 'This audit is currently locked by another user.', 'warning');
@@ -775,6 +787,7 @@ google.script.run
       .withSuccessHandler(function () {
         updateAuditStatusAndLock(auditId, 'evaluated')
           .then(() => {
+            clearInterval(window.auditHeartbeat); // ✅ stop the heartbeat
             showToast("Evaluation saved and audit unlocked successfully!", 'success');
             resetEvaluationForm();
             document.getElementById('evaluationLoadingIndicator')?.remove();
@@ -831,8 +844,6 @@ function resetEvaluationForm() {
   // Remove loading indicator if still present
   document.getElementById('evaluationLoadingIndicator')?.remove();
 }
-
-
 
   function loadEvaluations() {
   const tableBody = document.getElementById('evaluationsBody');
