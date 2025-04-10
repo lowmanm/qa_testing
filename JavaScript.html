@@ -1156,6 +1156,9 @@ function resolveDispute(disputeId) {
   google.script.run.withSuccessHandler(function(data) {
     const dispute = data.disputes.find(d => d.id === disputeId);
     const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
+  /*LOGGING*/
+  console.log('Dispute record from backend:', dispute);
+  console.log('Evaluation record from backend:', evaluation);
 
     if (!dispute || !evaluation) {
       showToast("Dispute or evaluation not found.", 'error');
