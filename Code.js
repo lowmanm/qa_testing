@@ -610,19 +610,20 @@ function getAllDisputes() {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
     const data = getSheetDataAsObjects(sheet);
 
-    // Convert questionIds from comma-separated string to trimmed array
     data.forEach(d => {
       if (typeof d.questionIds === 'string') {
-        d.questionIds = d.questionIds
-          .split(',')
-          .map(q => q.trim())
-          .filter(Boolean); // removes empty values
+        d.questionIds = d.questionIds.split(',').map(q => q.trim()).filter(Boolean);
       } else {
-        d.questionIds = []; // fallback
+        d.questionIds = [];
       }
     });
-    /*LOGGING*/
-    Logger.log('Disputes retrieved:', JSON.stringify(data, null, 2));
+
+    // ✅ Improved logging to detect empty/missing questionIds
+    Logger.log(`✅ Disputes Retrieved (${data.length}):`);
+    data.forEach((d, i) => {
+      Logger.log(`Dispute #${i + 1}: ID=${d.id}, EvalID=${d.evalId}, questionIds=${JSON.stringify(d.questionIds)}`);
+    });
+
     return data;
   });
 }
