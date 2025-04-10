@@ -460,6 +460,16 @@ function unlockStaleAudits() {
   clearCache('all_audits');
 }
 
+
+function checkIfAlreadyEvaluated(auditId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const auditIdIdx = headers.indexOf('auditId');
+
+  return data.some(row => row[auditIdIdx] === auditId);
+}
+
 /**
  * Prepares an evaluation by updating the audit status to 'In Process'.
  */
