@@ -1296,7 +1296,7 @@ function handleResolveDisputeSubmit(e) {
     const radioInputs = card.querySelectorAll('input[type="radio"]');
     if (!radioInputs.length) continue;
 
-    const questionId = radioInputs[0].name.split('_')[1];
+    const questionId = radioInputs[0].name.replace('resolution_', '');
     const selected = card.querySelector(`input[name="resolution_${questionId}"]:checked`);
     const note = card.querySelector(`#note_${questionId}`)?.value.trim() || '';
 
