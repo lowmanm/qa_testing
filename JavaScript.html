@@ -755,6 +755,7 @@ google.script.run
             showToast("Evaluation saved and audit unlocked successfully!", 'success');
             resetEvaluationForm();
             document.getElementById('evaluationLoadingIndicator')?.remove();
+            submitButton.disabled = false;
             form.classList.remove('hidden');
             showAuditQueue();
           })
