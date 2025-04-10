@@ -460,6 +460,20 @@ function unlockStaleAudits() {
   clearCache('all_audits');
 }
 
+function keepAuditLockAlive(auditId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIdx = headers.indexOf('auditId');
+  const lockedAtIdx = headers.indexOf('lockedAt');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === auditId) {
+      sheet.getRange(i + 1, lockedAtIdx + 1).setValue(new Date());
+      break;
+    }
+  }
+}
 
 function checkIfAlreadyEvaluated(auditId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
