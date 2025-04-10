@@ -621,7 +621,8 @@ function getAllDisputes() {
         d.questionIds = []; // fallback
       }
     });
-
+    /*LOGGING*/
+    Logger.log('Disputes retrieved:', JSON.stringify(data, null, 2));
     return data;
   });
 }
