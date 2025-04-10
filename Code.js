@@ -118,27 +118,32 @@ function getCachedOrFetch(key, fetchFn) {
 
   if (cached) {
     try {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      Logger.log(`✅ Cache hit for key: ${key}`);
+      return parsed;
     } catch (e) {
       Logger.log(`❌ Error parsing cache for ${key}: ${e.message}`);
+      // Proceed to fetch fresh
     }
   } else {
     Logger.log(`⚠️ Cache miss for key: ${key}`);
   }
 
+  // Fetch fresh data
   const fresh = fetchFn();
 
   if (fresh !== undefined && fresh !== null) {
     try {
       cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
+      Logger.log(`✅ Cached fresh value for key: ${key}`);
     } catch (e) {
       Logger.log(`❌ Failed to cache ${key}: ${e.message}`);
     }
-  } else {
-    Logger.log(`⚠️ Skipped caching for ${key} due to empty or invalid data.`);
+    return fresh;
   }
 
-  return fresh;
+  Logger.log(`⚠️ No data fetched for key: ${key}, returning null.`);
+  return null;
 }
 
 function clearCache(keys) {
@@ -809,16 +814,34 @@ function resolveDispute(resolution) {
   clearCache(['all_disputes', 'all_evaluations']);
   return true;
 }
-
+/*   BLOCK FOR TESTING
 function getAllEvaluationsAndDisputes() {
   const evaluations = getCachedOrFetch('all_evaluations', getAllEvaluations);
   const disputes = getCachedOrFetch('all_disputes', getAllDisputes);
+
+  Logger.log("✅ Final evaluations:", JSON.stringify(evaluations, null, 2));
+  Logger.log("✅ Final disputes:", JSON.stringify(disputes, null, 2));
 
   return {
     evaluations,
     disputes
   };
 }
+*/
+
+function getAllEvaluationsAndDisputes() {
+  const evaluations = getCachedOrFetch('all_evaluations', getAllEvaluations);
+  const disputes = getCachedOrFetch('all_disputes', getAllDisputes);
+
+  Logger.log("✅ getAllEvaluationsAndDisputes returned:");
+  Logger.log(JSON.stringify({ evaluations, disputes }, null, 2));
+
+  return {
+    evaluations,
+    disputes
+  };
+}
+
 
 function getDisputeStats() {
   const data = getAllDisputes();
