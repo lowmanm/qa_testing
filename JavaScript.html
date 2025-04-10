@@ -581,8 +581,6 @@ function showEvaluationForm(auditId) {
     .prepareEvaluation(auditId);
 }
   
-  let toastShown = false;
-
 function loadQuestionsForEvaluation(audit, attempt = 1) {
   const maxRetries = 5;
   const questionsContainer = document.getElementById('questions');
@@ -603,16 +601,27 @@ function loadQuestionsForEvaluation(audit, attempt = 1) {
     let maxPossibleScore = 0;
     questionsContainer.innerHTML = '';
 
-    if (questions.length === 0) {
-      if (!toastShown) {
-        showToast("No evaluation questions are set up for this request + task type.", 'error');
-        toastShown = true;
-      }
+    if (!questions || questions.length === 0) {
+      // 🧠 Inline UX update
+      questionsContainer.innerHTML = `
+        <div class="alert alert-warning" style="margin-top: 1rem;">
+          ⚠️ No evaluation questions are configured for this request type and task type.
+          <br>Please contact your QA admin.
+        </div>
+      `;
+
+      // 🛑 Prevent form submission
+      form.classList.add('disabled');
+
+      // 🔄 Log misconfiguration
       markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
-      showAuditQueue();
+
+      // ✅ Always show a toast
+      showToast("No evaluation questions are set up for this record.", 'warning');
       return;
     }
 
+    // ✅ Normal path: render all questions
     questions.forEach(q => {
       maxPossibleScore += parseInt(q.pointsPossible || 0);
 
