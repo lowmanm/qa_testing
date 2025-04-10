@@ -452,10 +452,37 @@ function loadPendingTasks() {
   // ✅ Attach the event listener just once
   if (!tableBody.hasListenerAttached) {
     tableBody.addEventListener('click', function(event) {
-      if (event.target.classList.contains('evaluate-button')) {
-        const auditId = event.target.getAttribute('data-audit-id');
-        showEvaluationForm(auditId);
+if (event.target.classList.contains('evaluate-button')) {
+  const button = event.target;
+  const auditId = button.getAttribute('data-audit-id');
+
+  // 🔄 Save original button state
+  const originalHTML = button.innerHTML;
+  button.disabled = true;
+
+  // Show spinner with "Checking..."
+  button.innerHTML = `<span class="spinner"></span>Checking...`;
+
+  google.script.run
+    .withSuccessHandler(function(alreadyEvaluated) {
+      if (alreadyEvaluated) {
+        showToast("This audit has already been evaluated.", "warning");
+        loadPendingTasks(); // Refresh table
+        return;
       }
+
+      showEvaluationForm(auditId);
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error checking evaluation status:', error);
+      showToast("Failed to verify evaluation status. Please try again.", "error");
+
+      // 🔄 Restore button on failure
+      button.disabled = false;
+      button.innerHTML = originalHTML;
+    })
+    .checkIfAlreadyEvaluated(auditId);
+}
     });
     tableBody.hasListenerAttached = true;
   }
@@ -628,6 +655,7 @@ function markAuditAsMisconfigured(auditId) {
   e.preventDefault();
 
   const form = document.getElementById('evaluationForm');
+  const submitButton = document.getElementById('submitEvaluationBtn');
   if (!form) return showToast("Evaluation form not found.", 'error');
 
   if (form.classList.contains('disabled')) {
@@ -705,30 +733,55 @@ function markAuditAsMisconfigured(auditId) {
   loadingIndicator.className = 'loading';
   loadingIndicator.innerText = 'Saving evaluation...';
   document.getElementById('evaluationFormView').appendChild(loadingIndicator);
+  submitButton.disabled = true;
 
-  google.script.run
-    .withSuccessHandler(function () {
-      updateAuditStatusAndLock(auditId, 'evaluated')
-        .then(() => {
-          showToast("Evaluation saved and audit unlocked successfully!", 'success');
-          resetEvaluationForm();
-          document.getElementById('evaluationLoadingIndicator')?.remove();
-          form.classList.remove('hidden');
-          showAuditQueue();
-        })
-        .catch(error => {
-          console.error('Error updating audit status:', error);
-          showToast("Failed to unlock the record. Try again.", 'error');
-          document.getElementById('evaluationLoadingIndicator')?.remove();
-          form.classList.remove('hidden');
-        });
-    })
-    .withFailureHandler(function (error) {
-      showToast("Error saving evaluation: " + error.message, 'error');
+// 🔍 Check live if this audit was already evaluated before submitting
+google.script.run
+  .withSuccessHandler(function (alreadyEvaluated) {
+    if (alreadyEvaluated) {
+      showToast("This audit has already been evaluated by another user.", 'warning');
       document.getElementById('evaluationLoadingIndicator')?.remove();
+      submitButton.disabled = false;
       form.classList.remove('hidden');
-    })
-    .saveEvaluation(evaluationData);
+      showAuditQueue();
+      return;
+    }
+
+    // ✅ Proceed to save since it's still valid
+    google.script.run
+      .withSuccessHandler(function () {
+        updateAuditStatusAndLock(auditId, 'evaluated')
+          .then(() => {
+            showToast("Evaluation saved and audit unlocked successfully!", 'success');
+            resetEvaluationForm();
+            document.getElementById('evaluationLoadingIndicator')?.remove();
+            form.classList.remove('hidden');
+            showAuditQueue();
+          })
+          .catch(error => {
+            console.error('Error updating audit status:', error);
+            showToast("Failed to unlock the record. Try again.", 'error');
+            document.getElementById('evaluationLoadingIndicator')?.remove();
+            submitButton.disabled = false;
+            form.classList.remove('hidden');
+          });
+      })
+      .withFailureHandler(function (error) {
+        showToast("Error saving evaluation: " + error.message, 'error');
+        document.getElementById('evaluationLoadingIndicator')?.remove();
+        submitButton.disabled = false;
+        form.classList.remove('hidden');
+      })
+      .saveEvaluation(evaluationData);
+  })
+  .withFailureHandler(function (error) {
+    console.error('Error checking evaluation status:', error);
+    showToast("Could not verify evaluation status. Please try again.", 'error');
+    document.getElementById('evaluationLoadingIndicator')?.remove();
+    submitButton.disabled = false;
+    form.classList.remove('hidden');
+  })
+  .checkIfAlreadyEvaluated(auditId);
 }
 
 function resetEvaluationForm() {
