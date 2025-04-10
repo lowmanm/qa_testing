@@ -1162,12 +1162,14 @@ function resolveDispute(disputeId) {
       return;
     }
 
-// ✅ Critical normalization fix here
-if (typeof dispute.questionIds === 'string') {
-  dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
-} else if (!Array.isArray(dispute.questionIds)) {
+// ✅ Enhanced fix for undefined questionIds
+if (!dispute.questionIds || typeof dispute.questionIds !== 'string') {
   dispute.questionIds = [];
+} else {
+  dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
 }
+/*LOGGING*/
+console.log('After robust normalization - dispute.questionIds:', dispute.questionIds);
 
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
