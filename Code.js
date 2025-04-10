@@ -475,7 +475,7 @@ function keepAuditLockAlive(auditId) {
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][idIdx] === auditId) {
-      sheet.getRange(i + 1, lockedAtIdx + 1).setValue(new Date());
+      sheet.getRange(i + 1, lockedAtIdx + 1).setValue(new Date().toISOString());
       break;
     }
   }
