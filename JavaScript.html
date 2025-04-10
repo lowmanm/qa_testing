@@ -1297,8 +1297,13 @@ function handleResolveDisputeSubmit(e) {
     if (!radioInputs.length) continue;
 
     const questionId = radioInputs[0].name.split('_')[1];
-    const selected = form.querySelector(`input[name="resolution_${questionId}"]:checked`);
-    const note = form.querySelector(`#note_${questionId}`)?.value.trim() || '';
+    const selected = card.querySelector(`input[name="resolution_${questionId}"]:checked`);
+    const note = card.querySelector(`#note_${questionId}`)?.value.trim() || '';
+
+    // 🔍 Debug logging
+    console.log('🔍 Question ID:', questionId);
+    console.log('✅ Selected resolution:', selected?.value || 'None selected');
+    console.log('📝 Justification:', note || '[empty]');
 
     if (!selected) {
       showToast(`Please select a resolution for all disputed questions.`, 'warning');
