@@ -818,21 +818,15 @@ function resolveDispute(resolution) {
   clearCache(['all_disputes', 'all_evaluations']);
   return true;
 }
-/*   BLOCK FOR TESTING
+
 function getAllEvaluationsAndDisputes() {
-  const evaluations = getCachedOrFetch('all_evaluations', getAllEvaluations);
-  const disputes = getCachedOrFetch('all_disputes', getAllDisputes);
+  const evaluations = getAllEvaluations(); // already uses getCachedOrFetch inside
+  const disputes = getAllDisputes();       // already uses getCachedOrFetch inside
 
-  Logger.log("✅ Final evaluations:", JSON.stringify(evaluations, null, 2));
-  Logger.log("✅ Final disputes:", JSON.stringify(disputes, null, 2));
-
-  return {
-    evaluations,
-    disputes
-  };
+  return { evaluations, disputes };
 }
-*/
 
+/* THIS WAS TO TEST BUT SEEMS LIKE DOUBLE CACHEING
 function getAllEvaluationsAndDisputes() {
   const evaluations = getCachedOrFetch('all_evaluations', getAllEvaluations);
   const disputes = getCachedOrFetch('all_disputes', getAllDisputes);
@@ -847,7 +841,7 @@ function getAllEvaluationsAndDisputes() {
     disputes
   };
 }
-
+*/
 
 function getDisputeStats() {
   const data = getAllDisputes();
