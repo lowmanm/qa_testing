@@ -439,6 +439,8 @@ function unlockStaleAudits() {
   const lockedAtIdx = headers.indexOf('lockedAt');
 
   const now = new Date();
+  const thresholdMinutes = 30;
+  let unlockedCount = 0;
 
   for (let i = 1; i < data.length; i++) {
     const status = data[i][statusIdx];
@@ -447,17 +449,21 @@ function unlockStaleAudits() {
 
     if (status === 'In Process' && lockedBy && lockedAtRaw) {
       const lockedAt = new Date(lockedAtRaw);
+      if (isNaN(lockedAt.getTime())) continue; // skip invalid dates
+
       const minutesLocked = (now - lockedAt) / 60000;
 
-      if (minutesLocked > 30) {
+      if (minutesLocked > thresholdMinutes) {
         sheet.getRange(i + 1, statusIdx + 1).setValue('pending');
         sheet.getRange(i + 1, lockedByIdx + 1).setValue('');
         sheet.getRange(i + 1, lockedAtIdx + 1).setValue('');
+        unlockedCount++;
       }
     }
   }
 
-  clearCache('all_audits');
+  Logger.log(`✅ unlockStaleAudits: ${unlockedCount} stale audits unlocked.`);
+  clearCache(['all_audits', 'pending_audits']);
 }
 
 function keepAuditLockAlive(auditId) {
