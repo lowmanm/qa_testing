@@ -811,9 +811,12 @@ function resolveDispute(resolution) {
 }
 
 function getAllEvaluationsAndDisputes() {
+  const evaluations = getCachedOrFetch('all_evaluations', getAllEvaluations);
+  const disputes = getCachedOrFetch('all_disputes', getAllDisputes);
+
   return {
-    evaluations: getAllEvaluations(),
-    disputes: getAllDisputes()
+    evaluations,
+    disputes
   };
 }
 
