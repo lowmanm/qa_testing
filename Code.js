@@ -168,6 +168,10 @@ function clearCache(keys) {
   }
 }
 
+function clearQaCaches() {
+  clearCache(['all_disputes', 'all_evaluations']);
+}
+
 // ====================
 // Sheet Data Helpers
 // ====================
@@ -834,7 +838,9 @@ function getAllEvaluationsAndDisputes() {
   const disputes = getCachedOrFetch('all_disputes', getAllDisputes);
 
   Logger.log("✅ getAllEvaluationsAndDisputes returned:");
-  Logger.log(JSON.stringify({ evaluations, disputes }, null, 2));
+  Logger.log('✅ Disputes:', JSON.stringify(disputes, null, 2));
+  Logger.log('✅ Evaluations:', JSON.stringify(evaluations, null, 2));
+
 
   return {
     evaluations,
