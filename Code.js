@@ -753,24 +753,23 @@ function resolveDispute(resolution) {
 
   const updatedQuestRows = [];
 
-  for (let i = 1; i < questData.length; i++) {
-    const row = questData[i];
-    if (row[qEvalIdx] !== evalId) continue;
+for (let i = 1; i < questData.length; i++) {
+  const row = questData[i];
+  if (row[qEvalIdx] !== evalId) continue;
 
-    const decision = decisions.find(d => d.questionId === row[qQIdIdx]);
-    if (!decision) continue;
+  const decision = decisions.find(d => d.questionId === row[qQIdIdx]);
+  if (!decision) continue;
 
-    if (decision.resolution === 'overturned') {
-      row[qRespIdx] = 'yes';
-      row[qPtsEarnedIdx] = row[qPtsPossibleIdx]; // award full points
-    }
-    row[qFeedbackIdx] = decision.note || '';
-    updatedQuestRows.push(row);
+  if (decision.resolution === 'overturned') {
+    row[qRespIdx] = 'Yes';  // Make sure case matches your frontend expectation
+    row[qPtsEarnedIdx] = row[qPtsPossibleIdx]; // award full points
   }
 
-  if (updatedQuestRows.length) {
-    questSheet.getRange(2, 1, updatedQuestRows.length, qHeaders.length).setValues(updatedQuestRows);
-  }
+  row[qFeedbackIdx] = decision.note || '';
+
+  // ✅ Write the updated row directly back to the sheet
+  questSheet.getRange(i + 1, 1, 1, qHeaders.length).setValues([row]);
+}
 
   // Recalculate totals
   const relevantRows = questData.filter(r => r[qEvalIdx] === evalId);
