@@ -949,8 +949,18 @@ function viewDispute(disputeId) {
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
-      if (!q.questionId || !q.questionText) return;
-      if (!dispute.questionIds.includes(q.questionId)) return;
+    const qid = String(q.questionId).trim();
+    if (!qid || !q.questionText) return;
+
+    if (!Array.isArray(dispute.questionIds)) {
+      console.warn('🚫 dispute.questionIds is not an array:', dispute.questionIds);
+      return;
+    }
+
+    if (!dispute.questionIds.includes(qid)) {
+      console.log(`⛔ Skipping question ${qid} — not in dispute list:`, dispute.questionIds);
+      return;
+    }
 
       const highlightClass = q.response === 'no' ? 'highlight-no' : '';
       const card = document.createElement('div');
@@ -1157,8 +1167,12 @@ function resolveDispute(disputeId) {
     const dispute = data.disputes.find(d => d.id === disputeId);
     const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
   /*LOGGING*/
-  console.log('Dispute record from backend:', dispute);
-  console.log('Evaluation record from backend:', evaluation);
+  // console.log('Dispute record from backend:', dispute);
+  // console.log('Evaluation record from backend:', evaluation);
+  console.log('📌 Dispute ID:', dispute.id);
+  console.log('✅ Dispute.questionIds:', dispute.questionIds);
+  console.log('✅ Evaluation.questions:', evaluation.questions.map(q => q.questionId));
+
 
     if (!dispute || !evaluation) {
       showToast("Dispute or evaluation not found.", 'error');
