@@ -754,6 +754,18 @@ data.forEach((d, i) => {
   });
 }
 
+function checkIfAlreadyDisputed(evalId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
+  if (!sheet) return false;
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const evalIdIdx = headers.indexOf('evalId');
+  if (evalIdIdx === -1) return false;
+
+  return data.some(row => row[evalIdIdx] === evalId);
+}
+
 function saveDispute(dispute) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
   const id = `dispute${Date.now()}`;
