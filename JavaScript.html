@@ -1244,7 +1244,7 @@ function viewDispute(disputeId) {
   }).getAllEvaluationsAndDisputes();
 }
 
-  function showDisputeForm(evaluationId) {
+function showDisputeForm(evaluationId) {
   hideAllViews();
 
   const disputeFormView = document.getElementById('disputeFormView');
@@ -1276,9 +1276,10 @@ function viewDispute(disputeId) {
 
   // 🧩 Re-attach event listeners after DOM was rebuilt
   document.getElementById('cancelDispute').addEventListener('click', () => {
-  removeUnloadHandlerForDispute(); // ✅ cleanup on cancel
-  showEvaluations();
-});
+    removeUnloadHandlerForDispute(); // ✅ cleanup on cancel
+    showEvaluations();
+  });
+
   document.getElementById('disputeForm').addEventListener('submit', handleDisputeSubmit);
 
   // 🔍 Load evaluation details and questions
@@ -1319,10 +1320,15 @@ function viewDispute(disputeId) {
 
     document.getElementById('disputeForm').setAttribute('data-evaluation-id', evaluationId);
 
+    // ✅ Load questions for dispute
     loadQuestionsForDispute(evaluation);
+
+    // ✅ Attach unload safeguard to revert evaluation status if user exits
+    attachUnloadHandlerForDispute(evaluationId);
 
   }).getAllEvaluations();
 }
+
 
   function loadQuestionsForDispute(evaluation) {
   const container = document.getElementById('disputeQuestions');
