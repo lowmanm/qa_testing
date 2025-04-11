@@ -629,6 +629,7 @@ function showEvaluationForm(auditId) {
       form.setAttribute('data-reference-number', audit.referenceNumber || '');
       form.setAttribute('data-task-type', audit.taskType || '');
       form.setAttribute('data-outcome', audit.outcome || '');
+      window.skipUnlock = false;
 
       // ✅ Load relevant questions
       loadQuestionsForEvaluation(audit);
