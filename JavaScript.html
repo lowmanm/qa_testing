@@ -10,6 +10,20 @@ let currentUserEmail = '';
   attachQuestionFormHandler();
 });
 
+function attachUnloadHandlerForDispute(evalId) {
+  // Clear any previous handler
+  if (window.handleDisputeUnloadUnlock) {
+    window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+  }
+
+  // Define and attach new handler
+  window.handleDisputeUnloadUnlock = () => {
+    google.script.run.resetEvalStatusFromReviewing(evalId);
+  };
+  window.addEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+}
+
+
   function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
@@ -198,9 +212,9 @@ function attachFormHandlers() {
       const form = document.getElementById('disputeForm');
       const evalId = form.getAttribute('data-evaluation-id');
 
-      if (evalId) {
-        google.script.run.resetEvalStatusFromReviewing(evalId);
-      }
+  if (evalId) {
+    attachUnloadHandlerForDispute(evalId);
+  }
 
       // Cleanup: unload listener
       window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
