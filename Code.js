@@ -530,6 +530,28 @@ function unlockStaleAudits() {
   clearCache(['all_audits', 'pending_audits']);
 }
 
+function fullyUnlockAudit(auditId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const idIdx = headers.indexOf('auditId');
+  const statusIdx = headers.indexOf('auditStatus');
+  const lockedByIdx = headers.indexOf('lockedBy');
+  const lockedAtIdx = headers.indexOf('lockedAt');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === auditId) {
+      sheet.getRange(i + 1, statusIdx + 1).setValue('pending');
+      sheet.getRange(i + 1, lockedByIdx + 1).setValue('');
+      sheet.getRange(i + 1, lockedAtIdx + 1).setValue('');
+      break;
+    }
+  }
+
+  clearCache(['all_audits', 'pending_audits']);
+}
+
 function keepAuditLockAlive(auditId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
