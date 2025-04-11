@@ -177,7 +177,7 @@ function clearCache(keys) {
 }
 
 function clearQaCaches() {
-  clearCache(['all_disputes', 'all_evaluations, 'pending_audits','all_audits']);
+  clearCache(['all_disputes', 'all_evaluations', 'pending_audits','all_audits']);
 }
 
 // ====================
