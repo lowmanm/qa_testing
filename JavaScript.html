@@ -158,32 +158,71 @@ function attachQuestionFormHandler() {
   }
 
   // == Form + Button Event Handlers ==
-  function attachFormHandlers() {
+function attachFormHandlers() {
+  // -------------------------
+  // Evaluation Cancel Handler
+  // -------------------------
   const cancelEval = document.getElementById('cancelEvaluation');
   const evalForm = document.getElementById('evaluationForm');
-  if (cancelEval) {
-  cancelEval.addEventListener('click', () => {
-    const form = document.getElementById('evaluationForm');
-    const auditId = form.getAttribute('data-audit-id');
 
-    if (auditId) {
-      // Unlock the audit before navigating away
-      google.script.run.updateAuditStatusAndLock(auditId, 'pending');
-    }
-    clearInterval(window.auditHeartbeat);
-    window.removeEventListener('beforeunload', window.handleUnloadUnlock);
-    resetEvaluationForm();  // optional: clear form
-    showAuditQueue();
-  });
-}
+  if (cancelEval) {
+    cancelEval.addEventListener('click', () => {
+      const form = document.getElementById('evaluationForm');
+      const auditId = form.getAttribute('data-audit-id');
+
+      if (auditId) {
+        google.script.run.updateAuditStatusAndLock(auditId, 'pending');
+      }
+
+      // Cleanup: heartbeat + unload listener
+      clearInterval(window.auditHeartbeat);
+      window.removeEventListener('beforeunload', window.handleUnloadUnlock);
+
+      resetEvaluationForm();
+      showAuditQueue();
+    });
+  }
 
   if (evalForm) evalForm.addEventListener('submit', handleEvaluationSubmit);
 
+  // -------------------------
+  // Dispute Cancel Handler
+  // -------------------------
   const cancelDispute = document.getElementById('cancelDispute');
   const disputeForm = document.getElementById('disputeForm');
-  if (cancelDispute) cancelDispute.addEventListener('click', showEvaluations);
-  if (disputeForm) disputeForm.addEventListener('submit', handleDisputeSubmit);
 
+  if (cancelDispute) {
+    cancelDispute.addEventListener('click', () => {
+      const form = document.getElementById('disputeForm');
+      const evalId = form.getAttribute('data-evaluation-id');
+
+      if (evalId) {
+        google.script.run.resetDisputeStatus(evalId);
+      }
+
+      // Cleanup: unload listener
+      window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+
+      showEvaluations();
+    });
+  }
+
+  if (disputeForm) {
+    disputeForm.addEventListener('submit', handleDisputeSubmit);
+
+    // Add unload listener for status reset
+    const evalId = disputeForm.getAttribute('data-evaluation-id');
+    if (evalId) {
+      window.handleDisputeUnloadUnlock = () => {
+        google.script.run.resetDisputeStatus(evalId);
+      };
+      window.addEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+    }
+  }
+
+  // -------------------------
+  // Import Button Handler
+  // -------------------------
   const importBtn = document.getElementById('importButton');
   if (importBtn) {
     importBtn.addEventListener('click', () => {
@@ -907,36 +946,45 @@ function resetEvaluationForm() {
 
       // Dispute Evaluation
       document.querySelectorAll('.dispute-button').forEach(btn =>
-        btn.addEventListener('click', () => {
-          const button = btn;
-          const evalId = button.dataset.evaluationId;
+  btn.addEventListener('click', () => {
+    const button = btn;
+    const evalId = button.dataset.evaluationId;
 
-          const originalHTML = button.innerHTML;
-          button.disabled = true;
-          button.innerHTML = `<span class="spinner"></span>Checking...`;
+    const originalHTML = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = `<span class="spinner"></span>Checking...`;
 
-          google.script.run
-            .withSuccessHandler(function(alreadyDisputed) {
-              if (alreadyDisputed) {
-                showToast("This evaluation is already under dispute.", "warning");
-                button.disabled = false;
-                button.innerHTML = originalHTML;
-                showEvaluations();
-                loadCompletedEvaluations();
-                return;
-              }
+    google.script.run
+      .withSuccessHandler(function(result) {
+        button.disabled = false;
+        button.innerHTML = originalHTML;
 
-              showDisputeForm(evalId);
-            })
-            .withFailureHandler(function(error) {
-              console.error("Error checking dispute status:", error);
-              showToast("Could not verify dispute status. Try again.", "error");
-              button.disabled = false;
-              button.innerHTML = originalHTML;
-            })
-            .checkIfAlreadyDisputed(evalId);
-        })
-      );
+        if (!result.success) {
+          const status = (result.status || '').toLowerCase();
+const msg =
+  status === 'reviewing'
+    ? "This evaluation is currently being reviewed by another user."
+    : status === 'disputed'
+    ? "This evaluation has already been disputed."
+    : "This evaluation is not available for dispute.";
+          showToast(msg, 'warning');
+          showEvaluations();
+          loadCompletedEvaluations();
+          return;
+        }
+
+        // ✅ Safe to show form
+        showDisputeForm(evalId);
+      })
+      .withFailureHandler(function(error) {
+        console.error("Error checking dispute status:", error);
+        showToast("Unable to validate dispute status. Try again.", "error");
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+      })
+      .checkAndSetDisputeReviewStatus(evalId);
+  })
+);
     }).getAllDisputes();
   }).getAllEvaluations();
 }
