@@ -1954,9 +1954,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function clearAuditLockIfExists() {
   const form = document.getElementById('evaluationForm');
+  const isVisible = !document.getElementById('evaluationFormView')?.classList.contains('hidden');
   const auditId = form?.getAttribute('data-audit-id');
 
-  if (auditId) {
+  if (isVisible && auditId) {
     google.script.run.fullyUnlockAudit(auditId); // ✅ full unlock
     form.removeAttribute('data-audit-id');
     clearInterval(window.auditHeartbeat);
