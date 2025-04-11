@@ -599,7 +599,9 @@ function showEvaluationForm(auditId) {
   taskDetails.innerHTML = 'Loading task details...';
   feedbackField.value = '';
   form.classList.add('disabled'); // prevent premature interaction
-  ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score'].forEach(attr => form.removeAttribute(attr));
+
+  ['data-audit-id', 'data-reference-number', 'data-task-type', 'data-outcome', 'data-max-score']
+    .forEach(attr => form.removeAttribute(attr));
 
   // Fetch and render new audit
   google.script.run
@@ -624,24 +626,25 @@ function showEvaluationForm(auditId) {
       // ✅ Load relevant questions
       loadQuestionsForEvaluation(audit);
 
-      // ✅ Start heartbeat ping every 5 minutes
+      // ✅ Heartbeat safety — clear old interval before starting new one
+      if (window.auditHeartbeat) clearInterval(window.auditHeartbeat);
       window.auditHeartbeat = setInterval(() => {
         google.script.run.keepAuditLockAlive(auditId);
-      }, 5 * 60 * 1000);
+        // console.log(`[Heartbeat] Audit ${auditId} pinged at ${new Date().toISOString()}`);
+      }, 5 * 60 * 1000); // 5 minutes
 
-      // Remove any previously registered unload listener
-if (window.boundUnloadUnlockHandler) {
-  window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
-}
+      // ✅ Unload handler safety — clear old before registering new
+      if (window.boundUnloadUnlockHandler) {
+        window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
+      }
 
-// Define a new scoped handler with current auditId
-const unloadHandler = () => {
-  google.script.run.updateAuditStatusAndLock(auditId, 'pending');
-};
+      const unloadHandler = () => {
+        // console.warn(`[Unload] Unlocking audit ${auditId}`);
+        google.script.run.updateAuditStatusAndLock(auditId, 'pending');
+      };
 
-// Register and store the handler
-window.boundUnloadUnlockHandler = unloadHandler;
-window.addEventListener('beforeunload', unloadHandler);
+      window.boundUnloadUnlockHandler = unloadHandler;
+      window.addEventListener('beforeunload', unloadHandler);
     })
     .withFailureHandler(function(error) {
       showToast(error.message || 'This audit is currently locked by another user.', 'warning');
