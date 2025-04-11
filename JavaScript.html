@@ -30,6 +30,7 @@ let currentUserEmail = '';
       currentUserEmail = user.email; // ✅ Save current user
       document.getElementById('userName').textContent = user.name;
       document.getElementById('userRole').textContent = formatRole(user.role);
+      document.getElementById('evaluationForm')?.removeAttribute('data-audit-id');
 
       const isAdmin = user.role === 'admin' || user.role === 'qa_manager';
       document.getElementById('navAdmin').style.display = isAdmin ? 'block' : 'none';
@@ -1953,11 +1954,12 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function clearAuditLockIfExists() {
+  if (window.skipUnlock) return; // ✅ prevent reset if marked misconfigured
+
   const form = document.getElementById('evaluationForm');
-  const isVisible = !document.getElementById('evaluationFormView')?.classList.contains('hidden');
   const auditId = form?.getAttribute('data-audit-id');
 
-  if (isVisible && auditId) {
+  if (auditId) {
     google.script.run.fullyUnlockAudit(auditId); // ✅ full unlock
     form.removeAttribute('data-audit-id');
     clearInterval(window.auditHeartbeat);
