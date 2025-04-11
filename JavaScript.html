@@ -558,6 +558,14 @@ function loadPendingTasks() {
   }
 }
 
+function showEvaluateModal() {
+  document.getElementById('evaluateModal')?.classList.remove('hidden');
+}
+
+function hideEvaluateModal() {
+  document.getElementById('evaluateModal')?.classList.add('hidden');
+}
+
 function loadErrorTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading errors...</td></tr>';
