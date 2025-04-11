@@ -152,7 +152,6 @@ function getCachedOrFetch(key, fetchFn) {
 
   return fresh;
 }
-}
 
 function clearCache(keys) {
   const cache = CacheService.getScriptCache();
