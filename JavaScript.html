@@ -11,15 +11,18 @@ let currentUserEmail = '';
 });
 
 function attachUnloadHandlerForDispute(evalId) {
+  if (!evalId) return; // 🛡️ Safety check
+
   // Clear any previous handler
   if (window.handleDisputeUnloadUnlock) {
     window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
   }
 
   // Define and attach new handler
-  window.handleDisputeUnloadUnlock = () => {
+  window.handleDisputeUnloadUnlock = function() {
     google.script.run.resetEvalStatusFromReviewing(evalId);
   };
+
   window.addEventListener('beforeunload', window.handleDisputeUnloadUnlock);
 }
 
@@ -29,8 +32,6 @@ function removeUnloadHandlerForDispute() {
     delete window.handleDisputeUnloadUnlock;
   }
 }
-
-
 
   function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
@@ -1395,16 +1396,16 @@ function handleDisputeSubmit(e) {
     submitBtn.textContent = 'Submitting...';
   }
 
-  // ✅ NEW: Live check using lightweight server call
+  // ✅ Live check
   google.script.run
     .withSuccessHandler(function(alreadyDisputed) {
       if (alreadyDisputed) {
         showToast("This evaluation has already been disputed.", 'warning');
+        removeUnloadHandlerForDispute(); // ✅ cleanup still needed
         showEvaluations();
         return;
       }
 
-      // ✅ Safe to proceed
       const disputeData = {
         evalId: evaluationId,
         reason,
@@ -1416,7 +1417,7 @@ function handleDisputeSubmit(e) {
         .withSuccessHandler(() => {
           showToast("Dispute submitted successfully!", 'success');
           removeUnloadHandlerForDispute();
-          showEvaluations(); // ✅ Back to evaluations view
+          showEvaluations();
         })
         .withFailureHandler(error => {
           console.error(error.message);
