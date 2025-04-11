@@ -375,25 +375,22 @@ function markAuditAsMisconfigured(auditId, requestType, taskType) {
     const currentTask = row[taskCol];
     const currentStatus = row[statusCol];
 
-    // ✅ Mark the triggering record directly
-    if (currentId === auditId) {
-      sheet.getRange(i + 1, statusCol + 1).setValue('misconfigured');
+    const isTargetRecord = currentId === auditId;
+    const isMatchingType = currentRequest === requestType && currentTask === taskType;
+
+    if (isTargetRecord) {
       foundAudit = true;
     }
 
-    // ✅ Also mark other matching records
-    if (
-      currentRequest === requestType &&
-      currentTask === taskType &&
-      currentStatus !== 'misconfigured'
-    ) {
+    if ((isTargetRecord || isMatchingType) && currentStatus !== 'misconfigured') {
       sheet.getRange(i + 1, statusCol + 1).setValue('misconfigured');
       updatedCount++;
     }
   }
 
   if (!foundAudit) throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
-  Logger.log(`✅ Marked ${updatedCount} other audits as misconfigured.`);
+
+  Logger.log(`✅ Marked ${updatedCount} audits as misconfigured.`);
   return updatedCount;
 }
 
