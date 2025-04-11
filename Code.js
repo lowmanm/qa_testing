@@ -349,7 +349,7 @@ function getAllQuestions() {
 /**
  * Marks an audit as misconfigured.
  */
-function markAuditAsMisconfigured(auditId) {
+function markAuditAsMisconfigured(auditId, requestType, taskType) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   if (!sheet) throw new Error(`Sheet "${SHEET_AUDIT_QUEUE}" not found`);
 
@@ -357,20 +357,44 @@ function markAuditAsMisconfigured(auditId) {
   const headers = data[0];
 
   const idCol = headers.indexOf('auditId');
+  const requestCol = headers.indexOf('requestType');
+  const taskCol = headers.indexOf('taskType');
   const statusCol = headers.indexOf('auditStatus');
 
-  if (idCol === -1 || statusCol === -1) {
-    throw new Error('Missing auditId or auditStatus column.');
+  if ([idCol, requestCol, taskCol, statusCol].includes(-1)) {
+    throw new Error('Missing one or more required columns (auditId, requestType, taskType, auditStatus)');
   }
 
+  let updatedCount = 0;
+  let foundAudit = false;
+
   for (let i = 1; i < data.length; i++) {
-    if (data[i][idCol] === auditId) {
+    const row = data[i];
+    const currentId = row[idCol];
+    const currentRequest = row[requestCol];
+    const currentTask = row[taskCol];
+    const currentStatus = row[statusCol];
+
+    // ✅ Mark the triggering record directly
+    if (currentId === auditId) {
       sheet.getRange(i + 1, statusCol + 1).setValue('misconfigured');
-      return;
+      foundAudit = true;
+    }
+
+    // ✅ Also mark other matching records
+    if (
+      currentRequest === requestType &&
+      currentTask === taskType &&
+      currentStatus !== 'misconfigured'
+    ) {
+      sheet.getRange(i + 1, statusCol + 1).setValue('misconfigured');
+      updatedCount++;
     }
   }
 
-  throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
+  if (!foundAudit) throw new Error(`Audit ID ${auditId} not found in ${SHEET_AUDIT_QUEUE}.`);
+  Logger.log(`✅ Marked ${updatedCount} other audits as misconfigured.`);
+  return updatedCount;
 }
 
 // ====================
