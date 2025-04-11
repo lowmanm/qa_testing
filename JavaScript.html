@@ -862,51 +862,83 @@ function resetEvaluationForm() {
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
   google.script.run.withSuccessHandler(function(evaluations) {
-  google.script.run.withSuccessHandler(function(disputesQueue) {
-    const disputedEvalIds = new Set(disputesQueue.map(d => d.evalId));
-    const pendingReviewingEvalIds = new Set(disputesQueue.filter(d => d.status === 'pending' || d.status === 'reviewing').map(d => d.evalId));
+    // After evaluations load, now load disputesQueue
+    google.script.run.withSuccessHandler(function(disputesQueue) {
+      const disputedEvalIds = new Set(disputesQueue.map(d => d.evalId));
+      const pendingReviewingEvalIds = new Set(
+        disputesQueue.filter(d => d.status === 'pending' || d.status === 'reviewing').map(d => d.evalId)
+      );
 
-    tableBody.innerHTML = '';
-    evaluations.forEach(e => {
-      const percentage = Math.round((e.totalPoints / e.totalPointsPossible) * 100);
-      let scoreClass = 'score-high';
-      if (percentage < 70) scoreClass = 'score-low';
-      else if (percentage < 90) scoreClass = 'score-medium';
+      tableBody.innerHTML = '';
+      evaluations.forEach(e => {
+        const percentage = Math.round((e.totalPoints / e.totalPointsPossible) * 100);
+        let scoreClass = 'score-high';
+        if (percentage < 70) scoreClass = 'score-low';
+        else if (percentage < 90) scoreClass = 'score-medium';
 
-      let rowClass = '';
-      if (e.status === 'pending' || e.status === 'reviewing') rowClass = 'highlight-pending-reviewing';
+        let rowClass = '';
+        if (e.status === 'pending' || e.status === 'reviewing') rowClass = 'highlight-pending-reviewing';
 
-      const row = document.createElement('tr');
-      row.className = rowClass;
-      row.innerHTML = `
-        <td>${formatTaskType(e.taskType)}</td>
-        <td>${e.qaEmail}</td>
-        <td>${formatDate(e.stopTimestamp)}</td>
-        <td class="evaluation-score ${scoreClass}">${e.totalPoints}/${e.totalPointsPossible} (${percentage}%)</td>
-        <td><span class="badge badge-${e.status}">${e.status}</span></td>
-        <td>
-          <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
-          ${e.status === 'completed' && !disputedEvalIds.has(e.id) && percentage < 100
-            ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>`
-            : ''}
-        </td>
-      `;
-      tableBody.appendChild(row);
-    });
+        const row = document.createElement('tr');
+        row.className = rowClass;
+        row.innerHTML = `
+          <td>${formatTaskType(e.taskType)}</td>
+          <td>${e.qaEmail}</td>
+          <td>${formatDate(e.stopTimestamp)}</td>
+          <td class="evaluation-score ${scoreClass}">${e.totalPoints}/${e.totalPointsPossible} (${percentage}%)</td>
+          <td><span class="badge badge-${e.status}">${e.status}</span></td>
+          <td>
+            <button class="btn btn-sm btn-primary view-evaluation-button" data-evaluation-id="${e.id}">View</button>
+            ${e.status === 'completed' && !disputedEvalIds.has(e.id) && percentage < 100
+              ? `<button class="btn btn-sm btn-danger ml-2 dispute-button" data-evaluation-id="${e.id}">Dispute</button>`
+              : ''}
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
 
-    // Delegate event listeners
-    document.querySelectorAll('.view-evaluation-button').forEach(btn =>
-      btn.addEventListener('click', () => {
-        const evaluationId = btn.getAttribute('data-evaluation-id');
-        viewEvaluation(evaluationId);
-      })
-    );
+      // View Evaluation
+      document.querySelectorAll('.view-evaluation-button').forEach(btn =>
+        btn.addEventListener('click', () => {
+          const evaluationId = btn.getAttribute('data-evaluation-id');
+          viewEvaluation(evaluationId);
+        })
+      );
 
-    document.querySelectorAll('.dispute-button').forEach(btn =>
-      btn.addEventListener('click', () => showDisputeForm(btn.dataset.evaluationId))
-    );
-  }).getAllDisputes();
-}).getAllEvaluations();
+      // Dispute Evaluation
+      document.querySelectorAll('.dispute-button').forEach(btn =>
+        btn.addEventListener('click', () => {
+          const button = btn;
+          const evalId = button.dataset.evaluationId;
+
+          const originalHTML = button.innerHTML;
+          button.disabled = true;
+          button.innerHTML = `<span class="spinner"></span>Checking...`;
+
+          google.script.run
+            .withSuccessHandler(function(alreadyDisputed) {
+              if (alreadyDisputed) {
+                showToast("This evaluation is already under dispute.", "warning");
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+                showEvaluations();
+                loadCompletedEvaluations();
+                return;
+              }
+
+              showDisputeForm(evalId);
+            })
+            .withFailureHandler(function(error) {
+              console.error("Error checking dispute status:", error);
+              showToast("Could not verify dispute status. Try again.", "error");
+              button.disabled = false;
+              button.innerHTML = originalHTML;
+            })
+            .checkIfAlreadyDisputed(evalId);
+        })
+      );
+    }).getAllDisputes();
+  }).getAllEvaluations();
 }
 
   function viewEvaluation(evaluationId) {
