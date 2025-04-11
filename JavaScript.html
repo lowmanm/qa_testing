@@ -411,7 +411,7 @@ function showAuditQueue() {
 
 function loadPendingTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
-  tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
 
   google.script.run.withSuccessHandler(function(audits) {
   if (!Array.isArray(audits)) {
@@ -435,6 +435,7 @@ function loadPendingTasks() {
       row.className = isLocked && !isLockedByUser ? 'row-locked' : '';
 
       row.innerHTML = `
+        <td><code>${audit.auditId}</code></td>
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
