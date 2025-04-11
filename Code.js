@@ -765,7 +765,7 @@ function updateEvaluationStatus(auditId, newStatus) {
   clearCache('all_evaluations');
 }
 
-function resetDisputeStatus(evalId) {
+function resetEvalStatusFromReviewing(evalId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
