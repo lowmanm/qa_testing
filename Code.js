@@ -439,7 +439,9 @@ function unlockStaleAudits() {
   const lockedAtIdx = headers.indexOf('lockedAt');
 
   const now = new Date();
-  const thresholdMinutes = 30;
+  const heartbeatIntervalMinutes = 5;
+  const graceBufferMinutes = 1;
+  const thresholdMinutes = heartbeatIntervalMinutes + graceBufferMinutes;
   let unlockedCount = 0;
 
   for (let i = 1; i < data.length; i++) {
