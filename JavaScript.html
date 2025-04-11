@@ -461,16 +461,16 @@ function loadPendingTasks() {
   tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
 
   google.script.run.withSuccessHandler(function(audits) {
-  if (!Array.isArray(audits)) {
-    console.error('Unexpected result from getPendingAudits:', audits);
-    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
-    return;
-  }
+    if (!Array.isArray(audits)) {
+      console.error('Unexpected result from getPendingAudits:', audits);
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
+      return;
+    }
 
-  if (audits.length === 0) {
-    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending audits found</td></tr>';
-    return;
-  }
+    if (audits.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending audits found</td></tr>';
+      return;
+    }
 
     const fragment = document.createDocumentFragment();
 
@@ -511,83 +511,49 @@ function loadPendingTasks() {
 
   // ✅ Attach the event listener just once
   if (!tableBody.hasListenerAttached) {
-  tableBody.addEventListener('click', function(event) {
-    if (!event.target.classList.contains('evaluate-button')) return;
+    tableBody.addEventListener('click', function(event) {
+      if (!event.target.classList.contains('evaluate-button')) return;
 
-    const clickedButton = event.target;
-    const auditId = clickedButton.getAttribute('data-audit-id');
+      const clickedButton = event.target;
+      const auditId = clickedButton.getAttribute('data-audit-id');
 
-    // Disable all evaluate buttons
-    const allButtons = document.querySelectorAll('.evaluate-button');
-    allButtons.forEach(btn => btn.disabled = true);
+      // Disable all evaluate buttons
+      const allButtons = document.querySelectorAll('.evaluate-button');
+      allButtons.forEach(btn => btn.disabled = true);
 
-    // Store original HTML to restore later
-    const originalHTML = clickedButton.innerHTML;
-    clickedButton.innerHTML = `<span class="spinner"></span>Checking...`;
+      const originalHTML = clickedButton.innerHTML;
+      clickedButton.innerHTML = `<span class="spinner"></span>Checking...`;
 
-    google.script.run
-      .withSuccessHandler(function(alreadyEvaluated) {
-        // Re-enable all buttons
-        allButtons.forEach(btn => {
-          btn.disabled = false;
-          btn.innerHTML = btn === clickedButton ? originalHTML : btn.innerHTML;
-        });
+      google.script.run
+        .withSuccessHandler(function(alreadyEvaluated) {
+          allButtons.forEach(btn => {
+            btn.disabled = false;
+            if (btn === clickedButton) btn.innerHTML = originalHTML;
+          });
 
-        if (alreadyEvaluated) {
-          showToast("This audit has already been evaluated.", "warning");
-          loadPendingTasks(); // Refresh the table
-          return;
-        }
+          if (alreadyEvaluated) {
+            showToast("This audit has already been evaluated.", "warning");
+            loadPendingTasks(); // Refresh
+            return;
+          }
 
-        showEvaluationForm(auditId);
-      })
-      .withFailureHandler(function(error) {
-        console.error('Error checking evaluation status:', error);
-        showToast("Failed to verify evaluation status. Please try again.", "error");
+          showEvaluationForm(auditId);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error checking evaluation status:', error);
+          showToast("Failed to verify evaluation status. Please try again.", "error");
 
-        // Restore UI state
-        allButtons.forEach(btn => {
-          btn.disabled = false;
-          btn.innerHTML = btn === clickedButton ? originalHTML : btn.innerHTML;
-        });
-      })
-      .checkIfAlreadyEvaluated(auditId);
-  });
-
-  tableBody.hasListenerAttached = true;
-}
-
-  // 🔄 Save original button state
-  const originalHTML = button.innerHTML;
-  button.disabled = true;
-
-  // Show spinner with "Checking..."
-  button.innerHTML = `<span class="spinner"></span>Checking...`;
-
-  google.script.run
-    .withSuccessHandler(function(alreadyEvaluated) {
-      if (alreadyEvaluated) {
-        showToast("This audit has already been evaluated.", "warning");
-        loadPendingTasks(); // Refresh table
-        return;
-      }
-
-      showEvaluationForm(auditId);
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error checking evaluation status:', error);
-      showToast("Failed to verify evaluation status. Please try again.", "error");
-
-      // 🔄 Restore button on failure
-      button.disabled = false;
-      button.innerHTML = originalHTML;
-    })
-    .checkIfAlreadyEvaluated(auditId);
-}
+          allButtons.forEach(btn => {
+            btn.disabled = false;
+            if (btn === clickedButton) btn.innerHTML = originalHTML;
+          });
+        })
+        .checkIfAlreadyEvaluated(auditId);
     });
+
     tableBody.hasListenerAttached = true;
   }
-}
+}}
 
 function loadErrorTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
