@@ -1409,6 +1409,7 @@ function handleDisputeSubmit(e) {
       google.script.run
         .withSuccessHandler(() => {
           showToast("Dispute submitted successfully!", 'success');
+          removeUnloadHandlerForDispute();
           showEvaluations(); // ✅ Back to evaluations view
         })
         .withFailureHandler(error => {
