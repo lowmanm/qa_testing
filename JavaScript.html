@@ -409,10 +409,16 @@ function loadPendingTasks() {
   tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
   google.script.run.withSuccessHandler(function(audits) {
-    if (audits.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending audits found</td></tr>';
-      return;
-    }
+  if (!Array.isArray(audits)) {
+    console.error('Unexpected result from getPendingAudits:', audits);
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
+    return;
+  }
+
+  if (audits.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending audits found</td></tr>';
+    return;
+  }
 
     const fragment = document.createDocumentFragment();
 
