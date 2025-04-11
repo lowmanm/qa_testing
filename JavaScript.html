@@ -284,6 +284,7 @@ function showAddQuestionForm() {
   }
 
   function showEvaluations() {
+    clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
     hideAllViews();
     document.getElementById('evaluationsView')?.classList.remove('hidden');
     highlightNavItem('navEvaluations');
@@ -291,6 +292,7 @@ function showAddQuestionForm() {
   }
 
   function showDisputes() {
+    clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
     hideAllViews();
     document.getElementById('disputesView')?.classList.remove('hidden');
     highlightNavItem('navDisputes');
@@ -395,7 +397,8 @@ function populateTaskTypeOptions(types) {
 }
 
 
-  function showAuditQueue() {
+function showAuditQueue() {
+  clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
   hideAllViews();
   document.getElementById('auditQueueView').classList.remove('hidden');
   highlightNavItem('navAuditQueue');
@@ -1829,5 +1832,17 @@ document.addEventListener('DOMContentLoaded', function () {
     cancelQuestionBtn.addEventListener('click', hideQuestionForm);
   }
 });
+
+function clearAuditLockIfExists() {
+  const form = document.getElementById('evaluationForm');
+  const auditId = form?.getAttribute('data-audit-id');
+
+  if (auditId) {
+    google.script.run.fullyUnlockAudit(auditId); // ✅ full unlock
+    form.removeAttribute('data-audit-id');
+    clearInterval(window.auditHeartbeat);
+    window.auditHeartbeat = null;
+  }
+}
 
 </script>
