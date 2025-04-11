@@ -757,9 +757,14 @@ function loadQuestionsForEvaluation(audit, attempt = 1) {
   }).getQuestionsBySet(audit.requestType, audit.taskType);
 }
 
-function markAuditAsMisconfigured(auditId) {
-  if (!auditId) return;
-  google.script.run.markAuditAsMisconfigured(auditId);
+function markAuditAsMisconfigured(auditId, requestType, taskType) {
+  if (!auditId || !requestType || !taskType) return;
+
+  google.script.run
+    .withSuccessHandler(count => {
+      showToast(`Marked ${count} audits as misconfigured for this task.`, 'warning');
+    })
+    .markAuditAsMisconfigured(auditId, requestType, taskType);
 }
 
   function handleEvaluationSubmit(e) {
