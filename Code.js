@@ -726,6 +726,23 @@ function updateEvaluationStatus(auditId, newStatus) {
   clearCache('all_evaluations');
 }
 
+function resetDisputeStatus(evalId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+
+  if (idIdx === -1 || statusIdx === -1) return;
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === evalId && data[i][statusIdx] === 'reviewing') {
+      sheet.getRange(i + 1, statusIdx + 1).setValue('completed');
+      break;
+    }
+  }
+}
+
 // ====================
 // Disputes Module
 // ====================
