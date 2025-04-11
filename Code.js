@@ -356,17 +356,21 @@ function markAuditAsMisconfigured(auditId) {
 function getAllAudits() {
   return getCachedOrFetch('all_audits', () => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
-    const audits = getSheetDataAsObjects(sheet);
+    if (!sheet) {
+      Logger.log('❌ Sheet not found: SHEET_AUDIT_QUEUE');
+      return [];
+    }
 
-    // Optional: normalize key fields (safety and consistency)
-    audits.forEach(audit => {
-      audit.auditStatus = (audit.auditStatus || '').toLowerCase();
-      audit.taskType = audit.taskType || '';
-      audit.requestType = audit.requestType || '';
-      audit.auditId = audit.auditId || '';
-    });
+    const values = getSheetDataAsObjects(sheet);
 
-    return audits;
+    if (values.length > 1000) {
+      Logger.log(`⚠️ Not caching all_audits because size = ${values.length}`);
+      // Return directly without caching
+      return values;
+    }
+
+    Logger.log(`✅ Loaded ${values.length} audits`);
+    return values;
   });
 }
 
