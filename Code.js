@@ -144,11 +144,16 @@ function getCachedOrFetch(key, fetchFn) {
   }
 
   try {
-    cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
+  const json = JSON.stringify(fresh);
+  if (json.length < 90000) {
+    cache.put(key, json, CACHE_DURATION);
     Logger.log(`✅ Cached fresh value for key: ${key}`);
-  } catch (e) {
-    Logger.log(`❌ Failed to cache ${key}: ${e.message}`);
+  } else {
+    Logger.log(`⚠️ Skipped caching for ${key}: data too large (${json.length} bytes)`);
   }
+} catch (e) {
+  Logger.log(`❌ Failed to process caching for ${key}: ${e.message}`);
+}
 
   return fresh;
 }
