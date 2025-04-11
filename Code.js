@@ -466,6 +466,11 @@ function updateAuditStatus(auditId, newStatus) {
  * Updates the status of an audit and locks it.
  */
 function updateAuditStatusAndLock(auditId, status) {
+  if (!auditId || typeof auditId !== 'string') {
+    Logger.log(`❌ Skipping updateAuditStatusAndLock: Invalid auditId provided: ${auditId}`);
+    return;
+  }
+
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_AUDIT_QUEUE);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
@@ -475,16 +480,29 @@ function updateAuditStatusAndLock(auditId, status) {
   const lockedByIdx = headers.indexOf('lockedBy');
   const lockedAtIdx = headers.indexOf('lockedAt');
 
-  const rowIndex = data.findIndex((r, i) => i > 0 && r[idIdx] === auditId);
-  if (rowIndex === -1) throw new Error('Audit not found');
+  if ([idIdx, statusIdx, lockedByIdx, lockedAtIdx].some(idx => idx === -1)) {
+    Logger.log('❌ One or more required columns (auditId, auditStatus, lockedBy, lockedAt) are missing.');
+    return;
+  }
 
-  sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(status);
-  sheet.getRange(rowIndex + 1, lockedByIdx + 1).setValue('');
-  sheet.getRange(rowIndex + 1, lockedAtIdx + 1).setValue('');
+  let updated = false;
 
-  clearCache('all_audits');
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === auditId) {
+      sheet.getRange(i + 1, statusIdx + 1).setValue(status);
+      sheet.getRange(i + 1, lockedByIdx + 1).setValue('');
+      sheet.getRange(i + 1, lockedAtIdx + 1).setValue('');
+      Logger.log(`✅ Audit ${auditId} status updated to '${status}' and lock cleared.`);
+      updated = true;
+      break;
+    }
+  }
 
-  return { success: true };
+  if (!updated) {
+    Logger.log(`⚠️ Audit with ID ${auditId} not found in sheet.`);
+  }
+
+  clearCache(['all_audits', 'pending_audits']);
 }
 
 /*
