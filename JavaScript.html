@@ -176,7 +176,7 @@ function attachFormHandlers() {
 
       // Cleanup: heartbeat + unload listener
       clearInterval(window.auditHeartbeat);
-      window.removeEventListener('beforeunload', window.handleUnloadUnlock);
+      window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
 
       resetEvaluationForm();
       showAuditQueue();
@@ -629,11 +629,19 @@ function showEvaluationForm(auditId) {
         google.script.run.keepAuditLockAlive(auditId);
       }, 5 * 60 * 1000);
 
-      // ✅ Unlock audit if user closes tab or navigates away
-      window.handleUnloadUnlock = () => {
-        google.script.run.updateAuditStatusAndLock(auditId, 'pending');
-      };
-      window.addEventListener('beforeunload', window.handleUnloadUnlock);
+      // Remove any previously registered unload listener
+if (window.boundUnloadUnlockHandler) {
+  window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
+}
+
+// Define a new scoped handler with current auditId
+const unloadHandler = () => {
+  google.script.run.updateAuditStatusAndLock(auditId, 'pending');
+};
+
+// Register and store the handler
+window.boundUnloadUnlockHandler = unloadHandler;
+window.addEventListener('beforeunload', unloadHandler);
     })
     .withFailureHandler(function(error) {
       showToast(error.message || 'This audit is currently locked by another user.', 'warning');
