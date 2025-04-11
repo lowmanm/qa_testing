@@ -340,6 +340,7 @@ function showAddQuestionForm() {
 
   function showDashboard() {
     clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
+    removeUnloadHandlerForDispute(); // ✅ Redundant safeguard
     hideAllViews();
     document.getElementById('dashboardView')?.classList.remove('hidden');
     highlightNavItem('navDashboard');
@@ -356,6 +357,7 @@ function showAddQuestionForm() {
 
   function showEvaluations() {
     clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
+    removeUnloadHandlerForDispute(); // ✅ Redundant safeguard
     hideAllViews();
     document.getElementById('evaluationsView')?.classList.remove('hidden');
     highlightNavItem('navEvaluations');
@@ -364,6 +366,7 @@ function showAddQuestionForm() {
 
   function showDisputes() {
     clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
+    removeUnloadHandlerForDispute(); // ✅ Redundant safeguard
     hideAllViews();
     document.getElementById('disputesView')?.classList.remove('hidden');
     highlightNavItem('navDisputes');
@@ -372,6 +375,7 @@ function showAddQuestionForm() {
 
   function showAdmin() {
     clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
+    removeUnloadHandlerForDispute(); // ✅ Redundant safeguard
     hideAllViews();
     document.getElementById('adminView')?.classList.remove('hidden');
     highlightNavItem('navAdmin');
@@ -471,6 +475,7 @@ function populateTaskTypeOptions(types) {
 
 function showAuditQueue() {
   clearAuditLockIfExists(); // ✅ ensures stale lock is cleared
+  removeUnloadHandlerForDispute(); // ✅ Redundant safeguard
   hideAllViews();
   document.getElementById('auditQueueView').classList.remove('hidden');
   highlightNavItem('navAuditQueue');
@@ -1949,6 +1954,9 @@ function escapeHTML(str) {
 }
 
   function hideAllViews() {
+    // ✅ Automatically reset dispute review status when navigating away
+  removeUnloadHandlerForDispute();
+    
   const views = [
     'dashboardView',
     'auditQueueView',
