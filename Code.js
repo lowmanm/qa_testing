@@ -130,20 +130,28 @@ function getCachedOrFetch(key, fetchFn) {
   }
 
   // Fetch fresh data
-  const fresh = fetchFn();
-
-  if (fresh !== undefined && fresh !== null) {
-    try {
-      cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
-      Logger.log(`✅ Cached fresh value for key: ${key}`);
-    } catch (e) {
-      Logger.log(`❌ Failed to cache ${key}: ${e.message}`);
-    }
-    return fresh;
+  let fresh;
+  try {
+    fresh = fetchFn();
+  } catch (e) {
+    Logger.log(`❌ fetchFn for key ${key} threw an error: ${e.message}`);
+    return [];
   }
 
-  Logger.log(`⚠️ No data fetched for key: ${key}, returning null.`);
-  return null;
+  if (!Array.isArray(fresh)) {
+    Logger.log(`⚠️ Fetched data for ${key} is not an array. Returning empty list.`);
+    return [];
+  }
+
+  try {
+    cache.put(key, JSON.stringify(fresh), CACHE_DURATION);
+    Logger.log(`✅ Cached fresh value for key: ${key}`);
+  } catch (e) {
+    Logger.log(`❌ Failed to cache ${key}: ${e.message}`);
+  }
+
+  return fresh;
+}
 }
 
 function clearCache(keys) {
@@ -169,7 +177,7 @@ function clearCache(keys) {
 }
 
 function clearQaCaches() {
-  clearCache(['all_disputes', 'all_evaluations']);
+  clearCache(['all_disputes', 'all_evaluations, 'pending_audits','all_audits']);
 }
 
 // ====================
