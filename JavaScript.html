@@ -520,9 +520,8 @@ function loadPendingTasks() {
       // Disable all evaluate buttons to prevent spam clicking
       const allButtons = document.querySelectorAll('.evaluate-button');
       allButtons.forEach(btn => btn.disabled = true);
-
-      const originalHTML = clickedButton.innerHTML;
-      clickedButton.innerHTML = `<span class="spinner"></span>Checking...`;
+      // Show modal
+      document.getElementById('evaluateModal')?.classList.remove('hidden');
 
       google.script.run
         .withSuccessHandler(function(alreadyEvaluated) {
