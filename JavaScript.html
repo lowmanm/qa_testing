@@ -687,41 +687,45 @@ function loadQuestionsForEvaluation(audit, attempt = 1) {
     questionsContainer.innerHTML = '';
 
     if (!questions || questions.length === 0) {
-  // 🧠 Inline UX update + countdown message
-  questionsContainer.innerHTML = `
-    <div class="alert alert-warning" style="margin-top: 1rem;">
-      ⚠️ No evaluation questions are configured for this request type and task type.
-      <br>Please contact your QA admin.
-      <br><br><em>Returning to the Audit Queue in <span id="redirectCountdown">5</span> seconds...</em>
-    </div>
-  `;
+      // 🧠 Inline UX update + countdown message
+      questionsContainer.innerHTML = `
+        <div class="alert alert-warning" style="margin-top: 1rem;">
+          ⚠️ No evaluation questions are configured for this request type and task type.
+          <br>Please contact your QA admin.
+          <br><br><em>Returning to the Audit Queue in <span id="redirectCountdown">5</span> seconds...</em>
+        </div>
+      `;
 
-  // 🛑 Prevent form submission
-  form.classList.add('disabled');
+      // 🛑 Prevent form submission
+      form.classList.add('disabled');
 
-  // ✅ Prevent automatic unlock — misconfigured
-  window.skipUnlock = true;
+      // ✅ Prevent automatic unlock — misconfigured
+      window.skipUnlock = true;
 
-  // 🔄 Log misconfiguration
-  markAuditAsMisconfigured(form.getAttribute('data-audit-id'));
+      // ✅ Log misconfiguration (updated to pass all required values)
+      markAuditAsMisconfigured(
+        audit.auditId,
+        audit.requestType,
+        audit.taskType
+      );
 
-  // ✅ Show toast message
-  showToast("No evaluation questions are set up for this record.", 'warning');
+      // ✅ Show toast message
+      showToast("No evaluation questions are set up for this record.", 'warning');
 
-  // 🕒 Start 5-second redirect countdown
-  let secondsLeft = 5;
-  const countdownEl = document.getElementById('redirectCountdown');
-  const countdownTimer = setInterval(() => {
-    secondsLeft--;
-    if (countdownEl) countdownEl.textContent = secondsLeft;
-    if (secondsLeft <= 0) {
-      clearInterval(countdownTimer);
-      showAuditQueue();
+      // 🕒 Start 5-second redirect countdown
+      let secondsLeft = 5;
+      const countdownEl = document.getElementById('redirectCountdown');
+      const countdownTimer = setInterval(() => {
+        secondsLeft--;
+        if (countdownEl) countdownEl.textContent = secondsLeft;
+        if (secondsLeft <= 0) {
+          clearInterval(countdownTimer);
+          showAuditQueue();
+        }
+      }, 1000);
+
+      return;
     }
-  }, 1000);
-
-  return;
-}
 
     // ✅ Normal path: render all questions
     questions.forEach(q => {
