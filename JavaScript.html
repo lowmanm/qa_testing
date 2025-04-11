@@ -177,6 +177,7 @@ function attachFormHandlers() {
       // Cleanup: heartbeat + unload listener
       clearInterval(window.auditHeartbeat);
       window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
+      delete window.boundUnloadUnlockHandler;
 
       resetEvaluationForm();
       showAuditQueue();
@@ -202,6 +203,7 @@ function attachFormHandlers() {
 
       // Cleanup: unload listener
       window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+      delete window.handleDisputeUnloadUnlock;
 
       showEvaluations();
     });
@@ -213,6 +215,11 @@ function attachFormHandlers() {
     // Add unload listener for status reset
     const evalId = disputeForm.getAttribute('data-evaluation-id');
     if (evalId) {
+      // Prevent multiple listeners
+      if (window.handleDisputeUnloadUnlock) {
+        window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+      }
+
       window.handleDisputeUnloadUnlock = () => {
         google.script.run.resetDisputeStatus(evalId);
       };
@@ -850,6 +857,8 @@ google.script.run
         updateAuditStatusAndLock(auditId, 'evaluated')
           .then(() => {
             clearInterval(window.auditHeartbeat); // ✅ stop the heartbeat
+            window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
+              delete window.boundUnloadUnlockHandler;
             showToast("Evaluation saved and audit unlocked successfully!", 'success');
             resetEvaluationForm();
             document.getElementById('evaluationLoadingIndicator')?.remove();
