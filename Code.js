@@ -378,20 +378,38 @@ function getPendingAudits() {
   Logger.log('📥 Fetching pending audits (from cache or fresh)...');
 
   return getCachedOrFetch('pending_audits', () => {
-    const audits = getAllAudits();
-    const evaluations = getAllEvaluations();
+    let audits = [];
+    let evaluations = [];
 
-    if (!Array.isArray(audits) || !Array.isArray(evaluations)) {
-      Logger.log('❌ Invalid audits or evaluations data. Returning empty list.');
-      return [];
+    try {
+      audits = getAllAudits();
+      if (!Array.isArray(audits)) {
+        Logger.log('❌ getAllAudits returned non-array or null');
+        audits = [];
+      }
+    } catch (e) {
+      Logger.log(`❌ getAllAudits threw error: ${e.message}`);
+    }
+
+    try {
+      evaluations = getAllEvaluations();
+      if (!Array.isArray(evaluations)) {
+        Logger.log('❌ getAllEvaluations returned non-array or null');
+        evaluations = [];
+      }
+    } catch (e) {
+      Logger.log(`❌ getAllEvaluations threw error: ${e.message}`);
     }
 
     const evaluatedIds = new Set(evaluations.map(e => e.evalId));
 
-    return audits.filter(a =>
+    const pending = audits.filter(a =>
       a.auditStatus?.toLowerCase() === 'pending' &&
       !evaluatedIds.has(a.auditId)
     );
+
+    Logger.log(`✅ getPendingAudits: ${pending.length} audits returned.`);
+    return pending;
   });
 }
 
