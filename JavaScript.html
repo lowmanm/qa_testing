@@ -999,7 +999,7 @@ function resetEvaluationForm() {
       );
 
       // Dispute Evaluation
-      document.querySelectorAll('.dispute-button').forEach(btn =>
+document.querySelectorAll('.dispute-button').forEach(btn =>
   btn.addEventListener('click', () => {
     const button = btn;
     const evalId = button.dataset.evaluationId;
@@ -1008,22 +1008,25 @@ function resetEvaluationForm() {
     button.disabled = true;
     button.innerHTML = `<span class="spinner"></span>Checking...`;
 
+    // Show modal during check
+    document.getElementById('evaluateModal')?.classList.remove('hidden');
+
     google.script.run
       .withSuccessHandler(function(result) {
+        document.getElementById('evaluateModal')?.classList.add('hidden');
         button.disabled = false;
         button.innerHTML = originalHTML;
 
         if (!result.success) {
           const status = (result.status || '').toLowerCase();
-const msg =
-  status === 'reviewing'
-    ? "This evaluation is currently being reviewed by another user."
-    : status === 'disputed'
-    ? "This evaluation has already been disputed."
-    : "This evaluation is not available for dispute.";
+          const msg =
+            status === 'reviewing'
+              ? "This evaluation is currently being reviewed by another user."
+              : status === 'disputed'
+              ? "This evaluation has already been disputed."
+              : "This evaluation is not available for dispute.";
           showToast(msg, 'warning');
-          showEvaluations();
-          loadCompletedEvaluations();
+          loadEvaluations();
           return;
         }
 
@@ -1031,6 +1034,7 @@ const msg =
         showDisputeForm(evalId);
       })
       .withFailureHandler(function(error) {
+        document.getElementById('evaluateModal')?.classList.add('hidden');
         console.error("Error checking dispute status:", error);
         showToast("Unable to validate dispute status. Try again.", "error");
         button.disabled = false;
