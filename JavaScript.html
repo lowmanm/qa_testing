@@ -1254,39 +1254,49 @@ function handleDisputeSubmit(e) {
     submitBtn.textContent = 'Submitting...';
   }
 
-  google.script.run.withSuccessHandler(function(disputes) {
-    const alreadyDisputed = disputes.some(d => d.evalId === evaluationId);
+  // ✅ NEW: Live check using lightweight server call
+  google.script.run
+    .withSuccessHandler(function(alreadyDisputed) {
+      if (alreadyDisputed) {
+        showToast("This evaluation has already been disputed.", 'warning');
+        showEvaluations();
+        return;
+      }
 
-    if (alreadyDisputed) {
-      showToast("This evaluation has already been disputed.", 'warning');
-      showEvaluations();
-      return;
-    }
+      // ✅ Safe to proceed
+      const disputeData = {
+        evalId: evaluationId,
+        reason,
+        questionIds: disputedQuestionIds,
+        status: 'pending'
+      };
 
-    const disputeData = {
-      evalId: evaluationId,
-      reason,
-      questionIds: disputedQuestionIds,
-      status: 'pending'
-    };
-
-    google.script.run
-      .withSuccessHandler(() => {
-        showToast("Dispute submitted successfully!", 'success');
-        showEvaluations(); // ✅ Back to evaluations view
-      })
-      .withFailureHandler(error => {
-        console.error(error.message);
-        showToast("Error submitting dispute: " + error.message, 'error');
-        form.classList.remove('disabled');
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Submit Dispute';
-        }
-      })
-      .saveDispute(disputeData);
-
-  }).getAllDisputes(); // Live validation
+      google.script.run
+        .withSuccessHandler(() => {
+          showToast("Dispute submitted successfully!", 'success');
+          showEvaluations(); // ✅ Back to evaluations view
+        })
+        .withFailureHandler(error => {
+          console.error(error.message);
+          showToast("Error submitting dispute: " + error.message, 'error');
+          form.classList.remove('disabled');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Dispute';
+          }
+        })
+        .saveDispute(disputeData);
+    })
+    .withFailureHandler(error => {
+      console.error("Dispute check failed:", error);
+      showToast("Could not verify dispute status. Please try again.", 'error');
+      form.classList.remove('disabled');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Dispute';
+      }
+    })
+    .checkIfAlreadyDisputed(evaluationId);
 }
 
 function resolveDispute(disputeId) {
