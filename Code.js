@@ -369,9 +369,15 @@ function getAllAudits() {
  */
 function getPendingAudits() {
   Logger.log('📥 Fetching pending audits (from cache or fresh)...');
+
   return getCachedOrFetch('pending_audits', () => {
     const audits = getAllAudits();
     const evaluations = getAllEvaluations();
+
+    if (!Array.isArray(audits) || !Array.isArray(evaluations)) {
+      Logger.log('❌ Invalid audits or evaluations data. Returning empty list.');
+      return [];
+    }
 
     const evaluatedIds = new Set(evaluations.map(e => e.evalId));
 
