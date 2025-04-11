@@ -511,52 +511,51 @@ function loadPendingTasks() {
 
   // ✅ Attach the event listener just once
   if (!tableBody.hasListenerAttached) {
-  tableBody.addEventListener('click', function(event) {
-    if (!event.target.classList.contains('evaluate-button')) return;
+    tableBody.addEventListener('click', function(event) {
+      if (!event.target.classList.contains('evaluate-button')) return;
 
-    const clickedButton = event.target;
-    const auditId = clickedButton.getAttribute('data-audit-id');
-    const originalHTML = clickedButton.innerHTML;
+      const clickedButton = event.target;
+      const auditId = clickedButton.getAttribute('data-audit-id');
+      const originalHTML = clickedButton.innerHTML;
 
-    // Disable all evaluate buttons
-    const allButtons = document.querySelectorAll('.evaluate-button');
-    allButtons.forEach(btn => btn.disabled = true);
+      const allButtons = document.querySelectorAll('.evaluate-button');
+      allButtons.forEach(btn => btn.disabled = true);
 
-    // Show modal
-    document.getElementById('evaluateModal')?.classList.remove('hidden');
+      showEvaluateModal();
 
-    google.script.run
-      .withSuccessHandler(function(alreadyEvaluated) {
-        document.getElementById('evaluateModal')?.classList.add('hidden');
+      google.script.run
+        .withSuccessHandler(function(alreadyEvaluated) {
+          hideEvaluateModal();
 
-        allButtons.forEach(btn => {
-          btn.disabled = false;
-          if (btn === clickedButton) btn.innerHTML = originalHTML;
-        });
+          allButtons.forEach(btn => {
+            btn.disabled = false;
+            if (btn === clickedButton) btn.innerHTML = originalHTML;
+          });
 
-        if (alreadyEvaluated) {
-          showToast("This audit has already been evaluated.", "warning");
-          loadPendingTasks();
-          return;
-        }
+          if (alreadyEvaluated) {
+            showToast("This audit has already been evaluated.", "warning");
+            loadPendingTasks();
+            return;
+          }
 
-        showEvaluationForm(auditId);
-      })
-      .withFailureHandler(function(error) {
-        document.getElementById('evaluateModal')?.classList.add('hidden');
+          showEvaluationForm(auditId);
+        })
+        .withFailureHandler(function(error) {
+          hideEvaluateModal();
 
-        console.error('Error checking evaluation status:', error);
-        showToast("Failed to verify evaluation status. Please try again.", "error");
+          console.error('Error checking evaluation status:', error);
+          showToast("Failed to verify evaluation status. Please try again.", "error");
 
-        allButtons.forEach(btn => {
-          btn.disabled = false;
-          if (btn === clickedButton) btn.innerHTML = originalHTML;
-        });
-      })
-      .checkIfAlreadyEvaluated(auditId);
-  });
+          allButtons.forEach(btn => {
+            btn.disabled = false;
+            if (btn === clickedButton) btn.innerHTML = originalHTML;
+          });
+        })
+        .checkIfAlreadyEvaluated(auditId);
+    });
 
-  tableBody.hasListenerAttached = true;
+    tableBody.hasListenerAttached = true;
+  }
 }
 
 function loadErrorTasks() {
