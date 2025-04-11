@@ -192,15 +192,37 @@ function clearQaCaches() {
  * Converts sheet data to an array of objects with headers.
  */
 function getSheetDataAsObjects(sheet) {
-  if (!sheet) return [];
+  if (!sheet) {
+    Logger.log('❌ getSheetDataAsObjects: No sheet provided');
+    return [];
+  }
 
-  const [headers, ...values] = sheet.getDataRange().getValues();
-  return values.map(row => {
+  const range = sheet.getDataRange();
+  const data = range.getValues();
+
+  Logger.log(`📄 getSheetDataAsObjects: Rows = ${data.length}, Columns = ${data[0]?.length || 0}`);
+
+  if (!data.length || !Array.isArray(data[0])) {
+    Logger.log('⚠️ Sheet data is empty or malformed.');
+    return [];
+  }
+
+  const [headers, ...values] = data;
+
+  if (!headers || headers.length === 0) {
+    Logger.log('⚠️ getSheetDataAsObjects: No headers found in the first row.');
+    return [];
+  }
+
+  const objects = values.map((row, rowIndex) => {
     return headers.reduce((obj, header, i) => {
       if (header) obj[header] = row[i];
       return obj;
     }, {});
   });
+
+  Logger.log(`✅ Parsed ${objects.length} data rows into objects.`);
+  return objects;
 }
 
 // ====================
