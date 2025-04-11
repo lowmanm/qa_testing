@@ -23,6 +23,14 @@ function attachUnloadHandlerForDispute(evalId) {
   window.addEventListener('beforeunload', window.handleDisputeUnloadUnlock);
 }
 
+function removeUnloadHandlerForDispute() {
+  if (window.handleDisputeUnloadUnlock) {
+    window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+    delete window.handleDisputeUnloadUnlock;
+  }
+}
+
+
 
   function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
@@ -1267,7 +1275,10 @@ function viewDispute(disputeId) {
   `;
 
   // 🧩 Re-attach event listeners after DOM was rebuilt
-  document.getElementById('cancelDispute').addEventListener('click', showEvaluations);
+  document.getElementById('cancelDispute').addEventListener('click', () => {
+  removeUnloadHandlerForDispute(); // ✅ cleanup on cancel
+  showEvaluations();
+});
   document.getElementById('disputeForm').addEventListener('submit', handleDisputeSubmit);
 
   // 🔍 Load evaluation details and questions
