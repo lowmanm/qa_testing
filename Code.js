@@ -754,6 +754,31 @@ data.forEach((d, i) => {
   });
 }
 
+function checkAndSetDisputeReviewStatus(evalId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_EVAL_SUMMARY);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+
+  if (idIdx === -1 || statusIdx === -1) return { success: false, error: "Missing columns" };
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === evalId) {
+      const currentStatus = data[i][statusIdx].toLowerCase();
+      if (currentStatus === 'disputed' || currentStatus === 'reviewing') {
+        return { success: false, status: currentStatus };
+      }
+
+      // Otherwise, mark it as under review
+      sheet.getRange(i + 1, statusIdx + 1).setValue('reviewing');
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: "Evaluation not found" };
+}
+
 function checkIfAlreadyDisputed(evalId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
   if (!sheet) return false;
