@@ -199,7 +199,7 @@ function attachFormHandlers() {
       const evalId = form.getAttribute('data-evaluation-id');
 
       if (evalId) {
-        google.script.run.resetDisputeStatus(evalId);
+        google.script.run.resetEvalStatusFromReviewing(evalId);
       }
 
       // Cleanup: unload listener
@@ -222,7 +222,7 @@ function attachFormHandlers() {
       }
 
       window.handleDisputeUnloadUnlock = () => {
-        google.script.run.resetDisputeStatus(evalId);
+        google.script.run.resetEvalStatusFromReviewing(evalId);
       };
       window.addEventListener('beforeunload', window.handleDisputeUnloadUnlock);
     }
