@@ -1126,22 +1126,20 @@ function loadEvaluations() {
   }).getAllEvaluations();
 }
 
-  // Load disputes
-  function loadDisputes() {
-    var tableBody = document.getElementById('disputesBody');
-    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+function loadDisputes() {
+  const tableBody = document.getElementById('disputesBody');
+  tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
 
-    // Get disputes
-    google.script.run.withSuccessHandler(function(disputes) {
-      if (disputes.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No disputes found</td></tr>';
-        return;
-      }
+  google.script.run.withSuccessHandler(function(disputes) {
+    if (disputes.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No disputes found</td></tr>';
+      return;
+    }
 
-      tableBody.innerHTML = '';
+    tableBody.innerHTML = '';
 
-      disputes.forEach(function(dispute) {
-        var row = document.createElement('tr');
+    disputes.forEach(function(dispute) {
+      const row = document.createElement('tr');
 
       row.innerHTML = `
         <td>Evaluation #${dispute.evalId}</td>
@@ -1157,7 +1155,7 @@ function loadEvaluations() {
       tableBody.appendChild(row);
     });
 
-    // Add event listeners to view and resolve dispute buttons
+    // Add listeners for View
     document.querySelectorAll('.view-dispute-button').forEach(button => {
       button.addEventListener('click', function () {
         const id = this.getAttribute('data-dispute-id');
@@ -1165,10 +1163,42 @@ function loadEvaluations() {
       });
     });
 
+    // Add listeners for Resolve
     document.querySelectorAll('.resolve-dispute-button').forEach(button => {
       button.addEventListener('click', function () {
-        const id = this.getAttribute('data-dispute-id');
-        resolveDispute(id);
+        const button = this;
+        const disputeId = button.getAttribute('data-dispute-id');
+
+        // 🌀 Show spinner modal
+        document.getElementById('evaluateModal')?.classList.remove('hidden');
+
+        google.script.run
+          .withSuccessHandler(function(status) {
+            document.getElementById('evaluateModal')?.classList.add('hidden');
+
+            const normalized = (status || '').toLowerCase();
+
+            if (['overturned', 'upheld', 'partial overturn'].includes(normalized)) {
+              showToast("This dispute has already been resolved.", 'warning');
+              loadDisputes();
+              return;
+            }
+
+            if (normalized === 'reviewing') {
+              showToast("This dispute is currently being reviewed by another user.", 'warning');
+              loadDisputes();
+              return;
+            }
+
+            // ✅ Status is still pending — safe to proceed
+            resolveDispute(disputeId);
+          })
+          .withFailureHandler(function(error) {
+            document.getElementById('evaluateModal')?.classList.add('hidden');
+            console.error("Dispute status check failed:", error);
+            showToast("Unable to validate dispute status. Please try again.", 'error');
+          })
+          .checkDisputeReviewStatus(disputeId); 
       });
     });
   }).getAllDisputes();
