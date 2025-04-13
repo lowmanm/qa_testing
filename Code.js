@@ -888,6 +888,29 @@ function saveDispute(dispute) {
   };
 }
 
+function checkDisputeReviewStatus(disputeId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+
+  if (idIdx === -1 || statusIdx === -1) return { success: false, reason: 'Missing columns' };
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIdx] === disputeId) {
+      const status = (data[i][statusIdx] || '').toLowerCase();
+      const isLocked = status === 'reviewing';
+      const isResolved = ['overturned', 'upheld', 'partial'].includes(status);
+
+      return { success: !isLocked && !isResolved, status };
+    }
+  }
+
+  return { success: false, reason: 'Dispute not found' };
+}
+
 /**
  * Updates the status of a dispute in the disputesQueue sheet.
  */
