@@ -1,5 +1,7 @@
 <script>
 let currentUserEmail = '';
+let activeDisputeEvalId = null;
+
 
   document.addEventListener('DOMContentLoaded', () => {
   initializeApp();
@@ -30,6 +32,11 @@ function removeUnloadHandlerForDispute() {
   if (window.handleDisputeUnloadUnlock) {
     window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
     delete window.handleDisputeUnloadUnlock;
+  }
+
+  if (activeDisputeEvalId) {
+    google.script.run.resetEvalStatusFromReviewing(activeDisputeEvalId);
+    activeDisputeEvalId = null;
   }
 }
 
@@ -1331,6 +1338,7 @@ function showDisputeForm(evaluationId) {
 
     // ✅ Attach unload safeguard to revert evaluation status if user exits
     attachUnloadHandlerForDispute(evaluationId);
+    activeDisputeEvalId = evaluationId;
 
   }).getAllEvaluations();
 }
