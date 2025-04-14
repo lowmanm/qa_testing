@@ -1057,7 +1057,7 @@ function loadEvaluations() {
               button.innerHTML = originalHTML;
 
               if (!result.success) {
-                const status = (result.status || '').toLowerCase();
+                const status = String(result.status || '').toLowerCase();
                 const msg =
                   status === 'reviewing'
                     ? "This evaluation is currently being reviewed by another user."
