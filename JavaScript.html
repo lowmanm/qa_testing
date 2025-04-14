@@ -1689,38 +1689,44 @@ function handleResolveDisputeSubmit(e) {
 
   // ✅ Check one more time if dispute was already resolved
   google.script.run
-    .withSuccessHandler(function(currentStatus) {
-      const normalized = (currentStatus || '').toLowerCase();
+  .withSuccessHandler(function(result) {
+    const normalized = (result?.status || '').toLowerCase();
 
-      if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
-        document.getElementById('evaluateModal')?.classList.add('hidden');
-        showToast("This dispute has already been resolved.", 'warning');
-        showDisputes();
-        return;
-      }
-
-      // ✅ Safe to proceed — resolve dispute
-      google.script.run
-        .withSuccessHandler(() => {
-          // ✅ Clean up before navigating
-          removeUnloadHandlerForDisputeResolution();
-          document.getElementById('evaluateModal')?.classList.add('hidden');
-          showToast('Dispute resolved successfully.', 'success');
-          showDisputes();
-        })
-        .withFailureHandler(error => {
-          console.error('Error resolving dispute:', error);
-          document.getElementById('evaluateModal')?.classList.add('hidden');
-          showToast('Failed to resolve dispute: ' + error.message, 'error');
-        })
-        .resolveDispute({ disputeId, evalId, resolutionNotes, decisions, status });
-    })
-    .withFailureHandler(error => {
-      console.error("Status check failed:", error);
+    if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
       document.getElementById('evaluateModal')?.classList.add('hidden');
-      showToast("Unable to verify dispute status. Try again.", 'error');
-    })
-    .checkDisputeReviewStatus(disputeId); // ✅ existing server-side function
+      showToast("This dispute has already been resolved.", 'warning');
+      showDisputes();
+      return;
+    }
+
+    if (normalized === 'reviewing') {
+      document.getElementById('evaluateModal')?.classList.add('hidden');
+      showToast("This dispute is currently being reviewed by another user.", 'warning');
+      showDisputes();
+      return;
+    }
+
+    // ✅ Safe to proceed — continue to resolveDispute
+    google.script.run
+      .withSuccessHandler(() => {
+        removeUnloadHandlerForDisputeResolution();
+        document.getElementById('evaluateModal')?.classList.add('hidden');
+        showToast('Dispute resolved successfully.', 'success');
+        showDisputes();
+      })
+      .withFailureHandler(error => {
+        console.error('Error resolving dispute:', error);
+        document.getElementById('evaluateModal')?.classList.add('hidden');
+        showToast('Failed to resolve dispute: ' + error.message, 'error');
+      })
+      .resolveDispute({ disputeId, evalId, resolutionNotes, decisions, status });
+  })
+  .withFailureHandler(error => {
+    console.error("Status check failed:", error);
+    document.getElementById('evaluateModal')?.classList.add('hidden');
+    showToast("Unable to verify dispute status. Try again.", 'error');
+  })
+  .checkDisputeReviewStatus(disputeId); // ✅ existing server-side function
 }
 
   function loadUsers() {
