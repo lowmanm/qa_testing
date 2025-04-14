@@ -1,6 +1,7 @@
 <script>
 let currentUserEmail = '';
 let activeDisputeEvalId = null;
+let activeDisputeResolutionId = null;
 
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -41,21 +42,35 @@ function removeUnloadHandlerForDispute() {
 }
 
 function attachUnloadHandlerForDisputeResolution(disputeId) {
-  if (window.resolveUnloadHandler) {
-    window.removeEventListener('beforeunload', window.resolveUnloadHandler);
+  if (!disputeId) return;
+
+  activeDisputeResolutionId = disputeId;
+
+  // Remove any previous
+  if (window.handleDisputeResolutionUnload) {
+    window.removeEventListener('beforeunload', window.handleDisputeResolutionUnload);
   }
 
-  window.resolveUnloadHandler = () => {
-    google.script.run.resetDisputeStatus(disputeId);
+  window.handleDisputeResolutionUnload = function () {
+    google.script.run
+      .withFailureHandler(err => console.warn('Unload reset failed:', err))
+      .updateDisputeStatus(disputeId, 'pending');
   };
 
-  window.addEventListener('beforeunload', window.resolveUnloadHandler);
+  window.addEventListener('beforeunload', window.handleDisputeResolutionUnload);
 }
 
 function removeUnloadHandlerForDisputeResolution() {
-  if (window.resolveUnloadHandler) {
-    window.removeEventListener('beforeunload', window.resolveUnloadHandler);
-    delete window.resolveUnloadHandler;
+  if (window.handleDisputeResolutionUnload) {
+    window.removeEventListener('beforeunload', window.handleDisputeResolutionUnload);
+    delete window.handleDisputeResolutionUnload;
+  }
+
+  if (activeDisputeResolutionId) {
+    google.script.run
+      .withFailureHandler(err => console.warn('Immediate reset failed:', err))
+      .updateDisputeStatus(activeDisputeResolutionId, 'pending');
+    activeDisputeResolutionId = null;
   }
 }
 
