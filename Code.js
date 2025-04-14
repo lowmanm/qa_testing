@@ -973,7 +973,7 @@ function resolveDispute(resolution) {
   const resolvedBy = Session.getActiveUser().getEmail();
   const resolvedAt = new Date().toISOString();
 
-  // Update questions in evalQuest
+  // Load and map quest data
   const questData = questSheet.getDataRange().getValues();
   const qHeaders = questData[0];
   const qEvalIdx = qHeaders.indexOf('evalId');
@@ -985,23 +985,41 @@ function resolveDispute(resolution) {
 
   const updatedQuestRows = [];
 
-for (let i = 1; i < questData.length; i++) {
-  const row = questData[i];
-  if (row[qEvalIdx] !== evalId) continue;
+  for (let i = 1; i < questData.length; i++) {
+    const row = questData[i];
+    if (row[qEvalIdx] !== evalId) continue;
 
-  const decision = decisions.find(d => d.questionId === row[qQIdIdx]);
-  if (!decision) continue;
+    const questionId = row[qQIdIdx];
+    const decision = decisions.find(d => d.questionId === questionId);
+    if (!decision) continue;
 
-  if (decision.resolution === 'overturned') {
-    row[qRespIdx] = 'Yes';  // Make sure case matches your frontend expectation
-    row[qPtsEarnedIdx] = row[qPtsPossibleIdx]; // award full points
+    const originalResponse = row[qRespIdx];
+    const originalPoints = row[qPtsEarnedIdx];
+    const maxPoints = row[qPtsPossibleIdx];
+
+    // Overturned → "yes" + full points
+    if (decision.resolution === 'overturned') {
+      row[qRespIdx] = 'yes'; // lowercase fix
+      row[qPtsEarnedIdx] = maxPoints;
+    }
+
+    // Upheld → restore original response/points (remove overturn)
+    else if (decision.resolution === 'upheld') {
+      if (originalResponse === 'yes' && originalPoints === maxPoints) {
+        // Assume previous overturn — revert
+        row[qRespIdx] = 'no'; // default
+        row[qPtsEarnedIdx] = 0;
+      }
+    }
+
+    // Optional: logic for 'partial' can be inserted here later
+
+    // Notes always update
+    row[qFeedbackIdx] = decision.note || '';
+
+    // Write back updated row
+    questSheet.getRange(i + 1, 1, 1, qHeaders.length).setValues([row]);
   }
-
-  row[qFeedbackIdx] = decision.note || '';
-
-  // ✅ Write the updated row directly back to the sheet
-  questSheet.getRange(i + 1, 1, 1, qHeaders.length).setValues([row]);
-}
 
   // Recalculate totals
   const relevantRows = questData.filter(r => r[qEvalIdx] === evalId);
