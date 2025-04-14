@@ -1693,18 +1693,11 @@ function handleResolveDisputeSubmit(e) {
     const normalized = (result?.status || '').toLowerCase();
 
     if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
-      document.getElementById('evaluateModal')?.classList.add('hidden');
-      showToast("This dispute has already been resolved.", 'warning');
-      showDisputes();
-      return;
-    }
-
-    if (normalized === 'reviewing') {
-      document.getElementById('evaluateModal')?.classList.add('hidden');
-      showToast("This dispute is currently being reviewed by another user.", 'warning');
-      showDisputes();
-      return;
-    }
+  document.getElementById('evaluateModal')?.classList.add('hidden');
+  showToast("This dispute has already been resolved.", 'warning');
+  showDisputes();
+  return;
+}
 
     // ✅ Safe to proceed — continue to resolveDispute
     google.script.run
