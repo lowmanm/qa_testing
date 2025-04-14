@@ -44,20 +44,19 @@ function removeUnloadHandlerForDispute() {
 function attachUnloadHandlerForDisputeResolution(disputeId) {
   if (!disputeId) return;
 
-  activeDisputeResolutionId = disputeId;
-
-  // Remove any previous
-  if (window.handleDisputeResolutionUnload) {
-    window.removeEventListener('beforeunload', window.handleDisputeResolutionUnload);
+  // Clear existing handler if any
+  if (window.handleDisputeUnloadUnlock) {
+    window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
   }
 
-  window.handleDisputeResolutionUnload = function () {
-    google.script.run
-      .withFailureHandler(err => console.warn('Unload reset failed:', err))
-      .updateDisputeStatus(disputeId, 'pending');
+  window.handleDisputeUnloadUnlock = function () {
+    const statusBadge = document.querySelector('.badge.badge-overturned, .badge.badge-upheld, .badge.badge-partial');
+    if (!statusBadge) {
+      google.script.run.updateDisputeStatus(disputeId, 'pending');
+    }
   };
 
-  window.addEventListener('beforeunload', window.handleDisputeResolutionUnload);
+  window.addEventListener('beforeunload', window.handleDisputeUnloadUnlock);
 }
 
 function removeUnloadHandlerForDisputeResolution() {
@@ -1666,43 +1665,62 @@ function handleResolveDisputeSubmit(e) {
     const selected = card.querySelector(`input[name="resolution_${questionId}"]:checked`);
     const note = card.querySelector(`#note_${questionId}`)?.value.trim() || '';
 
-    // 🔍 Debug logging
-    console.log('🔍 Question ID:', questionId);
-    console.log('✅ Selected resolution:', selected?.value || 'None selected');
-    console.log('📝 Justification:', note || '[empty]');
-
     if (!selected) {
       showToast(`Please select a resolution for all disputed questions.`, 'warning');
-      return;  // Immediate return simplifies validation logic
+      return;
     }
 
     if (selected.value === 'upheld' && !note) {
       showToast(`Justification is required when upholding a question.`, 'warning');
-      return;  // Immediate return simplifies validation logic
+      return;
     }
 
     if (selected.value === 'overturned') overturnCount++;
-
     decisions.push({ questionId, resolution: selected.value, note });
   }
 
-  // Determine overall status
   const total = decisions.length;
   let status = 'upheld';
   if (overturnCount === total && total > 0) status = 'overturned';
   else if (overturnCount > 0) status = 'partial overturn';
 
-  // Send to server
+  // ✅ Show modal to block further interaction
+  document.getElementById('evaluateModal')?.classList.remove('hidden');
+
+  // ✅ Check one more time if dispute was already resolved
   google.script.run
-    .withSuccessHandler(() => {
-      showToast('Dispute resolved successfully.', 'success');
-      showDisputes();
+    .withSuccessHandler(function(currentStatus) {
+      const normalized = (currentStatus || '').toLowerCase();
+
+      if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
+        document.getElementById('evaluateModal')?.classList.add('hidden');
+        showToast("This dispute has already been resolved.", 'warning');
+        showDisputes();
+        return;
+      }
+
+      // ✅ Safe to proceed — resolve dispute
+      google.script.run
+        .withSuccessHandler(() => {
+          // ✅ Clean up before navigating
+          removeUnloadHandlerForDisputeResolution();
+          document.getElementById('evaluateModal')?.classList.add('hidden');
+          showToast('Dispute resolved successfully.', 'success');
+          showDisputes();
+        })
+        .withFailureHandler(error => {
+          console.error('Error resolving dispute:', error);
+          document.getElementById('evaluateModal')?.classList.add('hidden');
+          showToast('Failed to resolve dispute: ' + error.message, 'error');
+        })
+        .resolveDispute({ disputeId, evalId, resolutionNotes, decisions, status });
     })
     .withFailureHandler(error => {
-      console.error('Error resolving dispute:', error);
-      showToast('Failed to resolve dispute: ' + error.message, 'error');
+      console.error("Status check failed:", error);
+      document.getElementById('evaluateModal')?.classList.add('hidden');
+      showToast("Unable to verify dispute status. Try again.", 'error');
     })
-    .resolveDispute({ disputeId, evalId, resolutionNotes, decisions, status });
+    .checkDisputeReviewStatus(disputeId); // ✅ existing server-side function
 }
 
   function loadUsers() {
