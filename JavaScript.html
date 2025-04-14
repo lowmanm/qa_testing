@@ -1173,26 +1173,27 @@ function loadDisputes() {
         document.getElementById('evaluateModal')?.classList.remove('hidden');
 
         google.script.run
-          .withSuccessHandler(function(status) {
-            document.getElementById('evaluateModal')?.classList.add('hidden');
+          .withSuccessHandler(function(result) {
+  document.getElementById('evaluateModal')?.classList.add('hidden');
 
-            const normalized = (status || '').toLowerCase();
+  const normalized = (result.status || '').toLowerCase();
 
-            if (['overturned', 'upheld', 'partial overturn'].includes(normalized)) {
-              showToast("This dispute has already been resolved.", 'warning');
-              loadDisputes();
-              return;
-            }
+  if (!result.success) {
+    if (['overturned', 'upheld', 'partial', 'partial overturn'].includes(normalized)) {
+      showToast("This dispute has already been resolved.", 'warning');
+    } else if (normalized === 'reviewing') {
+      showToast("This dispute is currently being reviewed by another user.", 'warning');
+    } else {
+      showToast("Unable to open this dispute at this time.", 'warning');
+    }
 
-            if (normalized === 'reviewing') {
-              showToast("This dispute is currently being reviewed by another user.", 'warning');
-              loadDisputes();
-              return;
-            }
+    loadDisputes();
+    return;
+  }
 
-            // ✅ Status is still pending — safe to proceed
-            resolveDispute(disputeId);
-          })
+  // ✅ Safe to proceed
+  resolveDispute(disputeId);
+})
           .withFailureHandler(function(error) {
             document.getElementById('evaluateModal')?.classList.add('hidden');
             console.error("Dispute status check failed:", error);
