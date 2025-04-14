@@ -40,6 +40,25 @@ function removeUnloadHandlerForDispute() {
   }
 }
 
+function attachUnloadHandlerForDisputeResolution(disputeId) {
+  if (window.resolveUnloadHandler) {
+    window.removeEventListener('beforeunload', window.resolveUnloadHandler);
+  }
+
+  window.resolveUnloadHandler = () => {
+    google.script.run.resetDisputeStatus(disputeId);
+  };
+
+  window.addEventListener('beforeunload', window.resolveUnloadHandler);
+}
+
+function removeUnloadHandlerForDisputeResolution() {
+  if (window.resolveUnloadHandler) {
+    window.removeEventListener('beforeunload', window.resolveUnloadHandler);
+    delete window.resolveUnloadHandler;
+  }
+}
+
   function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
@@ -1504,9 +1523,12 @@ function resolveDispute(disputeId) {
 
 
     if (!dispute || !evaluation) {
-      showToast("Dispute or evaluation not found.", 'error');
-      return;
-    }
+  showToast("Dispute or evaluation not found.", 'error');
+  return;
+}
+
+// ✅ Attach unload handler to reset if user leaves the page
+attachUnloadHandlerForDisputeResolution(dispute.id);
 
 // ✅ Robust normalization that handles both string and array inputs
 if (Array.isArray(dispute.questionIds)) {
@@ -1992,10 +2014,11 @@ function escapeHTML(str) {
   form.removeAttribute('data-max-score');
 }
 
-  function hideAllViews() {
-    // ✅ Automatically reset dispute review status when navigating away
+function hideAllViews() {
+  // ✅ Automatically reset dispute review status when navigating away
   removeUnloadHandlerForDispute();
-    
+  removeUnloadHandlerForDisputeResolution(); // <-- Add this line
+
   const views = [
     'dashboardView',
     'auditQueueView',
