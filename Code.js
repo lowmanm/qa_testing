@@ -902,7 +902,7 @@ function checkDisputeReviewStatus(disputeId) {
     if (data[i][idIdx] === disputeId) {
       const status = (data[i][statusIdx] || '').toLowerCase();
       const isLocked = status === 'reviewing';
-      const isResolved = ['overturned', 'upheld', 'partial'].includes(status);
+      const isResolved = ['overturned', 'upheld', 'partial overturn'].includes(status);
 
       return { success: !isLocked && !isResolved, status };
     }
