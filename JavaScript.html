@@ -1165,43 +1165,43 @@ function loadDisputes() {
 
     // Add listeners for Resolve
     document.querySelectorAll('.resolve-dispute-button').forEach(button => {
-      button.addEventListener('click', function () {
-        const button = this;
-        const disputeId = button.getAttribute('data-dispute-id');
+  button.addEventListener('click', function () {
+    const button = this;
+    const disputeId = button.getAttribute('data-dispute-id');
 
-        // 🌀 Show spinner modal
-        document.getElementById('evaluateModal')?.classList.remove('hidden');
+    // 🌀 Show modal spinner while checking
+    const modal = document.getElementById('evaluateModal');
+    if (modal) modal.classList.remove('hidden');
 
-        google.script.run
-          .withSuccessHandler(function(result) {
-  document.getElementById('evaluateModal')?.classList.add('hidden');
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (modal) modal.classList.add('hidden');
 
-  const normalized = (result.status || '').toLowerCase();
+        const status = (result?.status || '').toLowerCase();
 
-  if (!result.success) {
-    if (['overturned', 'upheld', 'partial', 'partial overturn'].includes(normalized)) {
-      showToast("This dispute has already been resolved.", 'warning');
-    } else if (normalized === 'reviewing') {
-      showToast("This dispute is currently being reviewed by another user.", 'warning');
-    } else {
-      showToast("Unable to open this dispute at this time.", 'warning');
-    }
+        if (['overturned', 'upheld', 'partial overturn'].includes(status)) {
+          showToast("This dispute has already been resolved.", 'warning');
+          loadDisputes();
+          return;
+        }
 
-    loadDisputes();
-    return;
-  }
+        if (status === 'reviewing') {
+          showToast("This dispute is currently being reviewed by another user.", 'warning');
+          loadDisputes();
+          return;
+        }
 
-  // ✅ Safe to proceed
-  resolveDispute(disputeId);
-})
-          .withFailureHandler(function(error) {
-            document.getElementById('evaluateModal')?.classList.add('hidden');
-            console.error("Dispute status check failed:", error);
-            showToast("Unable to validate dispute status. Please try again.", 'error');
-          })
-          .checkDisputeReviewStatus(disputeId); 
-      });
-    });
+        // ✅ Safe to open the form
+        resolveDispute(disputeId);
+      })
+      .withFailureHandler(function(error) {
+        if (modal) modal.classList.add('hidden');
+        console.error("Dispute status check failed:", error);
+        showToast("Unable to validate dispute status. Please try again.", 'error');
+      })
+      .checkDisputeReviewStatus(disputeId);
+  });
+});
   }).getAllDisputes();
 }
 
