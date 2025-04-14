@@ -1373,3 +1373,54 @@ function getUniqueTaskTypes() {
   const unique = [...new Set(values)].filter(v => v);
   return unique.sort();
 }
+
+function recalculateEvaluationScores(evalId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const questSheet = ss.getSheetByName(SHEET_EVAL_QUEST);
+  const summarySheet = ss.getSheetByName(SHEET_EVAL_SUMMARY);
+
+  const questData = questSheet.getDataRange().getValues();
+  const qHeaders = questData[0];
+  const evalIdx = qHeaders.indexOf('evalId');
+  const respIdx = qHeaders.indexOf('response');
+  const ptsEarnedIdx = qHeaders.indexOf('pointsEarned');
+  const ptsPossibleIdx = qHeaders.indexOf('pointsPossible');
+
+  let totalPoints = 0;
+  let totalPossible = 0;
+
+  for (let i = 1; i < questData.length; i++) {
+    const row = questData[i];
+    if (row[evalIdx] !== evalId) continue;
+
+    const response = String(row[respIdx] || '').toLowerCase();
+    const possible = parseFloat(row[ptsPossibleIdx]) || 0;
+    const earned = response === 'yes' ? possible : 0;
+
+    row[ptsEarnedIdx] = earned;
+    totalPoints += earned;
+    totalPossible += possible;
+
+    // Update the row in the sheet
+    questSheet.getRange(i + 1, ptsEarnedIdx + 1).setValue(earned);
+  }
+
+  const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
+
+  // Update summary
+  const summaryData = summarySheet.getDataRange().getValues();
+  const sHeaders = summaryData[0];
+  const idIdx = sHeaders.indexOf('id');
+  const scoreIdx = sHeaders.indexOf('evalScore');
+  const ptsIdx = sHeaders.indexOf('totalPoints');
+
+  for (let i = 1; i < summaryData.length; i++) {
+    if (summaryData[i][idIdx] === evalId) {
+      summarySheet.getRange(i + 1, ptsIdx + 1).setValue(totalPoints);
+      summarySheet.getRange(i + 1, scoreIdx + 1).setValue(evalScore);
+      break;
+    }
+  }
+
+  return { totalPoints, totalPossible, evalScore };
+}
