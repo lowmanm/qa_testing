@@ -662,7 +662,7 @@ function loadErrorTasks() {
     misconfigured.forEach(function(audit) {
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td><code>${audit.id || 'N/A'}</code></td>
+        <td><code>${audit.auditId || 'N/A'}</code></td>
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
