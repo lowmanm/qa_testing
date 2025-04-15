@@ -1666,16 +1666,17 @@ function handleResolveDisputeSubmit(e) {
     const note = card.querySelector(`#note_${questionId}`)?.value.trim() || '';
 
     if (!selected) {
-      showToast(`Please select a resolution for all disputed questions.`, 'warning');
+      showToast("Please select a resolution for all disputed questions.", 'warning');
       return;
     }
 
     if (selected.value === 'upheld' && !note) {
-      showToast(`Justification is required when upholding a question.`, 'warning');
+      showToast("Justification is required when upholding a question.", 'warning');
       return;
     }
 
     if (selected.value === 'overturned') overturnCount++;
+
     decisions.push({ questionId, resolution: selected.value, note });
   }
 
@@ -1684,42 +1685,61 @@ function handleResolveDisputeSubmit(e) {
   if (overturnCount === total && total > 0) status = 'overturned';
   else if (overturnCount > 0) status = 'partial overturn';
 
-  // ✅ Show modal to block further interaction
+  const resolutionData = { disputeId, evalId, resolutionNotes, decisions, status };
+
+  // Disable form and show spinner
+  form.classList.add('disabled');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner"></span>Submitting...`;
+  }
   document.getElementById('evaluateModal')?.classList.remove('hidden');
 
-  // ✅ Check one more time if dispute was already resolved
+  // Live check before sending resolution
   google.script.run
-  .withSuccessHandler(function(result) {
-    const normalized = (result?.status || '').toLowerCase();
+    .withSuccessHandler(serverStatus => {
+      const normalized = (serverStatus || '').toLowerCase();
 
-    if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
-  document.getElementById('evaluateModal')?.classList.add('hidden');
-  showToast("This dispute has already been resolved.", 'warning');
-  showDisputes();
-  return;
-}
-
-    // ✅ Safe to proceed — continue to resolveDispute
-    google.script.run
-      .withSuccessHandler(() => {
-        removeUnloadHandlerForDisputeResolution();
+      // Prevent submit if it was already resolved
+      if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
         document.getElementById('evaluateModal')?.classList.add('hidden');
-        showToast('Dispute resolved successfully.', 'success');
+        showToast("This dispute has already been resolved.", "warning");
         showDisputes();
-      })
-      .withFailureHandler(error => {
-        console.error('Error resolving dispute:', error);
-        document.getElementById('evaluateModal')?.classList.add('hidden');
-        showToast('Failed to resolve dispute: ' + error.message, 'error');
-      })
-      .resolveDispute({ disputeId, evalId, resolutionNotes, decisions, status });
-  })
-  .withFailureHandler(error => {
-    console.error("Status check failed:", error);
-    document.getElementById('evaluateModal')?.classList.add('hidden');
-    showToast("Unable to verify dispute status. Try again.", 'error');
-  })
-  .checkDisputeReviewStatus(disputeId); // ✅ existing server-side function
+        return;
+      }
+
+      // Submit to server
+      google.script.run
+        .withSuccessHandler(() => {
+          document.getElementById('evaluateModal')?.classList.add('hidden');
+          showToast('Dispute resolved successfully.', 'success');
+          removeUnloadHandlerForDisputeResolution();
+          showDisputes();
+        })
+        .withFailureHandler(error => {
+          document.getElementById('evaluateModal')?.classList.add('hidden');
+          console.error('Error resolving dispute:', error);
+          showToast('Failed to resolve dispute: ' + error.message, 'error');
+          form.classList.remove('disabled');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Resolution';
+          }
+        })
+        .resolveDispute(resolutionData);
+    })
+    .withFailureHandler(err => {
+      document.getElementById('evaluateModal')?.classList.add('hidden');
+      console.error("Live status check failed:", err);
+      showToast("Unable to verify dispute status. Please try again.", "error");
+      form.classList.remove('disabled');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Resolution';
+      }
+    })
+    .checkDisputeReviewStatus(disputeId);  // <- Reuse existing check function
 }
 
   function loadUsers() {
