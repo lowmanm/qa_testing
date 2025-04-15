@@ -1698,15 +1698,17 @@ function handleResolveDisputeSubmit(e) {
 
   // Live check before sending resolution
   google.script.run
-    .withSuccessHandler(serverStatus => {
-      const normalized = (serverStatus || '').toLowerCase();
+  .withSuccessHandler(serverResult => {
+    const normalized = (serverResult?.status || '').toLowerCase();
 
-      // Prevent submit if it was already resolved
-      if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
-        document.getElementById('evaluateModal')?.classList.add('hidden');
-        showToast("This dispute has already been resolved.", "warning");
-        showDisputes();
-        return;
+    if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
+      document.getElementById('evaluateModal')?.classList.add('hidden');
+      showToast("This dispute has already been resolved.", "warning");
+      showDisputes();
+      return;
+    }
+
+    // Continue with submission...
       }
 
       // Submit to server
