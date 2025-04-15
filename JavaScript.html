@@ -1457,47 +1457,52 @@ function handleDisputeSubmit(e) {
     return;
   }
 
-  const disputedQuestionIds = Array.from(document.querySelectorAll('input[name^="dispute_question_"]:checked'))
-    .map(cb => cb.value);
+  const disputedQuestionIds = Array.from(
+    document.querySelectorAll('input[name^="dispute_question_"]:checked')
+  ).map(cb => cb.value);
 
   if (disputedQuestionIds.length === 0) {
     showToast("Please select at least one question to dispute.", 'warning');
     return;
   }
 
-  // Optional UX: disable while submitting
+  const disputeData = {
+    evalId: evaluationId,
+    reason,
+    questionIds: disputedQuestionIds,
+    status: 'pending'
+  };
+
+  // Disable form and show spinner
   form.classList.add('disabled');
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting...';
+    submitBtn.innerHTML = `<span class="spinner"></span>Submitting...`;
   }
+  document.getElementById('evaluateModal')?.classList.remove('hidden');
 
-  // ✅ Live check
+  // Check if already disputed
   google.script.run
-    .withSuccessHandler(function(alreadyDisputed) {
+    .withSuccessHandler(alreadyDisputed => {
       if (alreadyDisputed) {
+        document.getElementById('evaluateModal')?.classList.add('hidden');
         showToast("This evaluation has already been disputed.", 'warning');
-        removeUnloadHandlerForDispute(); // ✅ cleanup still needed
         showEvaluations();
         return;
       }
 
-      const disputeData = {
-        evalId: evaluationId,
-        reason,
-        questionIds: disputedQuestionIds,
-        status: 'pending'
-      };
-
+      // ✅ Proceed to submit
       google.script.run
         .withSuccessHandler(() => {
+          document.getElementById('evaluateModal')?.classList.add('hidden');
           showToast("Dispute submitted successfully!", 'success');
           removeUnloadHandlerForDispute();
           showEvaluations();
         })
         .withFailureHandler(error => {
-          console.error(error.message);
+          document.getElementById('evaluateModal')?.classList.add('hidden');
+          console.error("Error submitting dispute:", error);
           showToast("Error submitting dispute: " + error.message, 'error');
           form.classList.remove('disabled');
           if (submitBtn) {
@@ -1508,6 +1513,7 @@ function handleDisputeSubmit(e) {
         .saveDispute(disputeData);
     })
     .withFailureHandler(error => {
+      document.getElementById('evaluateModal')?.classList.add('hidden');
       console.error("Dispute check failed:", error);
       showToast("Could not verify dispute status. Please try again.", 'error');
       form.classList.remove('disabled');
