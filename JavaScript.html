@@ -3,6 +3,8 @@ let currentUserEmail = '';
 let activeDisputeEvalId = null;
 let activeDisputeResolutionId = null;
 let currentAuditTab = 'pending';
+window.originalDisputeStatus = dispute.status;
+
 
 
 
@@ -67,12 +69,16 @@ function removeUnloadHandlerForDisputeResolution() {
     delete window.handleDisputeResolutionUnload;
   }
 
-  if (activeDisputeResolutionId) {
+  // ✅ Only reset status to 'pending' if it was previously 'reviewing'
+  if (activeDisputeResolutionId && window.originalDisputeStatus === 'reviewing') {
     google.script.run
-      .withFailureHandler(err => console.warn('Immediate reset failed:', err))
+      .withFailureHandler(err => console.warn('Dispute reset failed:', err))
       .updateDisputeStatus(activeDisputeResolutionId, 'pending');
-    activeDisputeResolutionId = null;
   }
+
+  // ✅ Cleanup global tracking variables
+  activeDisputeResolutionId = null;
+  delete window.originalDisputeStatus;
 }
 
   function showToast(message, type = 'info') {
@@ -1293,7 +1299,13 @@ function editDisputeResolution(disputeId) {
       dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
     }
 
+    // ✅ Track ID + original status for intelligent reset logic
+    activeDisputeResolutionId = dispute.id;
+    window.originalDisputeStatus = dispute.status;
+
+    // ✅ Attach unload handler to reset only if needed
     attachUnloadHandlerForDisputeResolution(dispute.id);
+
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
     resolveDisputeView.innerHTML = `
@@ -1824,8 +1836,13 @@ function resolveDispute(disputeId) {
   return;
 }
 
-// ✅ Attach unload handler to reset if user leaves the page
+// ✅ Track ID + original status for intelligent reset logic
+activeDisputeResolutionId = dispute.id;
+window.originalDisputeStatus = dispute.status;
+
+// ✅ Attach unload handler to reset only if needed
 attachUnloadHandlerForDisputeResolution(dispute.id);
+
 
 // ✅ Robust normalization that handles both string and array inputs
 if (Array.isArray(dispute.questionIds)) {
@@ -1871,12 +1888,20 @@ console.log('After robust normalization - dispute.questionIds:', dispute.questio
 const originalStatus = dispute.status;
 
 document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+  const modal = document.getElementById('evaluateModal');
+  if (modal) {
+    document.getElementById('evaluateModalMessage').textContent = 'Restoring dispute status...';
+    modal.classList.remove('hidden');
+  }
+
   google.script.run
     .withSuccessHandler(() => {
+      modal?.classList.add('hidden');
       showToast(`Dispute status restored to "${originalStatus}".`, 'info');
       showDisputes();
     })
     .withFailureHandler(error => {
+      modal?.classList.add('hidden');
       console.error('Error restoring dispute status:', error);
       showToast('Failed to restore dispute status: ' + error.message, 'error');
     })
