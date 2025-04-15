@@ -1317,7 +1317,12 @@ function editDisputeResolution(disputeId) {
     evaluation.questions.forEach(q => {
   const qid = String(q.questionId).trim();
   const isDisputed = dispute.questionIds.includes(qid);
-  const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+  let highlightClass = '';
+  if (isDisputed && q.response === 'yes') {
+    highlightClass = 'overturned-highlight';
+  } else if (isDisputed && q.response === 'no') {
+    highlightClass = 'highlight-no';
+  }
 
   const currentResponse = String(q.response || '').toLowerCase();
   const yesChecked = currentResponse === 'yes' ? 'checked' : '';
