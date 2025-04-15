@@ -72,13 +72,10 @@ function removeUnloadHandlerForDisputeResolution() {
   }
 
   if (activeDisputeResolutionId) {
-    const restoreTo = window.originalDisputeStatus || 'pending';
-    if (!['overturned', 'upheld', 'partial overturn'].includes(restoreTo.toLowerCase())) {
-      google.script.run
-        .withFailureHandler(err => console.warn('Reset after navigate failed:', err))
-        .updateDisputeStatus(activeDisputeResolutionId, restoreTo);
-    }
-
+    const statusToRestore = window.originalDisputeStatus || 'pending';
+    google.script.run
+      .withFailureHandler(err => console.warn('Immediate reset failed:', err))
+      .updateDisputeStatus(activeDisputeResolutionId, statusToRestore);
     activeDisputeResolutionId = null;
     delete window.originalDisputeStatus;
   }
@@ -1421,88 +1418,104 @@ function handleEditDisputeResolutionSubmit(e) {
   const disputeId = form.getAttribute('data-dispute-id');
   const resolutionNotes = document.getElementById('resolutionNotes')?.value.trim() || '';
 
-  const questionCards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
-  const decisions = [];
+  const questions = [];
   let overturnCount = 0;
-  let totalPoints = 0;
-  let totalPossible = 0;
 
-  let summaryHTML = `<div class="mb-3">`;
+  const cards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
+  cards.forEach(card => {
+    const qid = card.getAttribute('data-question-id');
+    const selected = card.querySelector(`input[name="edit_${qid}"]:checked`);
+    const note = document.getElementById(`editNote_${qid}`)?.value.trim() || '';
 
-  questionCards.forEach(card => {
-    const questionId = card.querySelector('input[type="radio"]')?.name.replace('edit_', '');
-    const questionText = card.querySelector('.question-text')?.textContent || '';
-    const points = parseInt(card.querySelector('.question-points')?.textContent.match(/\d+$/)?.[0]) || 0;
-    const selectedInput = card.querySelector(`input[name="edit_${questionId}"]:checked`);
-    const note = document.getElementById(`editNote_${questionId}`)?.value.trim() || '';
-
-    if (!selectedInput) return;
-
-    const resolution = selectedInput.value;
-    const wasDisputed = card.classList.contains('highlight-no');
-    const label = resolution === 'yes' ? 'Overturn' : 'Uphold';
-
-    if (resolution === 'yes') {
-      overturnCount++;
-      totalPoints += points;
+    if (!selected) {
+      showToast(`Please select a response for all questions.`, 'warning');
+      return;
     }
-    totalPossible += points;
 
-    decisions.push({
-      questionId,
-      resolution: resolution === 'yes' ? 'overturned' : 'upheld',
-      note
+    const response = selected.value.toLowerCase();
+    const pointsPossible = parseInt(card.getAttribute('data-points-possible') || 0);
+    const pointsEarned = response === 'yes' ? pointsPossible : 0;
+
+    if (response === 'yes') overturnCount++;
+
+    questions.push({
+      questionId: qid,
+      questionText: card.getAttribute('data-question-text'),
+      response,
+      pointsEarned,
+      pointsPossible,
+      feedback: note
     });
-
-    summaryHTML += `
-      <div class="card mb-2" style="background: ${wasDisputed ? '#fef3f2' : '#f9fafb'};">
-        <strong>${label}:</strong> ${questionText}<br>
-        ${note ? `<em>Note:</em> ${note}` : ''}
-        ${wasDisputed ? `<div class="badge badge-disputed mt-1">Disputed Question</div>` : ''}
-      </div>
-    `;
   });
 
-  summaryHTML += `</div>`;
-  summaryHTML += `<p><strong>General Notes:</strong> ${resolutionNotes || 'None'}</p>`;
+  if (questions.length !== cards.length) return; // 👮 prevent partial submission
 
-  const total = decisions.length;
+  // Calculate final status based on overturned questions
   let status = 'upheld';
-  if (overturnCount === total && total > 0) status = 'overturned';
+  if (overturnCount === questions.length) status = 'overturned';
   else if (overturnCount > 0) status = 'partial overturn';
 
-  const percentage = totalPossible > 0 ? Math.round((totalPoints / totalPossible) * 100) : 0;
+  const resolutionData = { disputeId, evalId, resolutionNotes, decisions: questions, status };
 
-  const resolutionData = {
-    disputeId,
-    evalId,
-    resolutionNotes,
-    decisions,
-    status
-  };
-
-  // Inject summary content
-  const modal = document.getElementById('resolutionSummaryModal');
-  const summaryContent = document.getElementById('summaryContent');
-  const scorePreview = document.getElementById('summaryScorePreview');
-
-  if (modal && summaryContent && scorePreview) {
-    summaryContent.innerHTML = summaryHTML + `<p><strong>Final Status:</strong> ${status}</p>`;
-    scorePreview.innerHTML = `${totalPoints}/${totalPossible} (${percentage}%)`;
-    modal.classList.remove('hidden');
+  // UI: show spinner
+  form.classList.add('disabled');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner"></span>Saving...`;
   }
+  document.getElementById('evaluateModalMessage').textContent = 'Saving updated resolution...';
+  document.getElementById('evaluateModal')?.classList.remove('hidden');
 
-  // Attach modal buttons
-  document.getElementById('confirmResolutionSubmit').onclick = () => {
-    modal.classList.add('hidden');
-    submitEditedResolution(form, resolutionData);
-  };
+  // ✅ Check live status
+  google.script.run
+    .withSuccessHandler(serverResult => {
+      const currentStatus = (serverResult?.status || '').toLowerCase();
 
-  document.getElementById('cancelResolutionSubmit').onclick = () => {
-    modal.classList.add('hidden');
-  };
+      if (['overturned', 'upheld', 'partial overturn'].includes(currentStatus) && currentStatus !== status) {
+        document.getElementById('evaluateModal')?.classList.add('hidden');
+        showToast("This dispute was recently updated. Reloading view...", "warning");
+        showDisputes();
+        return;
+      }
+
+      // ✅ Proceed to update
+      google.script.run
+        .withSuccessHandler(() => {
+          document.getElementById('evaluateModal')?.classList.add('hidden');
+          showToast("Dispute resolution updated.", 'success');
+
+          removeUnloadHandlerForDisputeResolution(); // ✅ clear before nulling
+          delete window.originalDisputeStatus;
+          activeDisputeResolutionId = null;
+
+          showDisputes();
+        })
+        .withFailureHandler(err => {
+          console.error('Failed to update resolution:', err);
+          showToast('Failed to update resolution: ' + err.message, 'error');
+          document.getElementById('evaluateModal')?.classList.add('hidden');
+          form.classList.remove('disabled');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Resolution';
+          }
+        })
+        .resolveDispute(resolutionData);
+    })
+    .withFailureHandler(err => {
+      console.error("Live status check failed:", err);
+      showToast("Could not verify dispute status. Please try again.", "error");
+      document.getElementById('evaluateModal')?.classList.add('hidden');
+      form.classList.remove('disabled');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Resolution';
+      }
+    })
+    .checkDisputeReviewStatus(disputeId);
 }
-
+  
 function submitEditedResolution(form, resolutionData) {
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) {
@@ -2027,11 +2040,15 @@ function handleResolveDisputeSubmit(e) {
       // ✅ Safe to resolve now
       google.script.run
         .withSuccessHandler(() => {
-          document.getElementById('evaluateModal')?.classList.add('hidden');
-          showToast('Dispute resolved successfully.', 'success');
-          removeUnloadHandlerForDisputeResolution();
-          showDisputes();
-        })
+  document.getElementById('evaluateModal')?.classList.add('hidden');
+  showToast('Dispute resolved successfully.', 'success');
+
+  removeUnloadHandlerForDisputeResolution(); // ✅ first
+  delete window.originalDisputeStatus;
+  activeDisputeResolutionId = null;
+
+  showDisputes();
+})
         .withFailureHandler(error => {
           document.getElementById('evaluateModal')?.classList.add('hidden');
           console.error('Error resolving dispute:', error);
