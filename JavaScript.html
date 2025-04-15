@@ -1196,7 +1196,7 @@ function loadDisputes() {
   tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
 
   google.script.run.withSuccessHandler(function(disputes) {
-    if (disputes.length === 0) {
+    if (!Array.isArray(disputes) || disputes.length === 0) {
       tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No disputes found</td></tr>';
       return;
     }
@@ -1205,24 +1205,27 @@ function loadDisputes() {
 
     disputes.forEach(function(dispute) {
       const status = (dispute.status || '').toLowerCase();
-      const isResolved = ['overturned', 'upheld', 'partial overturn'].includes((dispute.status || '').toLowerCase());
-row.innerHTML = `
-  <td>Evaluation #${dispute.evalId}</td>
-  <td>${dispute.userEmail}</td>
-  <td>${formatDate(dispute.disputeTimestamp)}</td>
-  <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
-  <td>
-    <button class="view-dispute-button btn btn-sm btn-secondary" data-dispute-id="${dispute.id}">View</button>
-    ${isResolved
-      ? `<button class="edit-dispute-button btn btn-sm btn-primary-edit" data-dispute-id="${dispute.id}">Edit Resolution</button>`
-      : `<button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Resolve Dispute</button>`
-    }
-  </td>
-`;
+      const isResolved = ['overturned', 'upheld', 'partial overturn'].includes(status);
+      const row = document.createElement('tr'); // ✅ FIXED
+
+      row.innerHTML = `
+        <td>Evaluation #${dispute.evalId}</td>
+        <td>${dispute.userEmail}</td>
+        <td>${formatDate(dispute.disputeTimestamp)}</td>
+        <td><span class="badge badge-${status}">${dispute.status}</span></td>
+        <td>
+          <button class="view-dispute-button btn btn-sm btn-secondary" data-dispute-id="${dispute.id}">View</button>
+          ${isResolved
+            ? `<button class="edit-dispute-button btn btn-sm btn-primary-edit" data-dispute-id="${dispute.id}">Edit Resolution</button>`
+            : `<button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Resolve Dispute</button>`
+          }
+        </td>
+      `;
+
       tableBody.appendChild(row);
     });
 
-    // View button
+    // ✅ View button
     document.querySelectorAll('.view-dispute-button').forEach(button => {
       button.addEventListener('click', function () {
         const id = this.getAttribute('data-dispute-id');
@@ -1230,18 +1233,21 @@ row.innerHTML = `
       });
     });
 
-    // Resolve button
+    // ✅ Resolve Dispute button
     document.querySelectorAll('.resolve-dispute-button').forEach(button => {
       button.addEventListener('click', function () {
         const button = this;
         const disputeId = button.getAttribute('data-dispute-id');
 
         const modal = document.getElementById('evaluateModal');
-        if (modal) modal.classList.remove('hidden');
+        if (modal) {
+          document.getElementById('evaluateModalMessage').textContent = 'Checking dispute status...';
+          modal.classList.remove('hidden');
+        }
 
         google.script.run
           .withSuccessHandler(function(result) {
-            if (modal) modal.classList.add('hidden');
+            modal?.classList.add('hidden');
             const status = (result?.status || '').toLowerCase();
 
             if (['overturned', 'upheld', 'partial overturn'].includes(status)) {
@@ -1259,7 +1265,7 @@ row.innerHTML = `
             resolveDispute(disputeId);
           })
           .withFailureHandler(function(error) {
-            if (modal) modal.classList.add('hidden');
+            modal?.classList.add('hidden');
             console.error("Dispute status check failed:", error);
             showToast("Unable to validate dispute status. Please try again.", 'error');
           })
@@ -1267,11 +1273,11 @@ row.innerHTML = `
       });
     });
 
-    // Edit Resolution button
-    document.querySelectorAll('.edit-resolution-button').forEach(button => {
+    // ✅ Edit Resolution button
+    document.querySelectorAll('.edit-dispute-button').forEach(button => {
       button.addEventListener('click', function () {
         const id = this.getAttribute('data-dispute-id');
-        editDisputeResolution(id); // We’ll define this function next
+        editDisputeResolution(id);
       });
     });
 
