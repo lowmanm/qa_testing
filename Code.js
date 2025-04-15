@@ -1285,31 +1285,25 @@ function saveQuestion(data) {
   }
 }
 
-function getQuestionsBySet(requestType, taskType) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+function getQuestionsBySetId(setId) {
+  const cacheKey = `questions_set_${setId}`;
+  return getCachedOrFetch(cacheKey, () => {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
+    const all = getSheetDataAsObjects(sheet);
 
-  const questions = data.slice(1)
-    .filter(row => row[headers.indexOf('active')])
-    .filter(row =>
-      row[headers.indexOf('requestType')] === requestType &&
-      row[headers.indexOf('taskType')] === taskType
-    )
-    .sort((a, b) => a[headers.indexOf('sequenceId')] - b[headers.indexOf('sequenceId')])
-    .map(row => ({
-      id: row[headers.indexOf('id')],
-      sequenceId: row[headers.indexOf('sequenceId')],
-      setId: row[headers.indexOf('setId')],
-      requestType: row[headers.indexOf('requestType')],
-      taskType: row[headers.indexOf('taskType')],
-      questionText: row[headers.indexOf('questionText')],
-      pointsPossible: row[headers.indexOf('pointsPossible')],
-      active: row[headers.indexOf('active')]
-    }));
-
-  return questions;
+    return all.filter(q =>
+      (q.active === true || q.active === 'true' || q.active === 'TRUE') &&
+      q.setId === setId
+    ).sort((a, b) => a.sequenceId - b.sequenceId)
+      .map(q => ({
+        id: q.id,
+        sequenceId: q.sequenceId,
+        questionText: q.questionText,
+        pointsPossible: q.pointsPossible
+      }));
+  });
 }
+
 
 function getQuestionById(id) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
