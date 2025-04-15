@@ -873,7 +873,6 @@ function markAuditAsMisconfigured(auditId, requestType, taskType) {
   }
 
   const auditId = form.getAttribute('data-audit-id');
-  const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
   const referenceNumber = form.getAttribute('data-reference-number');
   const taskType = form.getAttribute('data-task-type');
   const outcome = form.getAttribute('data-outcome');
@@ -882,10 +881,10 @@ function markAuditAsMisconfigured(auditId, requestType, taskType) {
 
   // Validation: all questions must be answered
   let allAnswered = true;
-  document.querySelectorAll('#questions .question-card').forEach(function (questionCard) {
-    const questionId = questionCard.getAttribute('data-question-id');
-    const selectedOption = questionCard.querySelector(`input[name="question_${questionId}"]:checked`);
-    if (!selectedOption) allAnswered = false;
+  document.querySelectorAll('#questions .question-card').forEach(card => {
+    const questionId = card.getAttribute('data-question-id');
+    const selected = card.querySelector(`input[name="question_${questionId}"]:checked`);
+    if (!selected) allAnswered = false;
   });
 
   if (!allAnswered) {
@@ -893,30 +892,24 @@ function markAuditAsMisconfigured(auditId, requestType, taskType) {
     return;
   }
 
-  // Compile responses
-  let score = 0;
+  // Compile responses — let server calculate scores
   const questions = [];
+  document.querySelectorAll('.question-card').forEach(card => {
+    const questionId = card.getAttribute('data-question-id');
+    const questionText = card.getAttribute('data-question-text');
+    const pointsPossible = parseInt(card.getAttribute('data-points-possible') || 0);
+    const selected = card.querySelector(`input[name="question_${questionId}"]:checked`);
+    const response = selected ? selected.value : 'no';
+    const feedbackInput = document.getElementById(`feedback_${questionId}`);
+    const feedback = feedbackInput ? feedbackInput.value : '';
 
-  document.querySelectorAll('.question-card').forEach(function (questionCard) {
-    const questionId = questionCard.getAttribute('data-question-id');
-    const questionText = questionCard.getAttribute('data-question-text');
-    const pointsPossible = parseInt(questionCard.getAttribute('data-points-possible') || 0);
-    const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
-    const response = selectedOption ? selectedOption.value : 'no';
-    const questionFeedbackField = document.getElementById(`feedback_${questionId}`);
-    const questionFeedback = questionFeedbackField ? questionFeedbackField.value : '';
-    const pointsEarned = response === 'yes' ? pointsPossible : 0;
-
-    // Ensure valid question data
     if (questionId && questionText) {
-      score += pointsEarned;
       questions.push({
         questionId,
         questionText,
         response,
-        pointsEarned,
         pointsPossible,
-        feedback: questionFeedback
+        feedback
       });
     }
   });
@@ -928,14 +921,11 @@ function markAuditAsMisconfigured(auditId, requestType, taskType) {
     outcome,
     qaEmail: '',
     startTimestamp: new Date().toISOString(),
-    totalPoints: score,
-    totalPointsPossible: maxPossibleScore,
-    status: 'completed',
     feedback,
     questions
   };
 
-  // UI: Show loading state
+  // UI: loading state
   form.classList.add('hidden');
   const loadingIndicator = document.createElement('div');
   loadingIndicator.id = 'evaluationLoadingIndicator';
@@ -944,57 +934,57 @@ function markAuditAsMisconfigured(auditId, requestType, taskType) {
   document.getElementById('evaluationFormView').appendChild(loadingIndicator);
   submitButton.disabled = true;
 
-// 🔍 Check live if this audit was already evaluated before submitting
-google.script.run
-  .withSuccessHandler(function (alreadyEvaluated) {
-    if (alreadyEvaluated) {
-      showToast("This audit has already been evaluated by another user.", 'warning');
-      document.getElementById('evaluationLoadingIndicator')?.remove();
-      submitButton.disabled = false;
-      form.classList.remove('hidden');
-      showAuditQueue();
-      return;
-    }
-
-    // ✅ Proceed to save since it's still valid
-    google.script.run
-      .withSuccessHandler(function () {
-        updateAuditStatusAndLock(auditId, 'evaluated')
-          .then(() => {
-            clearInterval(window.auditHeartbeat); // ✅ stop the heartbeat
-            window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
-              delete window.boundUnloadUnlockHandler;
-            showToast("Evaluation saved and audit unlocked successfully!", 'success');
-            resetEvaluationForm();
-            document.getElementById('evaluationLoadingIndicator')?.remove();
-            submitButton.disabled = false;
-            form.classList.remove('hidden');
-            showAuditQueue();
-          })
-          .catch(error => {
-            console.error('Error updating audit status:', error);
-            showToast("Failed to unlock the record. Try again.", 'error');
-            document.getElementById('evaluationLoadingIndicator')?.remove();
-            submitButton.disabled = false;
-            form.classList.remove('hidden');
-          });
-      })
-      .withFailureHandler(function (error) {
-        showToast("Error saving evaluation: " + error.message, 'error');
+  // Final check to prevent duplicate submission
+  google.script.run
+    .withSuccessHandler(alreadyEvaluated => {
+      if (alreadyEvaluated) {
+        showToast("This audit has already been evaluated by another user.", 'warning');
         document.getElementById('evaluationLoadingIndicator')?.remove();
         submitButton.disabled = false;
         form.classList.remove('hidden');
-      })
-      .saveEvaluation(evaluationData);
-  })
-  .withFailureHandler(function (error) {
-    console.error('Error checking evaluation status:', error);
-    showToast("Could not verify evaluation status. Please try again.", 'error');
-    document.getElementById('evaluationLoadingIndicator')?.remove();
-    submitButton.disabled = false;
-    form.classList.remove('hidden');
-  })
-  .checkIfAlreadyEvaluated(auditId);
+        showAuditQueue();
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(() => {
+          updateAuditStatusAndLock(auditId, 'evaluated')
+            .then(() => {
+              clearInterval(window.auditHeartbeat);
+              window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
+              delete window.boundUnloadUnlockHandler;
+
+              showToast("Evaluation saved successfully!", 'success');
+              resetEvaluationForm();
+              document.getElementById('evaluationLoadingIndicator')?.remove();
+              submitButton.disabled = false;
+              form.classList.remove('hidden');
+              showAuditQueue();
+            })
+            .catch(err => {
+              console.error('Audit status update error:', err);
+              showToast("Failed to unlock record. Try again.", 'error');
+              document.getElementById('evaluationLoadingIndicator')?.remove();
+              submitButton.disabled = false;
+              form.classList.remove('hidden');
+            });
+        })
+        .withFailureHandler(error => {
+          showToast("Error saving evaluation: " + error.message, 'error');
+          document.getElementById('evaluationLoadingIndicator')?.remove();
+          submitButton.disabled = false;
+          form.classList.remove('hidden');
+        })
+        .saveEvaluation(evaluationData);
+    })
+    .withFailureHandler(error => {
+      console.error('Error checking evaluation status:', error);
+      showToast("Could not verify evaluation status. Please try again.", 'error');
+      document.getElementById('evaluationLoadingIndicator')?.remove();
+      submitButton.disabled = false;
+      form.classList.remove('hidden');
+    })
+    .checkIfAlreadyEvaluated(auditId);
 }
 
 function resetEvaluationForm() {
