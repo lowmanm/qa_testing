@@ -3,6 +3,9 @@ let currentUserEmail = '';
 let activeDisputeEvalId = null;
 let activeDisputeResolutionId = null;
 let currentAuditTab = 'pending';
+window.originalDisputeStatus = dispute.status;
+
+
 
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -45,19 +48,22 @@ function removeUnloadHandlerForDispute() {
 function attachUnloadHandlerForDisputeResolution(disputeId) {
   if (!disputeId) return;
 
-  // Clear existing handler if any
-  if (window.handleDisputeUnloadUnlock) {
-    window.removeEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+  window.originalDisputeStatus = window.originalDisputeStatus || 'pending'; // fallback
+  activeDisputeResolutionId = disputeId;
+
+  // Remove any existing handler first
+  if (window.handleDisputeResolutionUnload) {
+    window.removeEventListener('beforeunload', window.handleDisputeResolutionUnload);
   }
 
-  window.handleDisputeUnloadUnlock = function () {
-    const statusBadge = document.querySelector('.badge.badge-overturned, .badge.badge-upheld, .badge.badge-partial');
-    if (!statusBadge) {
-      google.script.run.updateDisputeStatus(disputeId, 'pending');
-    }
+  window.handleDisputeResolutionUnload = function () {
+    // Reset only if still "reviewing"
+    google.script.run
+      .withFailureHandler(err => console.warn('Unload reset failed:', err))
+      .updateDisputeStatus(disputeId, window.originalDisputeStatus || 'pending');
   };
 
-  window.addEventListener('beforeunload', window.handleDisputeUnloadUnlock);
+  window.addEventListener('beforeunload', window.handleDisputeResolutionUnload);
 }
 
 function removeUnloadHandlerForDisputeResolution() {
@@ -66,16 +72,17 @@ function removeUnloadHandlerForDisputeResolution() {
     delete window.handleDisputeResolutionUnload;
   }
 
-  // ✅ Only reset status to 'pending' if it was previously 'reviewing'
-  if (activeDisputeResolutionId && window.originalDisputeStatus === 'reviewing') {
-    google.script.run
-      .withFailureHandler(err => console.warn('Dispute reset failed:', err))
-      .updateDisputeStatus(activeDisputeResolutionId, 'pending');
-  }
+  if (activeDisputeResolutionId) {
+    const restoreTo = window.originalDisputeStatus || 'pending';
+    if (!['overturned', 'upheld', 'partial overturn'].includes(restoreTo.toLowerCase())) {
+      google.script.run
+        .withFailureHandler(err => console.warn('Reset after navigate failed:', err))
+        .updateDisputeStatus(activeDisputeResolutionId, restoreTo);
+    }
 
-  // ✅ Cleanup global tracking variables
-  activeDisputeResolutionId = null;
-  delete window.originalDisputeStatus;
+    activeDisputeResolutionId = null;
+    delete window.originalDisputeStatus;
+  }
 }
 
   function showToast(message, type = 'info') {
@@ -1199,24 +1206,20 @@ function loadDisputes() {
 
     disputes.forEach(function(dispute) {
       const status = (dispute.status || '').toLowerCase();
-      const isResolved = ['upheld', 'overturned', 'partial overturn'].includes(status);
-
-      const actionButton = isResolved
-        ? `<button class="edit-resolution-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Edit Resolution</button>`
-        : `<button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Resolve Dispute</button>`;
-
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>Evaluation #${dispute.evalId}</td>
-        <td>${dispute.userEmail}</td>
-        <td>${formatDate(dispute.disputeTimestamp)}</td>
-        <td><span class="badge badge-${status}">${dispute.status}</span></td>
-        <td>
-          <button class="view-dispute-button btn btn-sm btn-secondary" data-dispute-id="${dispute.id}">View</button>
-          ${actionButton}
-        </td>
-      `;
-
+      const isResolved = ['overturned', 'upheld', 'partial overturn'].includes((dispute.status || '').toLowerCase());
+row.innerHTML = `
+  <td>Evaluation #${dispute.evalId}</td>
+  <td>${dispute.userEmail}</td>
+  <td>${formatDate(dispute.disputeTimestamp)}</td>
+  <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
+  <td>
+    <button class="view-dispute-button btn btn-sm btn-secondary" data-dispute-id="${dispute.id}">View</button>
+    ${isResolved
+      ? `<button class="edit-dispute-button btn btn-sm btn-primary-edit" data-dispute-id="${dispute.id}">Edit Resolution</button>`
+      : `<button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Resolve Dispute</button>`
+    }
+  </td>
+`;
       tableBody.appendChild(row);
     });
 
@@ -1331,26 +1334,18 @@ function editDisputeResolution(disputeId) {
     form.setAttribute('data-dispute-id', dispute.id);
     form.addEventListener('submit', handleEditDisputeResolutionSubmit);
 
-document.getElementById('cancelResolveDispute').addEventListener('click', function () {
-  const modal = document.getElementById('evaluateModal');
-  if (modal) {
-    document.getElementById('evaluateModalMessage').textContent = 'Restoring dispute status...';
-    modal.classList.remove('hidden');
-  }
-
-  google.script.run
-    .withSuccessHandler(() => {
-      modal?.classList.add('hidden');
-      showToast(`Dispute status restored to "${window.originalDisputeStatus}".`, 'info');
-      showDisputes();
-    })
-    .withFailureHandler(error => {
-      modal?.classList.add('hidden');
-      console.error('Error restoring dispute status:', error);
-      showToast('Failed to restore dispute status: ' + error.message, 'error');
-    })
-    .updateDisputeStatus(dispute.id, window.originalDisputeStatus || 'resolved');
-});
+    document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+      google.script.run
+        .withSuccessHandler(() => {
+          showToast('Dispute status updated to pending.', 'success');
+          showDisputes();
+        })
+        .withFailureHandler(error => {
+          console.error('Error updating dispute status:', error);
+          showToast('Failed to update dispute status: ' + error.message, 'error');
+        })
+        .updateDisputeStatus(dispute.id, 'pending');
+    });
 
     document.getElementById('resolveEvaluationDetails').innerHTML = `
       <div class="grid-2">
