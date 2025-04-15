@@ -755,68 +755,99 @@ function showEvaluationForm(auditId) {
     .prepareEvaluation(auditId);
 }
 
-function loadQuestionsForEvaluation(auditRecord) {
-  const container = document.getElementById('questions');
-  container.innerHTML = '<p class="text-center">Loading questions...</p>';
+function loadQuestionsForEvaluation(audit, attempt = 1) {
+  const maxRetries = 5;
+  const questionsContainer = document.getElementById('questions');
+  const form = document.getElementById('evaluationForm');
 
-  // ✅ Show spinner modal with custom message
-  const modal = document.getElementById('evaluateModal');
-  if (modal) {
-    const message = modal.querySelector('#modalMessage');
-    if (message) message.textContent = "Loading evaluation questions...";
-    modal.classList.remove('hidden');
+  if (!questionsContainer) {
+    if (attempt < maxRetries) {
+      return setTimeout(() => loadQuestionsForEvaluation(audit, attempt + 1), 300);
+    } else {
+      alert('Failed to load questions. Please return to the Audit Queue and try again.');
+      return;
+    }
   }
 
-  // Fetch questions based on taskType and requestType
-  google.script.run
-    .withSuccessHandler(function (questions) {
-      container.innerHTML = '';
+  questionsContainer.innerHTML = '<div class="loading">Loading questions...</div>';
 
-      if (!questions || questions.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500">No active questions found for this record.</p>';
-        document.getElementById('evaluationForm')?.classList.add('disabled');
-        document.getElementById('submitEvaluationBtn')?.setAttribute('disabled', true);
-        modal?.classList.add('hidden');
-        return;
-      }
+  google.script.run.withSuccessHandler(function (questions) {
+    let maxPossibleScore = 0;
+    questionsContainer.innerHTML = '';
 
-      document.getElementById('evaluationForm')?.classList.remove('disabled');
-      document.getElementById('submitEvaluationBtn')?.removeAttribute('disabled');
+    if (!questions || questions.length === 0) {
+      // 🧠 Inline UX update + countdown message
+      questionsContainer.innerHTML = `
+        <div class="alert alert-warning" style="margin-top: 1rem;">
+          ⚠️ No evaluation questions are configured for this request type and task type.
+          <br>Please contact your QA admin.
+          <br><br><em>Returning to the Audit Queue in <span id="redirectCountdown">5</span> seconds...</em>
+        </div>
+      `;
 
-      questions.forEach((q, i) => {
-        const card = document.createElement('div');
-        card.className = 'question-card';
-        card.setAttribute('data-question-id', q.id);
-        card.setAttribute('data-question-text', q.questionText);
-        card.setAttribute('data-points-possible', q.pointsPossible);
+      // 🛑 Prevent form submission
+      form.classList.add('disabled');
 
-        card.innerHTML = `
-          <div class="question-header">
-            <h3 class="question-text">${q.questionText}</h3>
-            <span class="question-points">${q.pointsPossible} pts</span>
+      // ✅ Prevent automatic unlock — misconfigured
+      window.skipUnlock = true;
+
+      // ✅ Log misconfiguration (updated to pass all required values)
+      markAuditAsMisconfigured(
+        audit.auditId,
+        audit.requestType,
+        audit.taskType
+      );
+
+      // ✅ Show toast message
+      showToast("No evaluation questions are set up for this record.", 'warning');
+
+      // 🕒 Start 5-second redirect countdown
+      let secondsLeft = 5;
+      const countdownEl = document.getElementById('redirectCountdown');
+      const countdownTimer = setInterval(() => {
+        secondsLeft--;
+        if (countdownEl) countdownEl.textContent = secondsLeft;
+        if (secondsLeft <= 0) {
+          clearInterval(countdownTimer);
+          showAuditQueue();
+        }
+      }, 1000);
+
+      return;
+    }
+
+    // ✅ Normal path: render all questions
+    questions.forEach(q => {
+      maxPossibleScore += parseInt(q.pointsPossible || 0);
+
+      const questionCard = document.createElement('div');
+      questionCard.className = 'question-card';
+      questionCard.setAttribute('data-question-id', q.id);
+      questionCard.setAttribute('data-question-text', q.questionText);
+      questionCard.setAttribute('data-points-possible', q.pointsPossible);
+
+      questionCard.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Points: ${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label><input type="radio" name="question_${q.id}" value="yes"> <span>Yes</span></label>
+            <label><input type="radio" name="question_${q.id}" value="no"> <span>No</span></label>
           </div>
-          <div class="question-body">
-            <label><input type="radio" name="question_${q.id}" value="yes" required> Yes</label>
-            <label><input type="radio" name="question_${q.id}" value="no"> No</label>
-            <div class="form-group mt-2">
-              <label for="feedback_${q.id}">Optional Feedback</label>
-              <textarea class="form-control" id="feedback_${q.id}" rows="2"></textarea>
-            </div>
+          <div class="feedback-field">
+            <label for="feedback_${q.id}">Specific Feedback:</label>
+            <textarea id="feedback_${q.id}" name="feedback_${q.id}" rows="2" class="form-control"></textarea>
           </div>
-        `;
+        </div>
+      `;
+      questionsContainer.appendChild(questionCard);
+    });
 
-        container.appendChild(card);
-      });
-
-      // ✅ Hide spinner after everything is rendered
-      modal?.classList.add('hidden');
-    })
-    .withFailureHandler(function (error) {
-      console.error('Failed to load questions:', error);
-      container.innerHTML = '<p class="text-center text-red-500">Error loading questions. Please try again.</p>';
-      modal?.classList.add('hidden');
-    })
-    .getQuestionsBySet(auditRecord.requestType, auditRecord.taskType);
+    form.setAttribute('data-max-score', maxPossibleScore);
+    form.classList.remove('disabled');
+  }).getQuestionsBySet(audit.requestType, audit.taskType);
 }
 
 function markAuditAsMisconfigured(auditId, requestType, taskType) {
@@ -829,7 +860,7 @@ function markAuditAsMisconfigured(auditId, requestType, taskType) {
     .markAuditAsMisconfigured(auditId, requestType, taskType);
 }
 
-function handleEvaluationSubmit(e) {
+  function handleEvaluationSubmit(e) {
   e.preventDefault();
 
   const form = document.getElementById('evaluationForm');
@@ -842,48 +873,45 @@ function handleEvaluationSubmit(e) {
   }
 
   const auditId = form.getAttribute('data-audit-id');
-  const maxPossibleScore = parseInt(form.getAttribute('data-max-score') || 0);
   const referenceNumber = form.getAttribute('data-reference-number');
   const taskType = form.getAttribute('data-task-type');
   const outcome = form.getAttribute('data-outcome');
-  const feedback = document.getElementById('feedback')?.value || '';
+  const feedbackField = document.getElementById('feedback');
+  const feedback = feedbackField ? feedbackField.value : '';
 
-  // Validate: all questions answered
+  // Validation: all questions must be answered
   let allAnswered = true;
   document.querySelectorAll('#questions .question-card').forEach(card => {
-    const qid = card.getAttribute('data-question-id');
-    const selected = card.querySelector(`input[name="question_${qid}"]:checked`);
+    const questionId = card.getAttribute('data-question-id');
+    const selected = card.querySelector(`input[name="question_${questionId}"]:checked`);
     if (!selected) allAnswered = false;
   });
 
   if (!allAnswered) {
-    showToast("Please answer all questions before submitting.", 'warning');
+    showToast("Please answer all questions before submitting the evaluation.", 'warning');
     return;
   }
 
-  // Compile responses
-  let totalScore = 0;
+  // Compile responses — let server calculate scores
   const questions = [];
-
   document.querySelectorAll('.question-card').forEach(card => {
-    const qid = card.getAttribute('data-question-id');
-    const qText = card.getAttribute('data-question-text');
-    const pts = parseInt(card.getAttribute('data-points-possible') || 0);
-    const selected = card.querySelector(`input[name="question_${qid}"]:checked`);
-    const resp = selected?.value || 'no';
-    const fb = document.getElementById(`feedback_${qid}`)?.value || '';
-    const earned = resp === 'yes' ? pts : 0;
+    const questionId = card.getAttribute('data-question-id');
+    const questionText = card.getAttribute('data-question-text');
+    const pointsPossible = parseInt(card.getAttribute('data-points-possible') || 0);
+    const selected = card.querySelector(`input[name="question_${questionId}"]:checked`);
+    const response = selected ? selected.value : 'no';
+    const feedbackInput = document.getElementById(`feedback_${questionId}`);
+    const feedback = feedbackInput ? feedbackInput.value : '';
 
-    totalScore += earned;
-
-    questions.push({
-      questionId: qid,
-      questionText: qText,
-      response: resp,
-      pointsEarned: earned,
-      pointsPossible: pts,
-      feedback: fb
-    });
+    if (questionId && questionText) {
+      questions.push({
+        questionId,
+        questionText,
+        response,
+        pointsPossible,
+        feedback
+      });
+    }
   });
 
   const evaluationData = {
@@ -893,34 +921,31 @@ function handleEvaluationSubmit(e) {
     outcome,
     qaEmail: '',
     startTimestamp: new Date().toISOString(),
-    totalPoints: totalScore,
-    totalPointsPossible: maxPossibleScore,
-    status: 'completed',
     feedback,
     questions
   };
 
-  // UI: disable form and show loading
+  // UI: loading state
   form.classList.add('hidden');
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.id = 'evaluationLoadingIndicator';
+  loadingIndicator.className = 'loading';
+  loadingIndicator.innerText = 'Saving evaluation...';
+  document.getElementById('evaluationFormView').appendChild(loadingIndicator);
   submitButton.disabled = true;
 
-  const loading = document.createElement('div');
-  loading.id = 'evaluationLoadingIndicator';
-  loading.className = 'loading';
-  loading.innerText = 'Saving evaluation...';
-  document.getElementById('evaluationFormView')?.appendChild(loading);
-
-  // ✅ Live check for existing evaluation
+  // Final check to prevent duplicate submission
   google.script.run
     .withSuccessHandler(alreadyEvaluated => {
       if (alreadyEvaluated) {
-        showToast("This audit has already been evaluated.", 'warning');
-        restoreEvaluationUI();
-        showAuditQueue(); // ✅ back to refreshed queue
+        showToast("This audit has already been evaluated by another user.", 'warning');
+        document.getElementById('evaluationLoadingIndicator')?.remove();
+        submitButton.disabled = false;
+        form.classList.remove('hidden');
+        showAuditQueue();
         return;
       }
 
-      // ✅ Safe to save
       google.script.run
         .withSuccessHandler(() => {
           updateAuditStatusAndLock(auditId, 'evaluated')
@@ -929,36 +954,37 @@ function handleEvaluationSubmit(e) {
               window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
               delete window.boundUnloadUnlockHandler;
 
-              showToast("Evaluation submitted successfully!", 'success');
+              showToast("Evaluation saved successfully!", 'success');
               resetEvaluationForm();
-              document.getElementById('evaluationFormView')?.classList.add('hidden'); // ✅ hide on success
-              showAuditQueue(); // ✅ return to refreshed queue
+              document.getElementById('evaluationLoadingIndicator')?.remove();
+              submitButton.disabled = false;
+              form.classList.remove('hidden');
+              showAuditQueue();
             })
-            .catch(error => {
-              console.error('Error unlocking audit:', error);
-              showToast("Evaluation saved, but failed to unlock audit.", 'warning');
-              restoreEvaluationUI();
+            .catch(err => {
+              console.error('Audit status update error:', err);
+              showToast("Failed to unlock record. Try again.", 'error');
+              document.getElementById('evaluationLoadingIndicator')?.remove();
+              submitButton.disabled = false;
+              form.classList.remove('hidden');
             });
         })
         .withFailureHandler(error => {
-          console.error('Save failed:', error);
           showToast("Error saving evaluation: " + error.message, 'error');
-          restoreEvaluationUI();
+          document.getElementById('evaluationLoadingIndicator')?.remove();
+          submitButton.disabled = false;
+          form.classList.remove('hidden');
         })
         .saveEvaluation(evaluationData);
     })
     .withFailureHandler(error => {
-      console.error('Check failed:', error);
-      showToast("Failed to check evaluation status. Try again.", 'error');
-      restoreEvaluationUI();
+      console.error('Error checking evaluation status:', error);
+      showToast("Could not verify evaluation status. Please try again.", 'error');
+      document.getElementById('evaluationLoadingIndicator')?.remove();
+      submitButton.disabled = false;
+      form.classList.remove('hidden');
     })
     .checkIfAlreadyEvaluated(auditId);
-
-  function restoreEvaluationUI() {
-    document.getElementById('evaluationLoadingIndicator')?.remove();
-    submitButton.disabled = false;
-    form.classList.remove('hidden'); // ✅ Important to re-show on error
-  }
 }
 
 function resetEvaluationForm() {
