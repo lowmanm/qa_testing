@@ -3,9 +3,6 @@ let currentUserEmail = '';
 let activeDisputeEvalId = null;
 let activeDisputeResolutionId = null;
 let currentAuditTab = 'pending';
-window.originalDisputeStatus = dispute.status;
-
-
 
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1334,18 +1331,26 @@ function editDisputeResolution(disputeId) {
     form.setAttribute('data-dispute-id', dispute.id);
     form.addEventListener('submit', handleEditDisputeResolutionSubmit);
 
-    document.getElementById('cancelResolveDispute').addEventListener('click', function () {
-      google.script.run
-        .withSuccessHandler(() => {
-          showToast('Dispute status updated to pending.', 'success');
-          showDisputes();
-        })
-        .withFailureHandler(error => {
-          console.error('Error updating dispute status:', error);
-          showToast('Failed to update dispute status: ' + error.message, 'error');
-        })
-        .updateDisputeStatus(dispute.id, 'pending');
-    });
+document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+  const modal = document.getElementById('evaluateModal');
+  if (modal) {
+    document.getElementById('evaluateModalMessage').textContent = 'Restoring dispute status...';
+    modal.classList.remove('hidden');
+  }
+
+  google.script.run
+    .withSuccessHandler(() => {
+      modal?.classList.add('hidden');
+      showToast(`Dispute status restored to "${window.originalDisputeStatus}".`, 'info');
+      showDisputes();
+    })
+    .withFailureHandler(error => {
+      modal?.classList.add('hidden');
+      console.error('Error restoring dispute status:', error);
+      showToast('Failed to restore dispute status: ' + error.message, 'error');
+    })
+    .updateDisputeStatus(dispute.id, window.originalDisputeStatus || 'resolved');
+});
 
     document.getElementById('resolveEvaluationDetails').innerHTML = `
       <div class="grid-2">
