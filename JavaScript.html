@@ -1867,18 +1867,21 @@ console.log('After robust normalization - dispute.questionIds:', dispute.questio
     form.setAttribute('data-dispute-id', dispute.id);
     form.addEventListener('submit', handleResolveDisputeSubmit);
 
-    document.getElementById('cancelResolveDispute').addEventListener('click', function () {
-      google.script.run
-        .withSuccessHandler(() => {
-          showToast('Dispute status updated to pending.', 'success');
-          showDisputes();
-        })
-        .withFailureHandler(error => {
-          console.error('Error updating dispute status:', error);
-          showToast('Failed to update dispute status: ' + error.message, 'error');
-        })
-        .updateDisputeStatus(dispute.id, 'pending');
-    });
+    // 🧠 Capture original status
+const originalStatus = dispute.status;
+
+document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+  google.script.run
+    .withSuccessHandler(() => {
+      showToast(`Dispute status restored to "${originalStatus}".`, 'info');
+      showDisputes();
+    })
+    .withFailureHandler(error => {
+      console.error('Error restoring dispute status:', error);
+      showToast('Failed to restore dispute status: ' + error.message, 'error');
+    })
+    .updateDisputeStatus(dispute.id, originalStatus);
+});
 
     document.getElementById('resolveEvaluationDetails').innerHTML = `
       <div class="grid-2">
