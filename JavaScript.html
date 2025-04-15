@@ -755,99 +755,68 @@ function showEvaluationForm(auditId) {
     .prepareEvaluation(auditId);
 }
 
-function loadQuestionsForEvaluation(audit, attempt = 1) {
-  const maxRetries = 5;
-  const questionsContainer = document.getElementById('questions');
-  const form = document.getElementById('evaluationForm');
+function loadQuestionsForEvaluation(auditRecord) {
+  const container = document.getElementById('questions');
+  container.innerHTML = '<p class="text-center">Loading questions...</p>';
 
-  // 🌀 Show modal while loading
-  document.getElementById('evaluateModal')?.classList.remove('hidden');
-
-  if (!questionsContainer) {
-    if (attempt < maxRetries) {
-      return setTimeout(() => loadQuestionsForEvaluation(audit, attempt + 1), 300);
-    } else {
-      document.getElementById('evaluateModal')?.classList.add('hidden');
-      alert('Failed to load questions. Please return to the Audit Queue and try again.');
-      return;
-    }
+  // ✅ Show spinner modal with custom message
+  const modal = document.getElementById('evaluateModal');
+  if (modal) {
+    const message = modal.querySelector('#modalMessage');
+    if (message) message.textContent = "Loading evaluation questions...";
+    modal.classList.remove('hidden');
   }
 
-  questionsContainer.innerHTML = '';
+  // Fetch questions based on taskType and requestType
+  google.script.run
+    .withSuccessHandler(function (questions) {
+      container.innerHTML = '';
 
-  google.script.run.withSuccessHandler(function (questions) {
-    document.getElementById('evaluateModal')?.classList.add('hidden');
-    questionsContainer.innerHTML = '';
-    let maxPossibleScore = 0;
+      if (!questions || questions.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-500">No active questions found for this record.</p>';
+        document.getElementById('evaluationForm')?.classList.add('disabled');
+        document.getElementById('submitEvaluationBtn')?.setAttribute('disabled', true);
+        modal?.classList.add('hidden');
+        return;
+      }
 
-    if (!questions || questions.length === 0) {
-      questionsContainer.innerHTML = `
-        <div class="alert alert-warning" style="margin-top: 1rem;">
-          ⚠️ No evaluation questions are configured for this request type and task type.
-          <br>Please contact your QA admin.
-          <br><br><em>Returning to the Audit Queue in <span id="redirectCountdown">5</span> seconds...</em>
-        </div>
-      `;
-      form.classList.add('disabled');
-      window.skipUnlock = true;
+      document.getElementById('evaluationForm')?.classList.remove('disabled');
+      document.getElementById('submitEvaluationBtn')?.removeAttribute('disabled');
 
-      markAuditAsMisconfigured(audit.auditId, audit.requestType, audit.taskType);
-      showToast("No evaluation questions are set up for this record.", 'warning');
+      questions.forEach((q, i) => {
+        const card = document.createElement('div');
+        card.className = 'question-card';
+        card.setAttribute('data-question-id', q.id);
+        card.setAttribute('data-question-text', q.questionText);
+        card.setAttribute('data-points-possible', q.pointsPossible);
 
-      let secondsLeft = 5;
-      const countdownEl = document.getElementById('redirectCountdown');
-      const timer = setInterval(() => {
-        secondsLeft--;
-        if (countdownEl) countdownEl.textContent = secondsLeft;
-        if (secondsLeft <= 0) {
-          clearInterval(timer);
-          showAuditQueue();
-        }
-      }, 1000);
-
-      return;
-    }
-
-    for (const q of questions) {
-      maxPossibleScore += parseInt(q.pointsPossible || 0);
-
-      const card = document.createElement('div');
-      card.className = 'question-card';
-      card.setAttribute('data-question-id', q.id);
-      card.setAttribute('data-question-text', q.questionText);
-      card.setAttribute('data-points-possible', q.pointsPossible);
-
-      card.innerHTML = `
-        <div class="question-header">
-          <h3 class="question-text">${q.questionText}</h3>
-          <span class="question-points">Points: ${q.pointsPossible}</span>
-        </div>
-        <div class="question-body">
-          <div class="radio-group">
-            <label><input type="radio" name="question_${q.id}" value="yes"> <span>Yes</span></label>
-            <label><input type="radio" name="question_${q.id}" value="no"> <span>No</span></label>
+        card.innerHTML = `
+          <div class="question-header">
+            <h3 class="question-text">${q.questionText}</h3>
+            <span class="question-points">${q.pointsPossible} pts</span>
           </div>
-          <div class="feedback-field">
-            <label for="feedback_${q.id}">Specific Feedback:</label>
-            <textarea id="feedback_${q.id}" name="feedback_${q.id}" rows="2" class="form-control"></textarea>
+          <div class="question-body">
+            <label><input type="radio" name="question_${q.id}" value="yes" required> Yes</label>
+            <label><input type="radio" name="question_${q.id}" value="no"> No</label>
+            <div class="form-group mt-2">
+              <label for="feedback_${q.id}">Optional Feedback</label>
+              <textarea class="form-control" id="feedback_${q.id}" rows="2"></textarea>
+            </div>
           </div>
-        </div>
-      `;
+        `;
 
-      questionsContainer.appendChild(card);
-    }
+        container.appendChild(card);
+      });
 
-    form.setAttribute('data-max-score', maxPossibleScore);
-    form.classList.remove('disabled');
-  })
-  .withFailureHandler(error => {
-    document.getElementById('evaluateModal')?.classList.add('hidden');
-    console.error('Failed to load questions:', error);
-    showToast("Failed to load questions for evaluation.", 'error');
-    resetEvaluationForm();
-    showAuditQueue();
-  })
-  .getQuestionsBySet(audit.requestType, audit.taskType);
+      // ✅ Hide spinner after everything is rendered
+      modal?.classList.add('hidden');
+    })
+    .withFailureHandler(function (error) {
+      console.error('Failed to load questions:', error);
+      container.innerHTML = '<p class="text-center text-red-500">Error loading questions. Please try again.</p>';
+      modal?.classList.add('hidden');
+    })
+    .getQuestionsBySet(auditRecord.requestType, auditRecord.taskType);
 }
 
 function markAuditAsMisconfigured(auditId, requestType, taskType) {
@@ -954,17 +923,18 @@ function handleEvaluationSubmit(e) {
       // ✅ Safe to save
       google.script.run
         .withSuccessHandler(() => {
-          updateAuditStatusAndLock(auditId, 'evaluated')
-            .then(() => {
-              clearInterval(window.auditHeartbeat);
-              window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
-              delete window.boundUnloadUnlockHandler;
+  updateAuditStatusAndLock(auditId, 'evaluated')
+    .then(() => {
+      clearInterval(window.auditHeartbeat);
+      window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
+      delete window.boundUnloadUnlockHandler;
 
-              showToast("Evaluation submitted successfully!", 'success');
-              resetEvaluationForm();
-              restoreEvaluationUI();
-              loadPendingTasks(); // ✅ Only refresh the table
-            })
+      showToast("Evaluation submitted successfully!", 'success');
+      resetEvaluationForm();
+      document.getElementById('evaluationFormView')?.classList.add('hidden'); // ✅ hide form
+      showAuditQueue(); // ✅ redirect to updated audit queue
+    })
+
             .catch(error => {
               console.error('Error unlocking audit:', error);
               showToast("Evaluation saved, but failed to unlock audit.", 'warning');
@@ -986,11 +956,12 @@ function handleEvaluationSubmit(e) {
     .checkIfAlreadyEvaluated(auditId);
 
   // ✅ Helper to reset UI state
-  function restoreEvaluationUI() {
-    document.getElementById('evaluationLoadingIndicator')?.remove();
-    submitButton.disabled = false;
-    form.classList.remove('hidden');
-  }
+    function restoreEvaluationUI() {
+      const loading = document.getElementById('evaluationLoadingIndicator');
+      if (loading) loading.remove();
+      submitButton.disabled = false;
+    // form.classList.remove('hidden'); // kept intentionally removed
+    }
 }
 
 function resetEvaluationForm() {
