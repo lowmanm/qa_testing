@@ -537,27 +537,29 @@ function showAuditQueue() {
 }
 
 function loadPendingTasks() {
-  currentAuditTab = 'pending'; // ✅ Track tab state
+  currentAuditTab = 'pending'; // ✅ Track active tab
   const tableBody = document.getElementById('pendingTasksBody');
   const statusMessage = document.getElementById('auditStatusMessage');
 
-  // 🌀 Show loading state
-  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading pending audits...</td></tr>';
-  if (statusMessage) statusMessage.textContent = 'Loading pending audits...';
+  // ✅ Show loading spinner only in the footer, not the table
+  tableBody.innerHTML = '';
+  if (statusMessage) {
+    statusMessage.innerHTML = `<div class="spinner-sm inline-block mr-2"></div> Loading pending audits...`;
+  }
 
   google.script.run.withSuccessHandler(function(audits) {
-    // 🛑 Skip if tab switched before data returned
+    // 🛑 Cancel rendering if the tab was switched before data returned
     if (currentAuditTab !== 'pending') return;
 
     if (!Array.isArray(audits)) {
       console.error('Unexpected result from getPendingAudits:', audits);
-      tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
+      tableBody.innerHTML = '';
       if (statusMessage) statusMessage.textContent = 'Error loading audits.';
       return;
     }
 
     if (audits.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500">No pending audits found</td></tr>';
+      tableBody.innerHTML = '';
       if (statusMessage) statusMessage.textContent = 'No pending audits.';
       return;
     }
@@ -597,10 +599,10 @@ function loadPendingTasks() {
 
     tableBody.innerHTML = '';
     tableBody.appendChild(fragment);
-    if (statusMessage) statusMessage.textContent = ''; // ✅ Clear loading msg
+    if (statusMessage) statusMessage.textContent = '';
   }).getPendingAudits();
 
-  // ✅ Ensure we only attach the event listener once
+  // ✅ Attach event listener once
   if (!tableBody.hasListenerAttached) {
     tableBody.addEventListener('click', function(event) {
       if (!event.target.classList.contains('evaluate-button')) return;
@@ -658,21 +660,21 @@ function hideEvaluateModal() {
 }
 
 function loadErrorTasks() {
-  currentAuditTab = 'error'; // ✅ Track current tab
   const tableBody = document.getElementById('pendingTasksBody');
   const statusMessage = document.getElementById('auditStatusMessage');
 
-  // 🌀 Loading placeholder
-  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading error audits...</td></tr>';
-  if (statusMessage) statusMessage.textContent = 'Loading error audits...';
+  tableBody.innerHTML = '';
+  if (statusMessage) statusMessage.innerHTML = `<div class="spinner-sm inline-block mr-2"></div> Loading error audits...`;
+
+  currentAuditTab = 'error';
 
   google.script.run.withSuccessHandler(function(audits) {
-    if (currentAuditTab !== 'error') return; // 🛑 Prevent race condition
+    if (currentAuditTab !== 'error') return;
 
     const misconfigured = audits.filter(a => a.auditStatus === 'misconfigured');
 
     if (misconfigured.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500">No misconfigured audits</td></tr>';
+      tableBody.innerHTML = '';
       if (statusMessage) statusMessage.textContent = 'No misconfigured audits.';
       return;
     }
@@ -682,7 +684,7 @@ function loadErrorTasks() {
     misconfigured.forEach(function(audit) {
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td><code>${audit.auditId || audit.id || 'N/A'}</code></td>
+        <td><code>${audit.auditId || 'N/A'}</code></td>
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
