@@ -973,79 +973,61 @@ function resolveDispute(resolution) {
   const resolvedBy = Session.getActiveUser().getEmail();
   const resolvedAt = new Date().toISOString();
 
-  // Load and map quest data
+  // 1. Update evalQuest rows
   const questData = questSheet.getDataRange().getValues();
-  const qHeaders = questData[0];
-  const qEvalIdx = qHeaders.indexOf('evalId');
-  const qQIdIdx = qHeaders.indexOf('questionId');
-  const qRespIdx = qHeaders.indexOf('response');
-  const qPtsEarnedIdx = qHeaders.indexOf('pointsEarned');
-  const qPtsPossibleIdx = qHeaders.indexOf('pointsPossible');
-  const qFeedbackIdx = qHeaders.indexOf('feedback');
-
-  const updatedQuestRows = [];
+  const headers = questData[0];
+  const evalIdx = headers.indexOf('evalId');
+  const qIdIdx = headers.indexOf('questionId');
+  const respIdx = headers.indexOf('response');
+  const ptsEarnedIdx = headers.indexOf('pointsEarned');
+  const ptsPossibleIdx = headers.indexOf('pointsPossible');
+  const feedbackIdx = headers.indexOf('feedback');
 
   for (let i = 1; i < questData.length; i++) {
     const row = questData[i];
-    if (row[qEvalIdx] !== evalId) continue;
+    if (row[evalIdx] !== evalId) continue;
 
-    const questionId = row[qQIdIdx];
-    const decision = decisions.find(d => d.questionId === questionId);
-    if (!decision) continue;
+    const match = decisions.find(d => d.questionId === row[qIdIdx]);
+    if (!match) continue;
 
-    const originalResponse = row[qRespIdx];
-    const originalPoints = row[qPtsEarnedIdx];
-    const maxPoints = row[qPtsPossibleIdx];
-
-    // Overturned → "yes" + full points
-    if (decision.resolution === 'overturned') {
-      row[qRespIdx] = 'yes'; // lowercase fix
-      row[qPtsEarnedIdx] = maxPoints;
+    if (match.resolution === 'overturned') {
+      row[respIdx] = 'yes';
+      row[ptsEarnedIdx] = row[ptsPossibleIdx];
+    } else {
+      row[respIdx] = 'no';
+      row[ptsEarnedIdx] = 0;
     }
 
-    // Upheld → restore original response/points (remove overturn)
-    else if (decision.resolution === 'upheld') {
-      if (originalResponse === 'yes' && originalPoints === maxPoints) {
-        // Assume previous overturn — revert
-        row[qRespIdx] = 'no'; // default
-        row[qPtsEarnedIdx] = 0;
-      }
-    }
-
-    // Optional: logic for 'partial' can be inserted here later
-
-    // Notes always update
-    row[qFeedbackIdx] = decision.note || '';
-
-    // Write back updated row
-    questSheet.getRange(i + 1, 1, 1, qHeaders.length).setValues([row]);
+    row[feedbackIdx] = match.note || '';
+    questSheet.getRange(i + 1, 1, 1, headers.length).setValues([row]);
   }
 
-  // Recalculate totals
-  const relevantRows = questData.filter(r => r[qEvalIdx] === evalId);
-  const totalPoints = relevantRows.reduce((sum, row) => sum + (parseFloat(row[qPtsEarnedIdx]) || 0), 0);
-  const totalPossible = relevantRows.reduce((sum, row) => sum + (parseFloat(row[qPtsPossibleIdx]) || 0), 0);
-  const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
+  // 2. Recalculate totals based on updated evalQuest
+  const updatedQuestData = questSheet.getDataRange().getValues();
+  const relevant = updatedQuestData.filter(r => r[evalIdx] === evalId);
+  const totalPoints = relevant.reduce((sum, row) => sum + (parseFloat(row[ptsEarnedIdx]) || 0), 0);
+  const totalPossible = relevant.reduce((sum, row) => sum + (parseFloat(row[ptsPossibleIdx]) || 0), 0);
+  const evalScore = totalPossible ? totalPoints / totalPossible : 0;
 
-  // Update evalSummary
+  // 3. Update evalSummary with recalculated score and updated status
   const summaryData = summarySheet.getDataRange().getValues();
   const sHeaders = summaryData[0];
-  const sIdIdx = sHeaders.indexOf('id');
-  const sPtsIdx = sHeaders.indexOf('totalPoints');
-  const sScoreIdx = sHeaders.indexOf('evalScore');
-  const sStatusIdx = sHeaders.indexOf('status');
+  const idIdx = sHeaders.indexOf('id');
+  const ptsIdx = sHeaders.indexOf('totalPoints');
+  const scoreIdx = sHeaders.indexOf('evalScore');
+  const statusIdx = sHeaders.indexOf('status');
 
   for (let i = 1; i < summaryData.length; i++) {
     const row = summaryData[i];
-    if (row[sIdIdx] === evalId) {
-      summarySheet.getRange(i + 1, sPtsIdx + 1).setValue(totalPoints);
-      summarySheet.getRange(i + 1, sScoreIdx + 1).setValue(evalScore);
-      summarySheet.getRange(i + 1, sStatusIdx + 1).setValue(status || 'resolved');
+    if (row[idIdx] === evalId) {
+      summarySheet.getRange(i + 1, ptsIdx + 1).setValue(totalPoints);
+      summarySheet.getRange(i + 1, scoreIdx + 1).setValue(evalScore);
+      summarySheet.getRange(i + 1, statusIdx + 1).setValue(status || 'resolved');
       break;
     }
   }
 
-  // Update disputesQueue
+  // 4. Update disputesQueue
   const disputeData = disputeSheet.getDataRange().getValues();
   const dHeaders = disputeData[0];
   const dIdIdx = dHeaders.indexOf('id');
