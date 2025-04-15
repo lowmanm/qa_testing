@@ -645,7 +645,6 @@ function loadErrorTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
   const statusMessage = document.getElementById('auditStatusMessage');
 
-  // ✅ Clear body and status
   tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading errors...</td></tr>';
   if (statusMessage) statusMessage.textContent = '';
 
@@ -663,10 +662,10 @@ function loadErrorTasks() {
     misconfigured.forEach(function(audit) {
       const row = document.createElement('tr');
       row.innerHTML = `
+        <td><code>${audit.id || 'N/A'}</code></td>
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
-        <td><code>${audit.id || 'N/A'}</code></td>
         <td>${formatDate(audit.taskTimestamp)}</td>
         <td>
           <span class="badge badge-danger" title="No questions configured for this task type">Misconfigured</span>
@@ -678,7 +677,6 @@ function loadErrorTasks() {
       fragment.appendChild(row);
     });
 
-    // ✅ Clear loading row and insert fragment
     tableBody.innerHTML = '';
     tableBody.appendChild(fragment);
     if (statusMessage) statusMessage.textContent = '';
