@@ -1237,106 +1237,78 @@ function getUniqueColumnValues(sheetName, columnName) {
 
 function saveQuestion(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
-  const allData = sheet.getDataRange().getValues();
-  const headers = allData[0];
+  const headers = sheet.getDataRange().getValues()[0];
+  const existingData = sheet.getDataRange().getValues();
   const idIndex = headers.indexOf('id');
 
   if (data.id) {
-    // 🔄 Update existing question
-    for (let i = 1; i < allData.length; i++) {
-      if (allData[i][idIndex] === data.id) {
+    // Update existing question
+    for (let i = 1; i < existingData.length; i++) {
+      if (existingData[i][idIndex] === data.id) {
         const row = i + 1;
-
-        // Update relevant fields
         sheet.getRange(row, headers.indexOf('sequenceId') + 1).setValue(data.sequenceId);
         sheet.getRange(row, headers.indexOf('requestType') + 1).setValue(data.requestType);
         sheet.getRange(row, headers.indexOf('taskType') + 1).setValue(data.taskType);
         sheet.getRange(row, headers.indexOf('questionText') + 1).setValue(data.questionText);
         sheet.getRange(row, headers.indexOf('pointsPossible') + 1).setValue(data.pointsPossible);
-
-        // Invalidate relevant cache keys
-        clearQuestionCacheFor(data.requestType, data.taskType);
-        clearCache('all_questions');
-
         return true;
       }
     }
   } else {
-    // 🆕 Create new question
+    // Create new question
     const newId = 'q_' + new Date().getTime();
     const setId = `${data.requestType}_${data.taskType}`;
     const createdBy = Session.getActiveUser().getEmail();
     const createdTimestamp = new Date().toISOString();
     const active = true;
 
-    const newRow = headers.map(header => {
+    const newRow = [];
+    headers.forEach(header => {
       switch (header) {
-        case 'id': return newId;
-        case 'sequenceId': return data.sequenceId;
-        case 'requestType': return data.requestType;
-        case 'taskType': return data.taskType;
-        case 'setId': return setId;
-        case 'questionText': return data.questionText;
-        case 'pointsPossible': return data.pointsPossible;
-        case 'createdBy': return createdBy;
-        case 'createdTimestamp': return createdTimestamp;
-        case 'active': return active;
-        default: return '';
+        case 'id': newRow.push(newId); break;
+        case 'sequenceId': newRow.push(data.sequenceId); break;
+        case 'requestType': newRow.push(data.requestType); break;
+        case 'taskType': newRow.push(data.taskType); break;
+        case 'setId': newRow.push(setId); break;
+        case 'questionText': newRow.push(data.questionText); break;
+        case 'pointsPossible': newRow.push(data.pointsPossible); break;
+        case 'createdBy': newRow.push(createdBy); break;
+        case 'createdTimestamp': newRow.push(createdTimestamp); break;
+        case 'active': newRow.push(active); break;
+        default: newRow.push('');
       }
     });
 
     sheet.appendRow(newRow);
-
-    // Invalidate relevant caches
-    clearQuestionCacheFor(data.requestType, data.taskType);
     clearCache('all_questions');
-
     return true;
   }
 }
 
 function getQuestionsBySet(requestType, taskType) {
-  const cacheKey = `questions_${requestType}_${taskType}`;
-  
-  // Optional caching layer for repeated access – uncomment to enable
-  const cached = CacheService.getScriptCache().get(cacheKey);
-  if (cached) return JSON.parse(cached);
-
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_QUESTIONS);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 
-  const idIdx = headers.indexOf('id');
-  const sequenceIdx = headers.indexOf('sequenceId');
-  const requestTypeIdx = headers.indexOf('requestType');
-  const taskTypeIdx = headers.indexOf('taskType');
-  const textIdx = headers.indexOf('questionText');
-  const pointsIdx = headers.indexOf('pointsPossible');
-  const activeIdx = headers.indexOf('active');
-
-  const results = data.slice(1)
+  const questions = data.slice(1)
+    .filter(row => row[headers.indexOf('active')])
     .filter(row =>
-      (row[activeIdx] === true || row[activeIdx] === 'true' || row[activeIdx] === 'TRUE') &&
-      row[requestTypeIdx] === requestType &&
-      row[taskTypeIdx] === taskType
+      row[headers.indexOf('requestType')] === requestType &&
+      row[headers.indexOf('taskType')] === taskType
     )
-    .sort((a, b) => a[sequenceIdx] - b[sequenceIdx])
+    .sort((a, b) => a[headers.indexOf('sequenceId')] - b[headers.indexOf('sequenceId')])
     .map(row => ({
-      id: row[idIdx],
-      sequenceId: row[sequenceIdx],
-      questionText: row[textIdx],
-      pointsPossible: row[pointsIdx]
+      id: row[headers.indexOf('id')],
+      sequenceId: row[headers.indexOf('sequenceId')],
+      setId: row[headers.indexOf('setId')],
+      requestType: row[headers.indexOf('requestType')],
+      taskType: row[headers.indexOf('taskType')],
+      questionText: row[headers.indexOf('questionText')],
+      pointsPossible: row[headers.indexOf('pointsPossible')],
+      active: row[headers.indexOf('active')]
     }));
 
-  // Optional caching
-  CacheService.getScriptCache().put(cacheKey, JSON.stringify(results), 300); // cache for 5 min
-
-  return results;
-}
-
-function clearQuestionCacheFor(requestType, taskType) {
-  const cacheKey = `questions_${requestType}_${taskType}`;
-  CacheService.getScriptCache().remove(cacheKey);
+  return questions;
 }
 
 function getQuestionById(id) {
@@ -1359,20 +1331,11 @@ function toggleQuestionActive(id, isActive) {
   const headers = data[0];
   const idIdx = headers.indexOf('id');
   const activeIdx = headers.indexOf('active');
-  const requestTypeIdx = headers.indexOf('requestType');
-  const taskTypeIdx = headers.indexOf('taskType');
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][idIdx] === id) {
-      // Perform the update
       sheet.getRange(i + 1, activeIdx + 1).setValue(isActive);
-
-      // Clear caches
-      const requestType = data[i][requestTypeIdx];
-      const taskType = data[i][taskTypeIdx];
-      clearQuestionCacheFor(requestType, taskType); // ✅ targeted
-      clearCache('all_questions'); // ✅ optional general fallback
-
+      clearCache('all_questions');
       return true;
     }
   }
