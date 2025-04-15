@@ -1162,23 +1162,29 @@ function loadDisputes() {
     tableBody.innerHTML = '';
 
     disputes.forEach(function(dispute) {
-      const row = document.createElement('tr');
+      const status = (dispute.status || '').toLowerCase();
+      const isResolved = ['upheld', 'overturned', 'partial overturn'].includes(status);
 
+      const actionButton = isResolved
+        ? `<button class="edit-resolution-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Edit Resolution</button>`
+        : `<button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Resolve Dispute</button>`;
+
+      const row = document.createElement('tr');
       row.innerHTML = `
         <td>Evaluation #${dispute.evalId}</td>
         <td>${dispute.userEmail}</td>
         <td>${formatDate(dispute.disputeTimestamp)}</td>
-        <td><span class="badge badge-${dispute.status}">${dispute.status}</span></td>
+        <td><span class="badge badge-${status}">${dispute.status}</span></td>
         <td>
           <button class="view-dispute-button btn btn-sm btn-secondary" data-dispute-id="${dispute.id}">View</button>
-          <button class="resolve-dispute-button btn btn-sm btn-primary" data-dispute-id="${dispute.id}">Resolve Dispute</button>
+          ${actionButton}
         </td>
       `;
 
       tableBody.appendChild(row);
     });
 
-    // Add listeners for View
+    // View button
     document.querySelectorAll('.view-dispute-button').forEach(button => {
       button.addEventListener('click', function () {
         const id = this.getAttribute('data-dispute-id');
@@ -1186,46 +1192,160 @@ function loadDisputes() {
       });
     });
 
-    // Add listeners for Resolve
+    // Resolve button
     document.querySelectorAll('.resolve-dispute-button').forEach(button => {
-  button.addEventListener('click', function () {
-    const button = this;
-    const disputeId = button.getAttribute('data-dispute-id');
+      button.addEventListener('click', function () {
+        const button = this;
+        const disputeId = button.getAttribute('data-dispute-id');
 
-    // 🌀 Show modal spinner while checking
-    const modal = document.getElementById('evaluateModal');
-    if (modal) modal.classList.remove('hidden');
+        const modal = document.getElementById('evaluateModal');
+        if (modal) modal.classList.remove('hidden');
 
-    google.script.run
-      .withSuccessHandler(function(result) {
-        if (modal) modal.classList.add('hidden');
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (modal) modal.classList.add('hidden');
+            const status = (result?.status || '').toLowerCase();
 
-        const status = (result?.status || '').toLowerCase();
+            if (['overturned', 'upheld', 'partial overturn'].includes(status)) {
+              showToast("This dispute has already been resolved.", 'warning');
+              loadDisputes();
+              return;
+            }
 
-        if (['overturned', 'upheld', 'partial overturn'].includes(status)) {
-          showToast("This dispute has already been resolved.", 'warning');
-          loadDisputes();
-          return;
-        }
+            if (status === 'reviewing') {
+              showToast("This dispute is currently being reviewed by another user.", 'warning');
+              loadDisputes();
+              return;
+            }
 
-        if (status === 'reviewing') {
-          showToast("This dispute is currently being reviewed by another user.", 'warning');
-          loadDisputes();
-          return;
-        }
+            resolveDispute(disputeId);
+          })
+          .withFailureHandler(function(error) {
+            if (modal) modal.classList.add('hidden');
+            console.error("Dispute status check failed:", error);
+            showToast("Unable to validate dispute status. Please try again.", 'error');
+          })
+          .checkDisputeReviewStatus(disputeId);
+      });
+    });
 
-        // ✅ Safe to open the form
-        resolveDispute(disputeId);
-      })
-      .withFailureHandler(function(error) {
-        if (modal) modal.classList.add('hidden');
-        console.error("Dispute status check failed:", error);
-        showToast("Unable to validate dispute status. Please try again.", 'error');
-      })
-      .checkDisputeReviewStatus(disputeId);
-  });
-});
+    // Edit Resolution button
+    document.querySelectorAll('.edit-resolution-button').forEach(button => {
+      button.addEventListener('click', function () {
+        const id = this.getAttribute('data-dispute-id');
+        editDisputeResolution(id); // We’ll define this function next
+      });
+    });
+
   }).getAllDisputes();
+}
+
+function editDisputeResolution(disputeId) {
+  hideAllViews();
+  const resolveDisputeView = document.getElementById('resolveDisputeView');
+  resolveDisputeView.classList.remove('hidden');
+  resolveDisputeView.innerHTML = '';
+
+  google.script.run.withSuccessHandler(function(data) {
+    const dispute = data.disputes.find(d => d.id === disputeId);
+    const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
+
+    if (!dispute || !evaluation) {
+      showToast("Dispute or evaluation not found.", 'error');
+      return;
+    }
+
+    // Normalize questionIds
+    if (typeof dispute.questionIds === 'string') {
+      dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
+    }
+
+    attachUnloadHandlerForDisputeResolution(dispute.id);
+    google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
+
+    resolveDisputeView.innerHTML = `
+      <div class="card">
+        <h2>Edit Dispute Resolution</h2>
+        <div id="resolveEvaluationDetails" class="mb-4">Loading...</div>
+
+        <form id="resolveDisputeForm">
+          <div id="resolveDisputeQuestions" class="questions-container mb-4">Loading questions...</div>
+
+          <div class="form-group mt-3">
+            <label for="resolutionNotes">General Notes (optional)</label>
+            <textarea id="resolutionNotes" name="resolutionNotes" rows="3" class="form-control">${dispute.resolutionNotes || ''}</textarea>
+          </div>
+
+          <div class="button-group">
+            <button type="button" id="cancelResolveDispute" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">Submit Resolution</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const form = document.getElementById('resolveDisputeForm');
+    form.setAttribute('data-eval-id', evaluation.id);
+    form.setAttribute('data-dispute-id', dispute.id);
+    form.addEventListener('submit', handleResolveDisputeSubmit);
+
+    document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+      google.script.run
+        .withSuccessHandler(() => {
+          showToast('Dispute status updated to pending.', 'success');
+          showDisputes();
+        })
+        .withFailureHandler(error => {
+          console.error('Error updating dispute status:', error);
+          showToast('Failed to update dispute status: ' + error.message, 'error');
+        })
+        .updateDisputeStatus(dispute.id, 'pending');
+    });
+
+    document.getElementById('resolveEvaluationDetails').innerHTML = `
+      <div class="grid-2">
+        <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
+        <div><p class="field-label">Task Type</p><p class="field-value">${formatTaskType(evaluation.taskType)}</p></div>
+        <div><p class="field-label">QA Agent</p><p class="field-value">${evaluation.qaEmail}</p></div>
+        <div><p class="field-label">Dispute Reason</p><p class="field-value">${dispute.reason}</p></div>
+      </div>
+    `;
+
+    const container = document.getElementById('resolveDisputeQuestions');
+    container.innerHTML = '';
+
+    evaluation.questions.forEach(q => {
+      const qid = String(q.questionId).trim();
+      const isDisputed = dispute.questionIds.includes(qid);
+      const highlightClass = isDisputed ? 'highlight-no' : '';
+
+      const card = document.createElement('div');
+      card.className = `question-card ${highlightClass}`;
+      card.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="resolution_${qid}" value="upheld" ${q.response === 'no' ? 'checked' : ''}>
+              <span>Uphold</span>
+            </label>
+            <label>
+              <input type="radio" name="resolution_${qid}" value="overturned" ${q.response === 'yes' ? 'checked' : ''}>
+              <span>Overturn</span>
+            </label>
+          </div>
+          <div class="form-group mt-2">
+            <label for="note_${qid}">Justification (required if Upheld)</label>
+            <textarea class="form-control" id="note_${qid}" name="note_${qid}" rows="2">${q.feedback || ''}</textarea>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }).getAllEvaluationsAndDisputes();
 }
 
 function viewDispute(disputeId) {
