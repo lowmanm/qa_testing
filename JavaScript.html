@@ -526,19 +526,23 @@ function showAuditQueue() {
 
 function loadPendingTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
-  
-  // ✅ Ensure this reflects correct column count (7 for auditId, agent, task, ref, date, status, action)
+  const statusMessage = document.getElementById('auditStatusMessage');
+
+  // ✅ Reset table + message immediately
   tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
+  if (statusMessage) statusMessage.textContent = '';
 
   google.script.run.withSuccessHandler(function(audits) {
     if (!Array.isArray(audits)) {
       console.error('Unexpected result from getPendingAudits:', audits);
       tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
+      if (statusMessage) statusMessage.textContent = 'Error loading audits.';
       return;
     }
 
     if (audits.length === 0) {
       tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500">No pending audits found</td></tr>';
+      if (statusMessage) statusMessage.textContent = 'No pending audits.';
       return;
     }
 
@@ -614,7 +618,6 @@ function loadPendingTasks() {
         })
         .withFailureHandler(function(error) {
           document.getElementById('evaluateModal')?.classList.add('hidden');
-
           console.error('Error checking evaluation status:', error);
           showToast("Failed to verify evaluation status. Please try again.", "error");
 
@@ -640,15 +643,18 @@ function hideEvaluateModal() {
 
 function loadErrorTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
+  const statusMessage = document.getElementById('auditStatusMessage');
 
-  // ✅ Clear the body and display a proper loading row (7 columns to match table)
+  // ✅ Clear body and status
   tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading errors...</td></tr>';
+  if (statusMessage) statusMessage.textContent = '';
 
   google.script.run.withSuccessHandler(function(audits) {
     const misconfigured = audits.filter(a => a.auditStatus === 'misconfigured');
 
     if (misconfigured.length === 0) {
       tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500">No misconfigured audits</td></tr>';
+      if (statusMessage) statusMessage.textContent = 'No misconfigured audits.';
       return;
     }
 
@@ -675,6 +681,7 @@ function loadErrorTasks() {
     // ✅ Clear loading row and insert fragment
     tableBody.innerHTML = '';
     tableBody.appendChild(fragment);
+    if (statusMessage) statusMessage.textContent = '';
   }).getAllAudits();
 }
 
