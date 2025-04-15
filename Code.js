@@ -898,26 +898,41 @@ function saveDispute(dispute) {
 }
 
 function checkDisputeReviewStatus(disputeId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('disputesQueue');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISPUTES_QUEUE);
+    if (!sheet) return { success: false, reason: 'Sheet not found' };
 
-  const idIdx = headers.indexOf('id');
-  const statusIdx = headers.indexOf('status');
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length < 2) return { success: false, reason: 'No data available' };
 
-  if (idIdx === -1 || statusIdx === -1) return { success: false, reason: 'Missing columns' };
+    const headers = data[0];
+    const idIdx = headers.indexOf('id');
+    const statusIdx = headers.indexOf('status');
 
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idIdx] === disputeId) {
-      const status = (data[i][statusIdx] || '').toLowerCase();
-      const isLocked = status === 'reviewing';
-      const isResolved = ['overturned', 'upheld', 'partial overturn'].includes(status);
-
-      return { success: !isLocked && !isResolved, status };
+    if (idIdx === -1 || statusIdx === -1) {
+      return { success: false, reason: 'Missing required columns: id or status' };
     }
-  }
 
-  return { success: false, reason: 'Dispute not found' };
+    for (let i = 1; i < data.length; i++) {
+      const rowId = data[i][idIdx];
+      if (rowId === disputeId) {
+        const status = String(data[i][statusIdx] || '').toLowerCase();
+        const isLocked = status === 'reviewing';
+        const isResolved = ['overturned', 'upheld', 'partial overturn'].includes(status);
+
+        return { 
+          success: !isLocked && !isResolved, // Only allow proceed if it's not locked or resolved
+          status: status
+        };
+      }
+    }
+
+    return { success: false, reason: 'Dispute not found' };
+
+  } catch (err) {
+    console.error('checkDisputeReviewStatus failed:', err);
+    return { success: false, reason: 'Unexpected error occurred' };
+  }
 }
 
 /**
