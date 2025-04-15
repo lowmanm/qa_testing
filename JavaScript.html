@@ -1368,23 +1368,30 @@ function handleEditDisputeResolutionSubmit(e) {
 
   const questionCards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
   const decisions = [];
-
   let overturnCount = 0;
+  let totalPoints = 0;
+  let totalPossible = 0;
 
-  let summaryHTML = `<ul style="padding-left: 20px;">`;
+  let summaryHTML = `<div class="mb-3">`;
 
   questionCards.forEach(card => {
     const questionId = card.querySelector('input[type="radio"]')?.name.replace('edit_', '');
     const questionText = card.querySelector('.question-text')?.textContent || '';
+    const points = parseInt(card.querySelector('.question-points')?.textContent.match(/\d+$/)?.[0]) || 0;
     const selectedInput = card.querySelector(`input[name="edit_${questionId}"]:checked`);
     const note = document.getElementById(`editNote_${questionId}`)?.value.trim() || '';
 
     if (!selectedInput) return;
 
     const resolution = selectedInput.value;
+    const wasDisputed = card.classList.contains('highlight-no');
     const label = resolution === 'yes' ? 'Overturn' : 'Uphold';
 
-    if (resolution === 'yes') overturnCount++;
+    if (resolution === 'yes') {
+      overturnCount++;
+      totalPoints += points;
+    }
+    totalPossible += points;
 
     decisions.push({
       questionId,
@@ -1392,16 +1399,24 @@ function handleEditDisputeResolutionSubmit(e) {
       note
     });
 
-    summaryHTML += `<li><strong>${label}:</strong> ${questionText}${note ? ` <br><em>Note:</em> ${note}` : ''}</li>`;
+    summaryHTML += `
+      <div class="card mb-2" style="background: ${wasDisputed ? '#fef3f2' : '#f9fafb'};">
+        <strong>${label}:</strong> ${questionText}<br>
+        ${note ? `<em>Note:</em> ${note}` : ''}
+        ${wasDisputed ? `<div class="badge badge-disputed mt-1">Disputed Question</div>` : ''}
+      </div>
+    `;
   });
 
-  summaryHTML += `</ul>`;
+  summaryHTML += `</div>`;
   summaryHTML += `<p><strong>General Notes:</strong> ${resolutionNotes || 'None'}</p>`;
 
   const total = decisions.length;
   let status = 'upheld';
   if (overturnCount === total && total > 0) status = 'overturned';
   else if (overturnCount > 0) status = 'partial overturn';
+
+  const percentage = totalPossible > 0 ? Math.round((totalPoints / totalPossible) * 100) : 0;
 
   const resolutionData = {
     disputeId,
@@ -1411,25 +1426,25 @@ function handleEditDisputeResolutionSubmit(e) {
     status
   };
 
-  // Show modal
-  const summaryModal = document.getElementById('resolutionSummaryModal');
+  // Inject summary content
+  const modal = document.getElementById('resolutionSummaryModal');
   const summaryContent = document.getElementById('summaryContent');
-  if (summaryModal && summaryContent) {
-    summaryContent.innerHTML = `
-      ${summaryHTML}
-      <p><strong>Final Status:</strong> ${status}</p>
-    `;
-    summaryModal.classList.remove('hidden');
+  const scorePreview = document.getElementById('summaryScorePreview');
+
+  if (modal && summaryContent && scorePreview) {
+    summaryContent.innerHTML = summaryHTML + `<p><strong>Final Status:</strong> ${status}</p>`;
+    scorePreview.innerHTML = `${totalPoints}/${totalPossible} (${percentage}%)`;
+    modal.classList.remove('hidden');
   }
 
-  // Attach button handlers
+  // Attach modal buttons
   document.getElementById('confirmResolutionSubmit').onclick = () => {
-    summaryModal.classList.add('hidden');
+    modal.classList.add('hidden');
     submitEditedResolution(form, resolutionData);
   };
 
   document.getElementById('cancelResolutionSubmit').onclick = () => {
-    summaryModal.classList.add('hidden');
+    modal.classList.add('hidden');
   };
 }
 
