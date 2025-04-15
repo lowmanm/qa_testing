@@ -1315,36 +1315,46 @@ function editDisputeResolution(disputeId) {
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
-      const qid = String(q.questionId).trim();
-      const isDisputed = dispute.questionIds.includes(qid);
-      const highlightClass = isDisputed ? 'highlight-no' : '';
+  const qid = String(q.questionId).trim();
+  const isDisputed = dispute.questionIds.includes(qid);
+  const highlightClass = q.response === 'no' ? 'highlight-no' : '';
 
-      const card = document.createElement('div');
-      card.className = `question-card ${highlightClass}`;
-      card.innerHTML = `
-        <div class="question-header">
-          <h3 class="question-text">${q.questionText}</h3>
-          <span class="question-points">Original: ${q.pointsEarned}/${q.pointsPossible}</span>
-        </div>
-        <div class="question-body">
-          <div class="radio-group">
-            <label>
-              <input type="radio" name="resolution_${qid}" value="upheld" ${q.response === 'no' ? 'checked' : ''}>
-              <span>Uphold</span>
-            </label>
-            <label>
-              <input type="radio" name="resolution_${qid}" value="overturned" ${q.response === 'yes' ? 'checked' : ''}>
-              <span>Overturn</span>
-            </label>
-          </div>
-          <div class="form-group mt-2">
-            <label for="note_${qid}">Justification (required if Upheld)</label>
-            <textarea class="form-control" id="note_${qid}" name="note_${qid}" rows="2">${q.feedback || ''}</textarea>
-          </div>
-        </div>
-      `;
-      container.appendChild(card);
-    });
+  const currentResponse = String(q.response || '').toLowerCase();
+  const yesChecked = currentResponse === 'yes' ? 'checked' : '';
+  const noChecked = currentResponse === 'no' ? 'checked' : '';
+
+  const card = document.createElement('div');
+  card.className = `question-card ${highlightClass}`;
+  card.innerHTML = `
+    <div class="question-header">
+      <h3 class="question-text">${q.questionText}</h3>
+      <span class="question-points">Current: ${q.pointsEarned}/${q.pointsPossible}</span>
+    </div>
+    <div class="question-body">
+      <div class="radio-group">
+        <label>
+          <input type="radio" name="edit_${qid}" value="yes" ${yesChecked}>
+          <span>Yes</span>
+        </label>
+        <label>
+          <input type="radio" name="edit_${qid}" value="no" ${noChecked}>
+          <span>No</span>
+        </label>
+      </div>
+
+      ${isDisputed ? `
+        <div class="alert alert-info mt-2">
+          This question was previously part of a dispute resolution.
+        </div>` : ''}
+
+      <div class="form-group mt-2">
+        <label for="editNote_${qid}">Optional Notes</label>
+        <textarea class="form-control" id="editNote_${qid}" name="editNote_${qid}" rows="2">${q.feedback || ''}</textarea>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+});
   }).getAllEvaluationsAndDisputes();
 }
 
@@ -1356,61 +1366,67 @@ function handleEditDisputeResolutionSubmit(e) {
   const disputeId = form.getAttribute('data-dispute-id');
   const resolutionNotes = document.getElementById('resolutionNotes')?.value.trim() || '';
 
+  const questionCards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
   const decisions = [];
+
   let overturnCount = 0;
 
-  const questionCards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
-  for (const card of questionCards) {
-    const radioInputs = card.querySelectorAll('input[type="radio"]');
-    if (!radioInputs.length) continue;
+  questionCards.forEach(card => {
+    const questionId = card.querySelector('input[type="radio"]')?.name.replace('edit_', '');
+    if (!questionId) return;
 
-    const questionId = radioInputs[0].name.replace('resolution_', '');
-    const selected = card.querySelector(`input[name="resolution_${questionId}"]:checked`);
-    const note = card.querySelector(`#note_${questionId}`)?.value.trim() || '';
+    const selectedInput = card.querySelector(`input[name="edit_${questionId}"]:checked`);
+    const note = document.getElementById(`editNote_${questionId}`)?.value.trim() || '';
 
-    if (!selected) {
-      showToast("Please select a resolution for all questions.", 'warning');
+    if (!selectedInput) {
+      showToast("Please select 'Yes' or 'No' for all questions.", "warning");
       return;
     }
 
-    if (selected.value === 'upheld' && !note) {
-      showToast("Justification is required when upholding a question.", 'warning');
-      return;
-    }
+    const selectedValue = selectedInput.value;
 
-    if (selected.value === 'overturned') overturnCount++;
+    if (selectedValue === 'yes') overturnCount++;
 
-    decisions.push({ questionId, resolution: selected.value, note });
-  }
+    decisions.push({
+      questionId,
+      resolution: selectedValue === 'yes' ? 'overturned' : 'upheld',
+      note
+    });
+  });
 
   const total = decisions.length;
   let status = 'upheld';
   if (overturnCount === total && total > 0) status = 'overturned';
   else if (overturnCount > 0) status = 'partial overturn';
 
-  const resolutionData = { disputeId, evalId, resolutionNotes, decisions, status };
+  const resolutionData = {
+    disputeId,
+    evalId,
+    resolutionNotes,
+    decisions,
+    status
+  };
 
-  // Disable form and show modal
-  form.classList.add('disabled');
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="spinner"></span>Submitting...`;
+    submitBtn.innerHTML = `<span class="spinner"></span>Saving...`;
   }
+  form.classList.add('disabled');
   document.getElementById('evaluateModal')?.classList.remove('hidden');
 
-  // ✅ Submit update (no status check needed here — it's already resolved)
+  // ✅ Submit update
   google.script.run
     .withSuccessHandler(() => {
       document.getElementById('evaluateModal')?.classList.add('hidden');
-      showToast("Dispute resolution updated successfully.", "success");
+      showToast("Resolution updated successfully.", "success");
       removeUnloadHandlerForDisputeResolution();
       showDisputes();
     })
     .withFailureHandler(error => {
-      document.getElementById('evaluateModal')?.classList.add('hidden');
-      console.error("Error updating resolution:", error);
+      console.error("Resolution update failed:", error);
       showToast("Failed to update resolution: " + error.message, "error");
+      document.getElementById('evaluateModal')?.classList.add('hidden');
       form.classList.remove('disabled');
       if (submitBtn) {
         submitBtn.disabled = false;
