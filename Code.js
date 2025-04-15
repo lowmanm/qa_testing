@@ -699,31 +699,16 @@ function saveEvaluation(data) {
 
   const evalId = 'eval' + Date.now();
   const stopTime = new Date().toISOString();
-  const score = data.totalPoints / data.totalPointsPossible;
+  const qaEmail = data.qaEmail || Session.getActiveUser().getEmail();
 
-  evalSheet.appendRow([
-    evalId,
-    data.evalId || data.auditId,
-    data.referenceNumber,
-    data.taskType,
-    data.outcome,
-    data.qaEmail || Session.getActiveUser().getEmail(),
-    data.startTimestamp || new Date().toISOString(),
-    stopTime,
-    data.totalPoints,
-    data.totalPointsPossible,
-    data.status || 'completed',
-    data.feedback || '',
-    score
-  ]);
-
+  // Step 1: Write to evalQuest first
   const questRows = data.questions.map((q, i) => [
     `${evalId}-q${i + 1}`,
     evalId,
     q.questionId,
     q.questionText,
     q.response,
-    q.pointsEarned,
+    q.response === 'yes' ? q.pointsPossible : 0,
     q.pointsPossible,
     q.feedback || ''
   ]);
@@ -732,22 +717,46 @@ function saveEvaluation(data) {
     questSheet.getRange(questSheet.getLastRow() + 1, 1, questRows.length, 8).setValues(questRows);
   }
 
+  // Step 2: Recalculate totals dynamically
+  const totalPoints = questRows.reduce((sum, row) => sum + (parseFloat(row[5]) || 0), 0);
+  const totalPossible = questRows.reduce((sum, row) => sum + (parseFloat(row[6]) || 0), 0);
+  const evalScore = totalPossible > 0 ? totalPoints / totalPossible : 0;
+
+  // Step 3: Write to evalSummary
+  evalSheet.appendRow([
+    evalId,
+    data.evalId || data.auditId,
+    data.referenceNumber,
+    data.taskType,
+    data.outcome,
+    qaEmail,
+    data.startTimestamp || new Date().toISOString(),
+    stopTime,
+    totalPoints,
+    totalPossible,
+    'completed',
+    data.feedback || '',
+    evalScore
+  ]);
+
+  // Step 4: Mark audit as evaluated
   updateAuditStatus(data.evalId || data.auditId, 'evaluated');
   clearCache(['all_evaluations', 'all_audits', 'pending_audits']);
 
-
+  // Step 5: Trigger email and return payload
   const evaluation = {
     id: evalId,
     ...data,
     stopTimestamp: stopTime,
-    evalScore: score,
+    evalScore,
+    totalPoints,
+    totalPointsPossible: totalPossible,
+    status: 'completed',
+    qaEmail,
     questions: data.questions
   };
 
-  // ✅ Send the notification
   sendEvaluationNotification(evaluation);
-
-  // ✅ Return the evaluation object
   return evaluation;
 }
 
