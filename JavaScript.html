@@ -1348,6 +1348,78 @@ function editDisputeResolution(disputeId) {
   }).getAllEvaluationsAndDisputes();
 }
 
+function handleEditDisputeResolutionSubmit(e) {
+  e.preventDefault();
+
+  const form = e.target;
+  const evalId = form.getAttribute('data-eval-id');
+  const disputeId = form.getAttribute('data-dispute-id');
+  const resolutionNotes = document.getElementById('resolutionNotes')?.value.trim() || '';
+
+  const decisions = [];
+  let overturnCount = 0;
+
+  const questionCards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
+  for (const card of questionCards) {
+    const radioInputs = card.querySelectorAll('input[type="radio"]');
+    if (!radioInputs.length) continue;
+
+    const questionId = radioInputs[0].name.replace('resolution_', '');
+    const selected = card.querySelector(`input[name="resolution_${questionId}"]:checked`);
+    const note = card.querySelector(`#note_${questionId}`)?.value.trim() || '';
+
+    if (!selected) {
+      showToast("Please select a resolution for all questions.", 'warning');
+      return;
+    }
+
+    if (selected.value === 'upheld' && !note) {
+      showToast("Justification is required when upholding a question.", 'warning');
+      return;
+    }
+
+    if (selected.value === 'overturned') overturnCount++;
+
+    decisions.push({ questionId, resolution: selected.value, note });
+  }
+
+  const total = decisions.length;
+  let status = 'upheld';
+  if (overturnCount === total && total > 0) status = 'overturned';
+  else if (overturnCount > 0) status = 'partial overturn';
+
+  const resolutionData = { disputeId, evalId, resolutionNotes, decisions, status };
+
+  // Disable form and show modal
+  form.classList.add('disabled');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner"></span>Submitting...`;
+  }
+  document.getElementById('evaluateModal')?.classList.remove('hidden');
+
+  // ✅ Submit update (no status check needed here — it's already resolved)
+  google.script.run
+    .withSuccessHandler(() => {
+      document.getElementById('evaluateModal')?.classList.add('hidden');
+      showToast("Dispute resolution updated successfully.", "success");
+      removeUnloadHandlerForDisputeResolution();
+      showDisputes();
+    })
+    .withFailureHandler(error => {
+      document.getElementById('evaluateModal')?.classList.add('hidden');
+      console.error("Error updating resolution:", error);
+      showToast("Failed to update resolution: " + error.message, "error");
+      form.classList.remove('disabled');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Resolution';
+      }
+    })
+    .resolveDispute(resolutionData);
+}
+
 function viewDispute(disputeId) {
   hideAllViews();
   document.getElementById('resolveDisputeView').classList.remove('hidden');
