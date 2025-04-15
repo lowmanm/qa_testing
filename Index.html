@@ -451,10 +451,22 @@
 
 <!-- Review Summary Modal -->
 <div id="resolutionSummaryModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Review Resolution Summary</h3>
-    <div id="summaryContent" style="text-align: left; margin-top: 10px;"></div>
-    <div class="button-group mt-3">
+  <div class="modal-content" style="max-width: 600px; padding: 1.5rem;">
+    <h3 style="margin-bottom: 0.5rem;">Review Resolution Summary</h3>
+    <p class="text-center" style="margin-bottom: 1rem; color: #6b7280;">
+      Please confirm the resolution updates below.
+    </p>
+    
+    <div id="summaryContent" style="text-align: left; max-height: 400px; overflow-y: auto;"></div>
+
+    <div class="stats-container mt-3">
+      <div class="stat-card">
+        <h3>Updated Score</h3>
+        <div class="stat-value" id="summaryScorePreview">—</div>
+      </div>
+    </div>
+
+    <div class="button-group mt-4">
       <button id="confirmResolutionSubmit" class="btn btn-primary">Confirm & Submit</button>
       <button id="cancelResolutionSubmit" class="btn btn-secondary">Cancel</button>
     </div>
