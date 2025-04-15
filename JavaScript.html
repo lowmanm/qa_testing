@@ -1287,7 +1287,7 @@ function editDisputeResolution(disputeId) {
     const form = document.getElementById('resolveDisputeForm');
     form.setAttribute('data-eval-id', evaluation.id);
     form.setAttribute('data-dispute-id', dispute.id);
-    form.addEventListener('submit', handleResolveDisputeSubmit);
+    form.addEventListener('submit', handleEditDisputeResolutionSubmit);
 
     document.getElementById('cancelResolveDispute').addEventListener('click', function () {
       google.script.run
