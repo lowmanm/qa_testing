@@ -74,10 +74,10 @@
       <div id="auditQueueView" class="hidden">
   <h2 class="mb-3">Audit Queue</h2>
 
-  <div class="audit-tabs mb-3">
-    <button id="tabPendingAudits" class="tab active">Pending Audits</button>
-    <button id="tabErrorAudits" class="tab">Errors</button>
-  </div>
+<div class="audit-tabs mb-3">
+  <button id="tabPendingAudits" class="tab active" data-tab="pending">Pending Audits</button>
+  <button id="tabErrorAudits" class="tab" data-tab="error">Errors</button>
+</div>
 
   <div class="card">
     <div class="table-responsive">
@@ -97,6 +97,7 @@
           <!-- Populated dynamically by JS -->
         </tbody>
       </table>
+      <div id="auditStatusMessage" class="text-center text-gray-500 mt-3"></div>
     </div>
   </div>
 </div>
