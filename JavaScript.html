@@ -900,7 +900,7 @@ function handleEvaluationSubmit(e) {
     questions
   };
 
-  // UI: disable form and show modal
+  // UI: disable form and show loading
   form.classList.add('hidden');
   submitButton.disabled = true;
 
@@ -910,31 +910,30 @@ function handleEvaluationSubmit(e) {
   loading.innerText = 'Saving evaluation...';
   document.getElementById('evaluationFormView')?.appendChild(loading);
 
-  // ✅ Check if audit was already evaluated
+  // ✅ Live check for existing evaluation
   google.script.run
     .withSuccessHandler(alreadyEvaluated => {
       if (alreadyEvaluated) {
         showToast("This audit has already been evaluated.", 'warning');
         restoreEvaluationUI();
-        loadPendingTasks(); // ✅ Only refresh the table
+        showAuditQueue(); // ✅ back to refreshed queue
         return;
       }
 
       // ✅ Safe to save
       google.script.run
         .withSuccessHandler(() => {
-  updateAuditStatusAndLock(auditId, 'evaluated')
-    .then(() => {
-      clearInterval(window.auditHeartbeat);
-      window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
-      delete window.boundUnloadUnlockHandler;
+          updateAuditStatusAndLock(auditId, 'evaluated')
+            .then(() => {
+              clearInterval(window.auditHeartbeat);
+              window.removeEventListener('beforeunload', window.boundUnloadUnlockHandler);
+              delete window.boundUnloadUnlockHandler;
 
-      showToast("Evaluation submitted successfully!", 'success');
-      resetEvaluationForm();
-      document.getElementById('evaluationFormView')?.classList.add('hidden'); // ✅ hide form
-      showAuditQueue(); // ✅ redirect to updated audit queue
-    })
-
+              showToast("Evaluation submitted successfully!", 'success');
+              resetEvaluationForm();
+              document.getElementById('evaluationFormView')?.classList.add('hidden'); // ✅ hide on success
+              showAuditQueue(); // ✅ return to refreshed queue
+            })
             .catch(error => {
               console.error('Error unlocking audit:', error);
               showToast("Evaluation saved, but failed to unlock audit.", 'warning');
@@ -955,13 +954,11 @@ function handleEvaluationSubmit(e) {
     })
     .checkIfAlreadyEvaluated(auditId);
 
-  // ✅ Helper to reset UI state
-    function restoreEvaluationUI() {
-      const loading = document.getElementById('evaluationLoadingIndicator');
-      if (loading) loading.remove();
-      submitButton.disabled = false;
-    // form.classList.remove('hidden'); // kept intentionally removed
-    }
+  function restoreEvaluationUI() {
+    document.getElementById('evaluationLoadingIndicator')?.remove();
+    submitButton.disabled = false;
+    form.classList.remove('hidden'); // ✅ Important to re-show on error
+  }
 }
 
 function resetEvaluationForm() {
