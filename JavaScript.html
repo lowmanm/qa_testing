@@ -2,6 +2,8 @@
 let currentUserEmail = '';
 let activeDisputeEvalId = null;
 let activeDisputeResolutionId = null;
+let currentAuditTab = 'pending';
+
 
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -131,16 +133,26 @@ function attachAuditTabHandlers() {
   const tabPending = document.getElementById('tabPendingAudits');
   const tabError = document.getElementById('tabErrorAudits');
 
+  if (!tabPending || !tabError) return;
+
   tabPending.addEventListener('click', () => {
+    if (currentAuditTab === 'pending') return;
+
+    currentAuditTab = 'pending';
     tabPending.classList.add('active');
     tabError.classList.remove('active');
-    loadPendingTasks(); // show pending audits
+
+    loadPendingTasks();
   });
 
   tabError.addEventListener('click', () => {
+    if (currentAuditTab === 'error') return;
+
+    currentAuditTab = 'error';
     tabError.classList.add('active');
     tabPending.classList.remove('active');
-    loadErrorTasks(); // show misconfigured audits
+
+    loadErrorTasks();
   });
 }
 
@@ -525,14 +537,18 @@ function showAuditQueue() {
 }
 
 function loadPendingTasks() {
+  currentAuditTab = 'pending'; // ✅ Track tab state
   const tableBody = document.getElementById('pendingTasksBody');
   const statusMessage = document.getElementById('auditStatusMessage');
 
-  // ✅ Reset table + message immediately
-  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
-  if (statusMessage) statusMessage.textContent = '';
+  // 🌀 Show loading state
+  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading pending audits...</td></tr>';
+  if (statusMessage) statusMessage.textContent = 'Loading pending audits...';
 
   google.script.run.withSuccessHandler(function(audits) {
+    // 🛑 Skip if tab switched before data returned
+    if (currentAuditTab !== 'pending') return;
+
     if (!Array.isArray(audits)) {
       console.error('Unexpected result from getPendingAudits:', audits);
       tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
@@ -581,6 +597,7 @@ function loadPendingTasks() {
 
     tableBody.innerHTML = '';
     tableBody.appendChild(fragment);
+    if (statusMessage) statusMessage.textContent = ''; // ✅ Clear loading msg
   }).getPendingAudits();
 
   // ✅ Ensure we only attach the event listener once
@@ -595,7 +612,6 @@ function loadPendingTasks() {
       const allButtons = document.querySelectorAll('.evaluate-button');
       allButtons.forEach(btn => btn.disabled = true);
 
-      // ✅ Set modal message dynamically
       document.getElementById('evaluateModalMessage').textContent = 'Validating record availability...';
       document.getElementById('evaluateModal')?.classList.remove('hidden');
 
@@ -642,13 +658,17 @@ function hideEvaluateModal() {
 }
 
 function loadErrorTasks() {
+  currentAuditTab = 'error'; // ✅ Track current tab
   const tableBody = document.getElementById('pendingTasksBody');
   const statusMessage = document.getElementById('auditStatusMessage');
 
-  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading errors...</td></tr>';
-  if (statusMessage) statusMessage.textContent = '';
+  // 🌀 Loading placeholder
+  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading error audits...</td></tr>';
+  if (statusMessage) statusMessage.textContent = 'Loading error audits...';
 
   google.script.run.withSuccessHandler(function(audits) {
+    if (currentAuditTab !== 'error') return; // 🛑 Prevent race condition
+
     const misconfigured = audits.filter(a => a.auditStatus === 'misconfigured');
 
     if (misconfigured.length === 0) {
@@ -662,7 +682,7 @@ function loadErrorTasks() {
     misconfigured.forEach(function(audit) {
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td><code>${audit.auditId || 'N/A'}</code></td>
+        <td><code>${audit.auditId || audit.id || 'N/A'}</code></td>
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
