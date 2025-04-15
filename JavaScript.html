@@ -1371,28 +1371,32 @@ function handleEditDisputeResolutionSubmit(e) {
 
   let overturnCount = 0;
 
+  let summaryHTML = `<ul style="padding-left: 20px;">`;
+
   questionCards.forEach(card => {
     const questionId = card.querySelector('input[type="radio"]')?.name.replace('edit_', '');
-    if (!questionId) return;
-
+    const questionText = card.querySelector('.question-text')?.textContent || '';
     const selectedInput = card.querySelector(`input[name="edit_${questionId}"]:checked`);
     const note = document.getElementById(`editNote_${questionId}`)?.value.trim() || '';
 
-    if (!selectedInput) {
-      showToast("Please select 'Yes' or 'No' for all questions.", "warning");
-      return;
-    }
+    if (!selectedInput) return;
 
-    const selectedValue = selectedInput.value;
+    const resolution = selectedInput.value;
+    const label = resolution === 'yes' ? 'Overturn' : 'Uphold';
 
-    if (selectedValue === 'yes') overturnCount++;
+    if (resolution === 'yes') overturnCount++;
 
     decisions.push({
       questionId,
-      resolution: selectedValue === 'yes' ? 'overturned' : 'upheld',
+      resolution: resolution === 'yes' ? 'overturned' : 'upheld',
       note
     });
+
+    summaryHTML += `<li><strong>${label}:</strong> ${questionText}${note ? ` <br><em>Note:</em> ${note}` : ''}</li>`;
   });
+
+  summaryHTML += `</ul>`;
+  summaryHTML += `<p><strong>General Notes:</strong> ${resolutionNotes || 'None'}</p>`;
 
   const total = decisions.length;
   let status = 'upheld';
@@ -1407,15 +1411,37 @@ function handleEditDisputeResolutionSubmit(e) {
     status
   };
 
+  // Show modal
+  const summaryModal = document.getElementById('resolutionSummaryModal');
+  const summaryContent = document.getElementById('summaryContent');
+  if (summaryModal && summaryContent) {
+    summaryContent.innerHTML = `
+      ${summaryHTML}
+      <p><strong>Final Status:</strong> ${status}</p>
+    `;
+    summaryModal.classList.remove('hidden');
+  }
+
+  // Attach button handlers
+  document.getElementById('confirmResolutionSubmit').onclick = () => {
+    summaryModal.classList.add('hidden');
+    submitEditedResolution(form, resolutionData);
+  };
+
+  document.getElementById('cancelResolutionSubmit').onclick = () => {
+    summaryModal.classList.add('hidden');
+  };
+}
+
+function submitEditedResolution(form, resolutionData) {
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="spinner"></span>Saving...`;
+    submitBtn.innerHTML = `<span class="spinner"></span>Submitting...`;
   }
   form.classList.add('disabled');
   document.getElementById('evaluateModal')?.classList.remove('hidden');
 
-  // ✅ Submit update
   google.script.run
     .withSuccessHandler(() => {
       document.getElementById('evaluateModal')?.classList.add('hidden');
