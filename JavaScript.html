@@ -71,11 +71,22 @@ function removeUnloadHandlerForDisputeResolution() {
     delete window.handleDisputeResolutionUnload;
   }
 
-  if (activeDisputeResolutionId) {
+    if (activeDisputeResolutionId) {
+    const idToReset = activeDisputeResolutionId;
     const statusToRestore = window.originalDisputeStatus || 'pending';
+  
     google.script.run
-      .withFailureHandler(err => console.warn('Immediate reset failed:', err))
-      .updateDisputeStatus(activeDisputeResolutionId, statusToRestore);
+      .withSuccessHandler(serverStatus => {
+        const current = (serverStatus || '').toLowerCase();
+        if (current === 'reviewing') {
+          google.script.run
+            .withFailureHandler(err => console.warn('Reset failed:', err))
+            .updateDisputeStatus(idToReset, statusToRestore);
+        }
+      })
+      .withFailureHandler(err => console.warn('Status check failed:', err))
+      .checkDisputeReviewStatus(idToReset);
+  
     activeDisputeResolutionId = null;
     delete window.originalDisputeStatus;
   }
@@ -1912,10 +1923,11 @@ document.getElementById('cancelResolveDispute').addEventListener('click', functi
     modal.classList.remove('hidden');
   }
 
-  google.script.run
+    google.script.run
     .withSuccessHandler(() => {
       modal?.classList.add('hidden');
       showToast(`Dispute status restored to "${originalStatus}".`, 'info');
+      removeUnloadHandlerForDisputeResolution(); // 👈 Add this here
       showDisputes();
     })
     .withFailureHandler(error => {
