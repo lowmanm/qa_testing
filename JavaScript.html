@@ -526,17 +526,19 @@ function showAuditQueue() {
 
 function loadPendingTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
+  
+  // ✅ Ensure this reflects correct column count (7 for auditId, agent, task, ref, date, status, action)
   tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
 
   google.script.run.withSuccessHandler(function(audits) {
     if (!Array.isArray(audits)) {
       console.error('Unexpected result from getPendingAudits:', audits);
-      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-red-500">Error loading audits. Please try again later.</td></tr>';
       return;
     }
 
     if (audits.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">No pending audits found</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500">No pending audits found</td></tr>';
       return;
     }
 
@@ -577,7 +579,7 @@ function loadPendingTasks() {
     tableBody.appendChild(fragment);
   }).getPendingAudits();
 
-  // ✅ Attach the event listener just once
+  // ✅ Ensure we only attach the event listener once
   if (!tableBody.hasListenerAttached) {
     tableBody.addEventListener('click', function(event) {
       if (!event.target.classList.contains('evaluate-button')) return;
@@ -586,11 +588,10 @@ function loadPendingTasks() {
       const auditId = clickedButton.getAttribute('data-audit-id');
       const originalHTML = clickedButton.innerHTML;
 
-      // Disable all evaluate buttons
       const allButtons = document.querySelectorAll('.evaluate-button');
       allButtons.forEach(btn => btn.disabled = true);
 
-      // ✅ Set dynamic modal message
+      // ✅ Set modal message dynamically
       document.getElementById('evaluateModalMessage').textContent = 'Validating record availability...';
       document.getElementById('evaluateModal')?.classList.remove('hidden');
 
@@ -639,6 +640,8 @@ function hideEvaluateModal() {
 
 function loadErrorTasks() {
   const tableBody = document.getElementById('pendingTasksBody');
+
+  // ✅ Clear the body and display a proper loading row (7 columns to match table)
   tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading errors...</td></tr>';
 
   google.script.run.withSuccessHandler(function(audits) {
@@ -649,27 +652,15 @@ function loadErrorTasks() {
       return;
     }
 
-    // Inject table header if needed (optional if using fixed header elsewhere)
-    tableBody.innerHTML = `
-      <tr>
-        <th>Agent</th>
-        <th>Task Type</th>
-        <th>Reference</th>
-        <th>Audit ID</th>
-        <th>Timestamp</th>
-        <th>Status</th>
-        <th>Action</th>
-      </tr>
-    `;
-
     const fragment = document.createDocumentFragment();
+
     misconfigured.forEach(function(audit) {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${audit.agentEmail}</td>
         <td>${formatTaskType(audit.taskType)}</td>
         <td>${audit.referenceNumber || 'N/A'}</td>
-        <td>${audit.id || 'N/A'}</td>
+        <td><code>${audit.id || 'N/A'}</code></td>
         <td>${formatDate(audit.taskTimestamp)}</td>
         <td>
           <span class="badge badge-danger" title="No questions configured for this task type">Misconfigured</span>
@@ -681,10 +672,11 @@ function loadErrorTasks() {
       fragment.appendChild(row);
     });
 
+    // ✅ Clear loading row and insert fragment
+    tableBody.innerHTML = '';
     tableBody.appendChild(fragment);
-  }).getAllAudits(); // using all audits here
+  }).getAllAudits();
 }
-
 
   function updateAuditStatusAndLock(auditId, status) {
   return new Promise((resolve, reject) => {
