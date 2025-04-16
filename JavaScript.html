@@ -1314,10 +1314,14 @@ function editDisputeResolution(disputeId) {
 
     // ✅ Track ID + original status for intelligent reset logic
     activeDisputeResolutionId = dispute.id;
-    window.originalDisputeStatus = dispute.status;
 
     // ✅ Attach unload handler to reset only if needed
     attachUnloadHandlerForDisputeResolution(dispute.id);
+
+    if (['overturned', 'upheld', 'partial overturn'].includes(dispute.status)) {
+  window.originalDisputeStatus = dispute.status;
+}
+
 
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
@@ -1913,9 +1917,6 @@ console.log('After robust normalization - dispute.questionIds:', dispute.questio
     form.setAttribute('data-dispute-id', dispute.id);
     form.addEventListener('submit', handleResolveDisputeSubmit);
 
-    // 🧠 Capture original status
-const originalStatus = dispute.status;
-
 document.getElementById('cancelResolveDispute').addEventListener('click', function () {
   const modal = document.getElementById('evaluateModal');
   if (modal) {
@@ -1923,11 +1924,11 @@ document.getElementById('cancelResolveDispute').addEventListener('click', functi
     modal.classList.remove('hidden');
   }
 
-    google.script.run
+  google.script.run
     .withSuccessHandler(() => {
       modal?.classList.add('hidden');
-      showToast(`Dispute status restored to "${originalStatus}".`, 'info');
-      removeUnloadHandlerForDisputeResolution(); // 👈 Add this here
+      showToast('Dispute status restored.', 'info');
+      removeUnloadHandlerForDisputeResolution();
       showDisputes();
     })
     .withFailureHandler(error => {
@@ -1935,8 +1936,9 @@ document.getElementById('cancelResolveDispute').addEventListener('click', functi
       console.error('Error restoring dispute status:', error);
       showToast('Failed to restore dispute status: ' + error.message, 'error');
     })
-    .updateDisputeStatus(dispute.id, originalStatus);
+    .updateDisputeStatus(dispute.id, window.originalDisputeStatus || 'pending');
 });
+
 
     document.getElementById('resolveEvaluationDetails').innerHTML = `
       <div class="grid-2">
