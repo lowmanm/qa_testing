@@ -1455,7 +1455,7 @@ function handleEditDisputeResolutionSubmit(e) {
   const cards = document.querySelectorAll('#resolveDisputeQuestions .question-card');
   cards.forEach(card => {
     const qid = card.getAttribute('data-question-id');
-    const selected = card.querySelector(`input[name="edit_${qid}"]:checked`);
+    const selected = form.querySelector(`input[name="edit_${qid}"]:checked`);
     const note = document.getElementById(`editNote_${qid}`)?.value.trim() || '';
 
     if (!selected) {
