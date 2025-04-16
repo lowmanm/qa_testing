@@ -2512,23 +2512,6 @@ function escapeHTML(str) {
   });
 }
 
-  function resetEvaluationForm() {
-  const form = document.getElementById('evaluationForm');
-  form.reset();
-
-  const questionsContainer = document.getElementById('questions');
-  if (questionsContainer) questionsContainer.innerHTML = '';
-
-  const feedbackField = document.getElementById('feedback');
-  if (feedbackField) feedbackField.value = '';
-
-  form.removeAttribute('data-audit-id');
-  form.removeAttribute('data-reference-number');
-  form.removeAttribute('data-task-type');
-  form.removeAttribute('data-outcome');
-  form.removeAttribute('data-max-score');
-}
-
 function hideAllViews() {
   // ✅ Automatically reset dispute review status when navigating away
   removeUnloadHandlerForDispute();
