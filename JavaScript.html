@@ -1491,55 +1491,155 @@ function handleEditDisputeResolutionSubmit(e) {
   document.getElementById('evaluateModalMessage').textContent = 'Saving updated resolution...';
   document.getElementById('evaluateModal')?.classList.remove('hidden');
 
-  // ✅ Check live status
-  google.script.run
-    .withSuccessHandler(serverResult => {
-      const currentStatus = (serverResult?.status || '').toLowerCase();
+  // ✅ Show summary modal instead of saving immediately
+window.pendingEditResolution = {
+  form,
+  evalId,
+  disputeId,
+  resolutionNotes,
+  questions,
+  overturnCount
+};
 
-      if (['overturned', 'upheld', 'partial overturn'].includes(currentStatus) && currentStatus !== status) {
-        document.getElementById('evaluateModal')?.classList.add('hidden');
-        showToast("This dispute was recently updated. Reloading view...", "warning");
-        showDisputes();
-        return;
+buildEditResolutionSummaryPreview(questions, overturnCount, form);
+
+function buildEditResolutionSummaryPreview(questions, overturnCount, form) {
+  const summaryModal = document.getElementById('resolutionSummaryModal');
+  const summaryContent = document.getElementById('summaryContent');
+  const scorePreview = document.getElementById('summaryScorePreview');
+  const confirmBtn = document.getElementById('confirmResolutionSubmit');
+  const cancelBtn = document.getElementById('cancelResolutionSubmit');
+  const evalModal = document.getElementById('evaluateModal');
+  const evalModalMessage = document.getElementById('evaluateModalMessage');
+
+  if (!summaryModal || !summaryContent || !scorePreview) {
+    console.error('Missing summary modal elements');
+    return;
+  }
+
+  // Build summary
+  let summaryHtml = '';
+  let totalEarned = 0;
+  let totalPossible = 0;
+
+  questions.forEach(q => {
+    const earned = q.pointsEarned || 0;
+    const possible = q.pointsPossible || 0;
+    totalEarned += earned;
+    totalPossible += possible;
+
+    const icon = q.response === 'yes' ? '✔️' : '✖️';
+    const colorStyle = q.response === 'yes' ? 'color: #15803d;' : 'color: #b91c1c;';
+
+    summaryHtml += `
+      <div style="margin-bottom: 0.75rem;">
+        <div style="${colorStyle}">
+          ${icon} <strong>${q.questionText}</strong>
+        </div>
+        <div style="margin-left: 1.25rem; font-size: 0.85rem; color: #6b7280;">
+          Answer: ${q.response.toUpperCase()}<br>
+          Points: ${earned}/${possible}
+        </div>
+      </div>
+    `;
+  });
+
+  // Set % preview
+  const percent = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+  scorePreview.textContent = `${percent}%`;
+  summaryContent.innerHTML = summaryHtml;
+  summaryModal.classList.remove('hidden');
+
+  // Attach handlers once
+  if (!confirmBtn.dataset.bound) {
+    confirmBtn.addEventListener('click', function () {
+      summaryModal.classList.add('hidden');
+
+      const data = window.pendingEditResolution;
+      if (!data) return;
+
+      const { form, evalId, disputeId, resolutionNotes, questions, overturnCount } = data;
+
+      const total = questions.length;
+      let status = 'upheld';
+      if (overturnCount === total && total > 0) status = 'overturned';
+      else if (overturnCount > 0) status = 'partial overturn';
+
+      const resolutionData = { disputeId, evalId, resolutionNotes, decisions: questions, status };
+
+      // Show spinner modal
+      if (evalModal && evalModalMessage) {
+        evalModalMessage.textContent = 'Saving updated resolution...';
+        evalModal.classList.remove('hidden');
       }
 
-      // ✅ Proceed to update
       google.script.run
         .withSuccessHandler(() => {
-          document.getElementById('evaluateModal')?.classList.add('hidden');
+          evalModal?.classList.add('hidden');
           showToast("Dispute resolution updated.", 'success');
-
-          removeUnloadHandlerForDisputeResolution(); // ✅ clear before nulling
+          removeUnloadHandlerForDisputeResolution();
           delete window.originalDisputeStatus;
+          window.pendingEditResolution = null;
           activeDisputeResolutionId = null;
-
           showDisputes();
         })
         .withFailureHandler(err => {
           console.error('Failed to update resolution:', err);
           showToast('Failed to update resolution: ' + err.message, 'error');
-          document.getElementById('evaluateModal')?.classList.add('hidden');
+          evalModal?.classList.add('hidden');
           form.classList.remove('disabled');
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit Resolution';
+          const btn = form.querySelector('button[type="submit"]');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Submit Resolution';
           }
         })
         .resolveDispute(resolutionData);
-    })
-    .withFailureHandler(err => {
-      console.error("Live status check failed:", err);
-      showToast("Could not verify dispute status. Please try again.", "error");
-      document.getElementById('evaluateModal')?.classList.add('hidden');
-      form.classList.remove('disabled');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Resolution';
-      }
-    })
-    .checkDisputeReviewStatus(disputeId);
+    });
+    confirmBtn.dataset.bound = 'true';
+  }
+
+  if (!cancelBtn.dataset.bound) {
+  cancelBtn.addEventListener('click', closeSummaryModal);
+  cancelBtn.dataset.bound = 'true';
 }
-  
+
+// Click outside modal content
+if (!summaryModal.dataset.outsideListenerAttached) {
+  summaryModal.addEventListener('click', function (e) {
+    if (e.target === summaryModal) {
+      closeSummaryModal();
+    }
+  });
+  summaryModal.dataset.outsideListenerAttached = 'true';
+}
+
+// Escape key
+if (!window.summaryEscListenerAttached) {
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !summaryModal.classList.contains('hidden')) {
+      closeSummaryModal();
+    }
+  });
+  window.summaryEscListenerAttached = true;
+}
+
+// Helper to fully close the summary modal
+function closeSummaryModal() {
+  summaryModal.classList.add('hidden');
+
+  const data = window.pendingEditResolution;
+  if (data?.form) {
+    data.form.classList.remove('disabled');
+    const btn = data.form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Submit Resolution';
+    }
+  }
+}
+}
+
 function submitEditedResolution(form, resolutionData) {
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) {
