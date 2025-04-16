@@ -1312,19 +1312,16 @@ function editDisputeResolution(disputeId) {
       dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
     }
 
-    // ✅ Track ID + original status for intelligent reset logic
+    // ✅ Track for unload/cancel restore
     activeDisputeResolutionId = dispute.id;
+    window.originalDisputeStatus = dispute.status;
 
-    // ✅ Attach unload handler to reset only if needed
     attachUnloadHandlerForDisputeResolution(dispute.id);
 
-    if (['overturned', 'upheld', 'partial overturn'].includes(dispute.status)) {
-  window.originalDisputeStatus = dispute.status;
-}
-
-
+    // Set status to reviewing
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
+    // Render view
     resolveDisputeView.innerHTML = `
       <div class="card">
         <h2>Edit Dispute Resolution</h2>
@@ -1346,24 +1343,38 @@ function editDisputeResolution(disputeId) {
       </div>
     `;
 
+    // Set form attributes + listener
     const form = document.getElementById('resolveDisputeForm');
     form.setAttribute('data-eval-id', evaluation.id);
     form.setAttribute('data-dispute-id', dispute.id);
     form.addEventListener('submit', handleEditDisputeResolutionSubmit);
 
+    // Cancel button with restore
     document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+      const modal = document.getElementById('evaluateModal');
+      if (modal) {
+        document.getElementById('evaluateModalMessage').textContent = 'Restoring dispute status...';
+        modal.classList.remove('hidden');
+      }
+
       google.script.run
         .withSuccessHandler(() => {
-          showToast('Dispute status updated to pending.', 'success');
+          modal?.classList.add('hidden');
+          showToast(`Dispute status restored to "${window.originalDisputeStatus}"`, 'info');
+          removeUnloadHandlerForDisputeResolution();
+          delete window.originalDisputeStatus;
+          activeDisputeResolutionId = null;
           showDisputes();
         })
         .withFailureHandler(error => {
-          console.error('Error updating dispute status:', error);
-          showToast('Failed to update dispute status: ' + error.message, 'error');
+          modal?.classList.add('hidden');
+          console.error('Error restoring dispute status:', error);
+          showToast('Failed to restore dispute status: ' + error.message, 'error');
         })
-        .updateDisputeStatus(dispute.id, 'pending');
+        .updateDisputeStatus(dispute.id, window.originalDisputeStatus || 'pending');
     });
 
+    // Display evaluation context
     document.getElementById('resolveEvaluationDetails').innerHTML = `
       <div class="grid-2">
         <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
@@ -1373,55 +1384,53 @@ function editDisputeResolution(disputeId) {
       </div>
     `;
 
+    // Render questions
     const container = document.getElementById('resolveDisputeQuestions');
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
-  const qid = String(q.questionId).trim();
-  const isDisputed = dispute.questionIds.includes(qid);
-  let highlightClass = '';
-  if (isDisputed && q.response === 'yes') {
-    highlightClass = 'overturned-highlight';
-  } else if (isDisputed && q.response === 'no') {
-    highlightClass = 'highlight-no';
-  }
+      const qid = String(q.questionId).trim();
+      const isDisputed = dispute.questionIds.includes(qid);
+      let highlightClass = '';
+      if (isDisputed && q.response === 'yes') highlightClass = 'overturned-highlight';
+      else if (isDisputed && q.response === 'no') highlightClass = 'highlight-no';
 
-  const currentResponse = String(q.response || '').toLowerCase();
-  const yesChecked = currentResponse === 'yes' ? 'checked' : '';
-  const noChecked = currentResponse === 'no' ? 'checked' : '';
+      const currentResponse = String(q.response || '').toLowerCase();
+      const yesChecked = currentResponse === 'yes' ? 'checked' : '';
+      const noChecked = currentResponse === 'no' ? 'checked' : '';
 
-  const card = document.createElement('div');
-  card.className = `question-card ${highlightClass}`;
-  card.innerHTML = `
-    <div class="question-header">
-      <h3 class="question-text">${q.questionText}</h3>
-      <span class="question-points">Current: ${q.pointsEarned}/${q.pointsPossible}</span>
-    </div>
-    <div class="question-body">
-      <div class="radio-group">
-        <label>
-          <input type="radio" name="edit_${qid}" value="yes" ${yesChecked}>
-          <span>Yes</span>
-        </label>
-        <label>
-          <input type="radio" name="edit_${qid}" value="no" ${noChecked}>
-          <span>No</span>
-        </label>
-      </div>
+      const card = document.createElement('div');
+      card.className = `question-card ${highlightClass}`;
+      card.innerHTML = `
+        <div class="question-header">
+          <h3 class="question-text">${q.questionText}</h3>
+          <span class="question-points">Current: ${q.pointsEarned}/${q.pointsPossible}</span>
+        </div>
+        <div class="question-body">
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="edit_${qid}" value="yes" ${yesChecked}>
+              <span>Yes</span>
+            </label>
+            <label>
+              <input type="radio" name="edit_${qid}" value="no" ${noChecked}>
+              <span>No</span>
+            </label>
+          </div>
 
-      ${isDisputed ? `
-        <div class="alert alert-info mt-2">
-          This question was previously part of a dispute resolution.
-        </div>` : ''}
+          ${isDisputed ? `
+            <div class="alert alert-info mt-2">
+              This question was previously part of a dispute resolution.
+            </div>` : ''}
 
-      <div class="form-group mt-2">
-        <label for="editNote_${qid}">Optional Notes</label>
-        <textarea class="form-control" id="editNote_${qid}" name="editNote_${qid}" rows="2">${q.feedback || ''}</textarea>
-      </div>
-    </div>
-  `;
-  container.appendChild(card);
-});
+          <div class="form-group mt-2">
+            <label for="editNote_${qid}">Optional Notes</label>
+            <textarea class="form-control" id="editNote_${qid}" name="editNote_${qid}" rows="2">${q.feedback || ''}</textarea>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
   }).getAllEvaluationsAndDisputes();
 }
 
@@ -1856,41 +1865,32 @@ function resolveDispute(disputeId) {
   google.script.run.withSuccessHandler(function(data) {
     const dispute = data.disputes.find(d => d.id === disputeId);
     const evaluation = data.evaluations.find(e => e.id === dispute.evalId || e.evalId === dispute.evalId);
-  /*LOGGING*/
-  // console.log('Dispute record from backend:', dispute);
-  // console.log('Evaluation record from backend:', evaluation);
-  console.log('📌 Dispute ID:', dispute.id);
-  console.log('✅ Dispute.questionIds:', dispute.questionIds);
-  console.log('✅ Evaluation.questions:', evaluation.questions.map(q => q.questionId));
-
 
     if (!dispute || !evaluation) {
-  showToast("Dispute or evaluation not found.", 'error');
-  return;
-}
+      showToast("Dispute or evaluation not found.", 'error');
+      return;
+    }
 
-// ✅ Track ID + original status for intelligent reset logic
-activeDisputeResolutionId = dispute.id;
-window.originalDisputeStatus = dispute.status;
+    // ✅ Track original status for cancel/refresh recovery
+    activeDisputeResolutionId = dispute.id;
+    window.originalDisputeStatus = dispute.status;
 
-// ✅ Attach unload handler to reset only if needed
-attachUnloadHandlerForDisputeResolution(dispute.id);
+    // ✅ Normalize questionIds
+    if (Array.isArray(dispute.questionIds)) {
+      // Already valid
+    } else if (typeof dispute.questionIds === 'string') {
+      dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
+    } else {
+      dispute.questionIds = [];
+    }
 
+    // ✅ Setup unload handler for protection
+    attachUnloadHandlerForDisputeResolution(dispute.id);
 
-// ✅ Robust normalization that handles both string and array inputs
-if (Array.isArray(dispute.questionIds)) {
-  // Already valid, do nothing
-} else if (typeof dispute.questionIds === 'string') {
-  dispute.questionIds = dispute.questionIds.split(',').map(id => id.trim()).filter(Boolean);
-} else {
-  dispute.questionIds = [];
-}
-
-/*LOGGING*/
-console.log('After robust normalization - dispute.questionIds:', dispute.questionIds);
-
+    // ✅ Set to reviewing
     google.script.run.updateDisputeStatus(dispute.id, 'reviewing');
 
+    // ✅ Render form
     resolveDisputeView.innerHTML = `
       <div class="card">
         <h2>Resolve Dispute</h2>
@@ -1912,34 +1912,38 @@ console.log('After robust normalization - dispute.questionIds:', dispute.questio
       </div>
     `;
 
+    // ✅ Populate metadata
     const form = document.getElementById('resolveDisputeForm');
     form.setAttribute('data-eval-id', evaluation.id);
     form.setAttribute('data-dispute-id', dispute.id);
     form.addEventListener('submit', handleResolveDisputeSubmit);
 
-document.getElementById('cancelResolveDispute').addEventListener('click', function () {
-  const modal = document.getElementById('evaluateModal');
-  if (modal) {
-    document.getElementById('evaluateModalMessage').textContent = 'Restoring dispute status...';
-    modal.classList.remove('hidden');
-  }
+    // ✅ Cancel button: restore prior status
+    document.getElementById('cancelResolveDispute').addEventListener('click', function () {
+      const modal = document.getElementById('evaluateModal');
+      if (modal) {
+        document.getElementById('evaluateModalMessage').textContent = 'Restoring dispute status...';
+        modal.classList.remove('hidden');
+      }
 
-  google.script.run
-    .withSuccessHandler(() => {
-      modal?.classList.add('hidden');
-      showToast('Dispute status restored.', 'info');
-      removeUnloadHandlerForDisputeResolution();
-      showDisputes();
-    })
-    .withFailureHandler(error => {
-      modal?.classList.add('hidden');
-      console.error('Error restoring dispute status:', error);
-      showToast('Failed to restore dispute status: ' + error.message, 'error');
-    })
-    .updateDisputeStatus(dispute.id, window.originalDisputeStatus || 'pending');
-});
+      google.script.run
+        .withSuccessHandler(() => {
+          modal?.classList.add('hidden');
+          showToast(`Dispute status restored to "${window.originalDisputeStatus}"`, 'info');
+          removeUnloadHandlerForDisputeResolution();
+          delete window.originalDisputeStatus;
+          activeDisputeResolutionId = null;
+          showDisputes();
+        })
+        .withFailureHandler(error => {
+          modal?.classList.add('hidden');
+          console.error('Error restoring dispute status:', error);
+          showToast('Failed to restore dispute status: ' + error.message, 'error');
+        })
+        .updateDisputeStatus(dispute.id, window.originalDisputeStatus || 'pending');
+    });
 
-
+    // ✅ Metadata fields
     document.getElementById('resolveEvaluationDetails').innerHTML = `
       <div class="grid-2">
         <div><p class="field-label">Reference</p><p class="field-value">${evaluation.referenceNumber}</p></div>
@@ -1949,15 +1953,16 @@ document.getElementById('cancelResolveDispute').addEventListener('click', functi
       </div>
     `;
 
+    // ✅ Render disputed questions only
     const container = document.getElementById('resolveDisputeQuestions');
     container.innerHTML = '';
 
     evaluation.questions.forEach(q => {
-      const qid = String(q.questionId).trim(); // ✅ ensure ID is trimmed string
-      if (!qid || !q.questionText) return;
-      if (!dispute.questionIds.includes(qid)) return;
+      const qid = String(q.questionId).trim();
+      if (!qid || !q.questionText || !dispute.questionIds.includes(qid)) return;
 
       const highlightClass = q.response === 'no' ? 'highlight-no' : '';
+
       const card = document.createElement('div');
       card.className = `question-card ${highlightClass}`;
       card.innerHTML = `
@@ -2005,8 +2010,8 @@ function handleResolveDisputeSubmit(e) {
     if (!radioInputs.length) continue;
 
     const questionId = radioInputs[0].name.replace('resolution_', '');
-    const selected = card.querySelector(`input[name="resolution_${questionId}"]:checked`);
-    const note = card.querySelector(`#note_${questionId}`)?.value.trim() || '';
+    const selected = form.querySelector(`input[name="resolution_${questionId}"]:checked`);
+    const note = form.querySelector(`#note_${questionId}`)?.value.trim() || '';
 
     if (!selected) {
       showToast("Please select a resolution for all disputed questions.", 'warning');
@@ -2028,43 +2033,55 @@ function handleResolveDisputeSubmit(e) {
   if (overturnCount === total && total > 0) status = 'overturned';
   else if (overturnCount > 0) status = 'partial overturn';
 
-  const resolutionData = { disputeId, evalId, resolutionNotes, decisions, status };
+  const resolutionData = {
+    disputeId,
+    evalId,
+    resolutionNotes,
+    decisions,
+    status
+  };
 
-  // Disable form and show spinner
+  // UI: disable form, show loading spinner
   form.classList.add('disabled');
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<span class="spinner"></span>Submitting...`;
   }
-  document.getElementById('evaluateModal')?.classList.remove('hidden');
 
-  // Live check before sending resolution
+  const modal = document.getElementById('evaluateModal');
+  if (modal) {
+    document.getElementById('evaluateModalMessage').textContent = 'Checking dispute status...';
+    modal.classList.remove('hidden');
+  }
+
+  // ✅ Live check before resolving
   google.script.run
     .withSuccessHandler(serverResult => {
-      const normalized = (serverResult?.status || '').toLowerCase();
+      const normalized = String(serverResult?.status || '').toLowerCase();
 
       if (['upheld', 'overturned', 'partial overturn'].includes(normalized)) {
-        document.getElementById('evaluateModal')?.classList.add('hidden');
+        modal?.classList.add('hidden');
         showToast("This dispute has already been resolved.", "warning");
         showDisputes();
         return;
       }
 
-      // ✅ Safe to resolve now
+      // ✅ Safe to proceed with resolution
       google.script.run
         .withSuccessHandler(() => {
-  document.getElementById('evaluateModal')?.classList.add('hidden');
-  showToast('Dispute resolved successfully.', 'success');
+          modal?.classList.add('hidden');
+          showToast('Dispute resolved successfully.', 'success');
 
-  removeUnloadHandlerForDisputeResolution(); // ✅ first
-  delete window.originalDisputeStatus;
-  activeDisputeResolutionId = null;
+          // Clear resolution state trackers
+          removeUnloadHandlerForDisputeResolution();
+          delete window.originalDisputeStatus;
+          activeDisputeResolutionId = null;
 
-  showDisputes();
-})
+          showDisputes();
+        })
         .withFailureHandler(error => {
-          document.getElementById('evaluateModal')?.classList.add('hidden');
+          modal?.classList.add('hidden');
           console.error('Error resolving dispute:', error);
           showToast('Failed to resolve dispute: ' + error.message, 'error');
           form.classList.remove('disabled');
@@ -2076,7 +2093,7 @@ function handleResolveDisputeSubmit(e) {
         .resolveDispute(resolutionData);
     })
     .withFailureHandler(err => {
-      document.getElementById('evaluateModal')?.classList.add('hidden');
+      modal?.classList.add('hidden');
       console.error("Live status check failed:", err);
       showToast("Unable to verify dispute status. Please try again.", "error");
       form.classList.remove('disabled');
