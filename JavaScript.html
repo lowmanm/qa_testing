@@ -1340,7 +1340,7 @@ function editDisputeResolution(disputeId) {
 
           <div class="button-group">
             <button type="button" id="cancelResolveDispute" class="btn btn-secondary">Cancel</button>
-            <button type="submit" class="btn btn-primary">Submit Resolution</button>
+            <button type="submit" class="btn btn-primary">Update Resolution</button>
           </div>
         </form>
       </div>
@@ -1357,7 +1357,7 @@ function editDisputeResolution(disputeId) {
       const modal = document.getElementById('evaluateModal');
       if (modal) {
         const modalMessage = document.getElementById('evaluateModalMessage');
-      if (modalMessage) modalMessage.textContent = 'Restoring dispute status...';
+        if (modalMessage) modalMessage.textContent = 'Restoring dispute status...';
         modal.classList.remove('hidden');
       }
 
@@ -1405,6 +1405,9 @@ function editDisputeResolution(disputeId) {
 
       const card = document.createElement('div');
       card.className = `question-card ${highlightClass}`;
+      card.setAttribute('data-question-id', qid); // ✅ Needed for form validation
+      card.setAttribute('data-question-text', q.questionText);
+      card.setAttribute('data-points-possible', q.pointsPossible);
       card.innerHTML = `
         <div class="question-header">
           <h3 class="question-text">${q.questionText}</h3>
